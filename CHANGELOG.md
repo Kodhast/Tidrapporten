@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.3.2
+
+- Startsidan har en knapp från det nya komponentbiblioteket web-ui-react, ännu utan funktion
+  (#13).
+
 ## 0.3.1
 
 - Reglerna är strängare: bara inloggningen via kodhast.com släpps in, en ändring av saldo,
