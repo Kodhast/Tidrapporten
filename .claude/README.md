@@ -30,10 +30,10 @@ Firestore-reglerna skrivs och granskas med pluginens `android:firestore-rules-cr
 
 ## Agenter
 
-| Agent       | När                                              | Modell | Källa                  |
-| ----------- | ------------------------------------------------ | ------ | ---------------------- |
-| `granskare` | Före varje PR: diffen mot reglerna, ändrar inget | Opus   | Egen, efter VeckansMat |
-| `ci-doktor` | Rött CI: läser loggarna, föreslår en fix         | Sonnet | Egen, efter VeckansMat |
+| Agent                    | När                                              | Modell | Källa                  |
+| ------------------------ | ------------------------------------------------ | ------ | ---------------------- |
+| `tidrapporten-granskare` | Före varje PR: diffen mot reglerna, ändrar inget | Opus   | Egen, efter VeckansMat |
+| `tidrapporten-ci-doktor` | Rött CI: läser loggarna, föreslår en fix         | Sonnet | Egen, efter VeckansMat |
 
 ## Hooks
 
@@ -64,9 +64,10 @@ Projekttrådar startar ovanför repot och läser då inte `.claude/settings.json
 
 - **Skills och agenter** hittar Claude Code själv i `.claude/`. Skillsen heter `<namn>`, eller
   `Tidrapporten:<namn>` när ett annat repo i tråden har en skill med samma namn (VeckansMat har
-  `refine-issue`, `implement-issue`, `mockup`, `release` och `adr`). Agenter får aldrig prefix;
-  `granskare` och `ci-doktor` finns också i VeckansMat, så i en tråd med båda repona är det
-  osäkert vilken som laddas – ge agenten repots sökväg i uppdraget.
+  `refine-issue`, `implement-issue`, `mockup`, `release` och `adr`). Agenter får aldrig prefix,
+  så en agent som finns i flera repon heter `<repo>-<namn>` (regeln i claude-android, #37):
+  `tidrapporten-granskare` och `tidrapporten-ci-doktor`. Med bara `granskare` laddades
+  VeckansMats agent i en tråd med båda repona.
 - **Hookarna** bärs av miljöns setup-skript (`scripts/repo-plugins.mjs` i `Kodhast/claude-android`),
   som gör varje repos hookar till en lokal plugin. Det gäller Tidrapporten utan ändring där.
 - **Spärrarna är stängda:** `verify-before-push` och `plan-approved` har `onFailure: "block"`.

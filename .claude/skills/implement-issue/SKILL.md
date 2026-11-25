@@ -55,13 +55,13 @@ React Aria i aktuell dokumentation (kopplingen Context7) i stället för att gis
 ## Granska – Tidrapporten
 
 Före granskarens runda: `/simplify` – mindre kod som gör samma jobb. Granskaren är agenten
-**`granskare`**. `/code-review` körs också när diffen rör data, regler, inloggning eller
+**`tidrapporten-granskare`**. `/code-review` körs också när diffen rör data, regler, inloggning eller
 beräkningar. Kör kontrollerna en sista gång efter sista rundan.
 
 ## PR och bevakning – Tidrapporten
 
 - PR-texten följer `.github/pull_request_template.md` och säger också avvikelser från issuet.
-- Rött CI → agenten **`ci-doktor`**.
+- Rött CI → agenten **`tidrapporten-ci-doktor`**.
 - Merga bara när **Plan godkänd** också är grön. Sattes etiketten efter att PR:en öppnades: kör om
   kontrollen (den startar inte av sig själv när issuet får etiketten).
 

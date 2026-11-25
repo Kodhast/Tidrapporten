@@ -65,4 +65,4 @@ high effort. Säg varför innan du byter till Fable 5.2.
 - Utseendet från `@kodhast/web-ui` och temat i `src/tema.css`; komponenter från web-ui-react
   (issue 13).
 - `/refine-issue` planerar, `/implement-issue` genomför, `/mockup` före ny GUI. Före push:
-  `/simplify`, agenten `granskare`, `/code-review`. Allt: `.claude/README.md`.
+  `/simplify`, agenten `tidrapporten-granskare`, `/code-review`. Allt: `.claude/README.md`.
