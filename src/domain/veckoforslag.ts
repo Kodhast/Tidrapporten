@@ -1,7 +1,7 @@
 // The suggested week report to a receiver (ADR 0012, skill tidsregler).
 import type { DayTime, SubjectTime } from './flex';
 import type { FreeDays } from './helgdagar';
-import { normMinutes } from './norm';
+import { normMinutes, roundToQuarter } from './norm';
 import { daysOfWeek } from './tid';
 import type {
 	Assignment,
@@ -14,16 +14,10 @@ import type {
 	SuggestionMode
 } from './types';
 
-const QUARTER: Minutes = 15;
-
-/** To the nearest quarter of an hour. Minutes are whole, so 7 rounds down and 8 up. */
-export const roundToQuarter = (minutes: Minutes): Minutes =>
-	Math.round(minutes / QUARTER) * QUARTER;
-
 /**
  * One day's time per internal subject (code or absence type) as the suggestion reports it.
  * `actualQuarter`: each subject's interval time rounded to the nearest quarter; whole-day absence
- * stays at the norm. `fillNorm`: the same, then the day is made to equal its norm by changing the
+ * stays at the norm, which is whole quarters too. `fillNorm`: the same, then the day is made to equal its norm by changing the
  * internal codes with the most time; absence is left as it is, and a day with norm 0 reports
  * nothing.
  */

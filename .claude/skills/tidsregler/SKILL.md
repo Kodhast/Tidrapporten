@@ -33,7 +33,8 @@ proven och vid behov ADR:en i samma PR – och ett nytt räknat exempel skrivs s
 
 ## Norm (`norm.ts`)
 
-- Normen för en dag = `workdayMinutes × scopePercent / 100`, avrundad till hel minut.
+- Normen för en dag = `workdayMinutes × scopePercent / 100`, avrundad till närmaste kvart
+  (ADR 0013): 80 % av 8 h ger 6:30, inte 6:24. En halv kvart avrundas uppåt.
 - 0 på lediga dagar och utanför uppdragets start- och slutdatum (båda inräknade).
 - Villkoren (`terms`) gäller från sitt datum; dagen räknas med de villkor som gällde då, så en
   ändrad omfattning skriver inte om flexen bakåt. Inga villkor än → 0.
@@ -76,7 +77,7 @@ så att alla mottagare med samma läge får samma summa.
 
 - **`actualQuarter`:** varje kods och frånvarotyps tid från intervall avrundad till närmaste
   kvart per dag. Minuterna är hela, så 7 min blir 0 och 8 min blir 15. Hel dags frånvaro
-  avrundas aldrig – den är exakt dagens norm, också när normen inte är hela kvartar (80 % = 6:24).
+  är exakt dagens norm, som redan är hela kvartar.
 - **`fillNorm`:** samma avrundning, sedan görs dagen lika med normen genom att den interna kod
   som har mest tid ändras (lika mycket → lägst id); blir den 0 tas resten från nästa.
   Frånvaro ändras inte. En dag med norm 0 (helg, helgdag) rapporterar inget, så arbete då hamnar

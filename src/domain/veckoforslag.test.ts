@@ -4,7 +4,8 @@ import { freeDaysByDate } from './helgdagar';
 import { absenceTypes, absentAllDay, assignment, receiver, workFor } from './testdata';
 import type { SubjectTime } from './flex';
 import type { Entry, Id, SuggestionMode } from './types';
-import { roundToQuarter, suggestDay, suggestWeek } from './veckoforslag';
+import { roundToQuarter } from './norm';
+import { suggestDay, suggestWeek } from './veckoforslag';
 
 const none = freeDaysByDate([]);
 const countings = absenceCountings(absenceTypes);
@@ -114,7 +115,7 @@ describe('suggestDay', () => {
 		expect(suggestDay(subjects([['c1', 300]]), 'fillNorm', 0).size).toBe(0);
 	});
 
-	it('keeps whole-day absence at a norm that is not whole quarters', () => {
+	it('never rounds whole-day absence, which is already the norm', () => {
 		const day = suggestDay(subjects([['semester', 384]], ['semester']), 'fillNorm', 384);
 		expect([...day]).toEqual([['semester', 384]]);
 		const actual = suggestDay(subjects([['semester', 384]], ['semester']), 'actualQuarter', 384);

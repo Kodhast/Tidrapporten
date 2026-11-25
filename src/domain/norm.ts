@@ -12,12 +12,21 @@ export const isWithinAssignment = (assignment: Assignment, date: IsoDate): boole
 export const termsOn = (assignment: Assignment, date: IsoDate): AssignmentTerms | undefined =>
 	assignment.terms.findLast((terms) => terms.from <= date);
 
-/** A workday's norm under the terms, ignoring whether the day is free. */
-export const fullDayNorm = (terms: AssignmentTerms): Minutes =>
-	Math.round((terms.workdayMinutes * terms.scopePercent) / 100);
+const QUARTER: Minutes = 15;
+
+/** To the nearest quarter of an hour, the smallest step the owner reports in; half rounds up. */
+export const roundToQuarter = (minutes: Minutes): Minutes =>
+	Math.round(minutes / QUARTER) * QUARTER;
 
 /**
- * The norm for the day: workday × scope / 100, rounded to a whole minute. Zero on weekends,
+ * A workday's norm under the terms, ignoring whether the day is free: workday × scope / 100,
+ * rounded to the nearest quarter so that a filled report is whole quarters (ADR 0013).
+ */
+export const fullDayNorm = (terms: AssignmentTerms): Minutes =>
+	roundToQuarter((terms.workdayMinutes * terms.scopePercent) / 100);
+
+/**
+ * The norm for the day: workday × scope / 100, rounded to the nearest quarter. Zero on weekends,
  * holidays, free eves, extra days off and outside the assignment.
  */
 export const normMinutes = (assignment: Assignment, date: IsoDate, freeDays: FreeDays): Minutes => {
