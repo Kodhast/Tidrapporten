@@ -27,7 +27,7 @@ Varje PR som ändrar appen höjer versionen i samma ändring, så att ingen rele
   då om den befintliga rubriken i `CHANGELOG.md`.
 - Räkna alltid mot aktuell `origin/main`, inte mot `main` som den var när grenen skapades.
 
-Agenten `granskare` kontrollerar höjningen.
+Agenten `tidrapporten-granskare` kontrollerar höjningen.
 
 ## Hur en release går till
 
