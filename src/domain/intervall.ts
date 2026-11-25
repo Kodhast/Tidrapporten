@@ -1,7 +1,7 @@
 // Intervals within local days: splitting at midnight, gaps, overlaps and the forgotten timer.
-import { fullDayNorm, termsOn } from './norm';
-import { addDays, dateOf, startOfDay } from './tid';
-import type { Assignment, Entry, Id, IsoDate, Minutes, Timer, UtcMillis } from './types';
+import { fullDayNorm, termsOn } from './norm.ts';
+import { addDays, dateOf, startOfDay } from './tid.ts';
+import type { Assignment, Entry, Id, IsoDate, Minutes, Timer, UtcMillis } from './types.ts';
 
 const MINUTE = 60_000;
 

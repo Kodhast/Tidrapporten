@@ -1,7 +1,7 @@
 // Swedish public holidays and the eves that are days off by default, computed from rules so that
 // no table needs updating (ADR 0012). FreeDay documents only hold the owner's exceptions.
-import { addDays, isWeekend, weekday } from './tid';
-import type { FreeDay, IsoDate } from './types';
+import { addDays, isWeekend, weekday } from './tid.ts';
+import type { FreeDay, IsoDate } from './types.ts';
 
 export interface DayOff {
 	date: IsoDate;

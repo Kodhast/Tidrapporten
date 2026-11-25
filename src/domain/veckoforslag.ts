@@ -1,8 +1,8 @@
 // The suggested week report to a receiver (ADR 0012, skill tidsregler).
-import type { DayTime, SubjectTime } from './flex';
-import type { FreeDays } from './helgdagar';
-import { normMinutes, roundToQuarter } from './norm';
-import { daysOfWeek } from './tid';
+import type { DayTime, SubjectTime } from './flex.ts';
+import type { FreeDays } from './helgdagar.ts';
+import { normMinutes, roundToQuarter } from './norm.ts';
+import { daysOfWeek } from './tid.ts';
 import type {
 	Assignment,
 	Id,
@@ -12,7 +12,7 @@ import type {
 	Receiver,
 	ReportLine,
 	SuggestionMode
-} from './types';
+} from './types.ts';
 
 /**
  * One day's time per internal subject (code or absence type) as the suggestion reports it.

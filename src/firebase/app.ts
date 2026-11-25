@@ -1,6 +1,12 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+import {
+	connectFirestoreEmulator,
+	initializeFirestore,
+	persistentLocalCache,
+	persistentMultipleTabManager,
+	type Firestore
+} from 'firebase/firestore';
 import { EMULATOR_HOST, EMULATOR_PORTS, environmentFor, firebaseOptions } from './config';
 
 export interface Firebase {
@@ -22,7 +28,11 @@ export function startFirebase(): Firebase {
 	const useEmulator = import.meta.env.VITE_FIREBASE_EMULATOR === 'true';
 	const app = initializeApp(firebaseOptions(environmentFor(import.meta.env.MODE, useEmulator)));
 	const auth = getAuth(app);
-	const db = getFirestore(app);
+	// The offline cache serves reads offline; which writes are allowed offline is the data
+	// layer's choice (ADR 0012): reports go through transactions, which need the server.
+	const db = initializeFirestore(app, {
+		localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+	});
 	if (import.meta.env.VITE_FIREBASE_EMULATOR === 'true') {
 		connectAuthEmulator(auth, `http://${EMULATOR_HOST}:${EMULATOR_PORTS.auth}`, {
 			disableWarnings: true

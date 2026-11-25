@@ -1,6 +1,6 @@
 // Calendar days, ISO weeks and clock times in Europe/Stockholm. Instants are stored in UTC
 // (ADR 0005, 0012); every conversion to a local day goes through this file.
-import type { ClockTime, IsoDate, IsoWeek, Minutes, UtcMillis } from './types';
+import type { ClockTime, IsoDate, IsoWeek, Minutes, UtcMillis } from './types.ts';
 
 export const TIME_ZONE = 'Europe/Stockholm';
 

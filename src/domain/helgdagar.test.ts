@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayOffOn, daysOffOf, easterSunday, freeDaysByDate, isDayOff } from './helgdagar';
+import { dayOffOn, daysOffOf, easterSunday, freeDaysByDate, isDayOff } from './helgdagar.ts';
 
 // Facit: the published dates of Easter Sunday, Midsummer Eve and All Saints' Day.
 const facit: [year: number, easter: string, midsummerEve: string, allSaints: string][] = [

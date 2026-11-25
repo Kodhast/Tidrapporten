@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.3.0
+
+- Datan ligger säkert i Firestore: bara du kommer åt den, en skickad veckorapport går bara att
+  låsa upp med ett skäl, och varje ändring av en låst vecka hamnar i en ändringslogg som inte
+  går att ändra (#15).
+
 ## 0.2.0
 
 - Räknereglerna bakom appen: svensk tid och sommartid, helgdagar, norm, flex och förslag till
