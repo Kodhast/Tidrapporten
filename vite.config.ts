@@ -13,6 +13,9 @@ export default defineConfig({
 			registerType: 'autoUpdate',
 			injectRegister: 'script-defer',
 			includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+			// The sign-in must reach Cloudflare Access and the Pages Function, never the cached app
+			// (decision 0017).
+			workbox: { navigateFallbackDenylist: [/^\/inloggning/, /^\/cdn-cgi\//] },
 			manifest: {
 				name: 'Tidrapporten',
 				short_name: 'Tid',
@@ -43,7 +46,7 @@ export default defineConfig({
 		expect: { requireAssertions: true },
 		coverage: {
 			provider: 'v8',
-			include: ['src/**/*.{ts,tsx}'],
+			include: ['src/**/*.{ts,tsx}', 'functions/**/*.ts'],
 			// The entry point only mounts the app in a browser; Playwright covers it. testdata.ts is
 			// made-up data for the tests and would only inflate the figure.
 			exclude: ['src/main.tsx', 'src/**/*.test.{ts,tsx}', 'src/domain/testdata.ts'],

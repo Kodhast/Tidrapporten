@@ -3,7 +3,7 @@ node_modules
 # Output
 dist
 dev-dist
-functions/lib
+firebase-functions/lib
 coverage
 *.local
 
@@ -27,3 +27,6 @@ vite.config.ts.timestamp-*
 
 # Logs
 *.log
+
+# Wrangler (local Pages runs)
+.wrangler

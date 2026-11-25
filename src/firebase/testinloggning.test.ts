@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { decodeJson } from '../../functions/_lib/jwt.ts';
 import { unsignedCustomToken } from './testinloggning';
 
-const decode = (part: string) =>
-	JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+const decode = decodeJson;
 
 describe('unsignedCustomToken', () => {
 	// 2026-01-05 08:00 UTC, a made-up moment.

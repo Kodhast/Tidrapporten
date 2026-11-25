@@ -28,3 +28,8 @@ test('the manifest makes the app installable', async ({ page, request }) => {
 		expect((await request.get(icon.src)).ok()).toBe(true);
 	}
 });
+
+test('"Logga in" shows when nobody is signed in', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: 'Logga in' })).toBeVisible();
+});

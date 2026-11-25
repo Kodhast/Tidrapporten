@@ -32,9 +32,12 @@ afterAll(() => {
 });
 
 describe('the drift build', { timeout: 120_000 }, () => {
-	it('has no test sign-in', async () => {
+	it('has no test sign-in, and lets the sign-in pass the service worker', async () => {
 		const code = await buildAndRead('drift', false);
 		expect(code).not.toContain(marker);
+		// Decision 0017: /inloggning must reach Access, not the cached app.
+		expect(code).toContain('/^\\/inloggning/');
+		expect(code).toContain('/^\\/cdn-cgi\\//');
 	});
 
 	it('is compared with an emulator build that has it', async () => {

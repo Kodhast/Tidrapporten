@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.4.0
+
+- Inloggningen finns: knappen Logga in på startsidan loggar in med Google genom kodhast.com och
+  visar vem du är inloggad som. Den fungerar på riktigt först när appen ligger på Cloudflare
+  (#11, beslut 0017).
+
 ## 0.3.2
 
 - Startsidan har en knapp från det nya komponentbiblioteket web-ui-react, ännu utan funktion
