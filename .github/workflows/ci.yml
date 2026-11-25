@@ -72,10 +72,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: 91ecbef25f1216be12523b34ba303639
-      WRANGLER: wrangler@4.160.0
+    # One publication per branch at a time, in order, so an older main never overwrites a newer.
+    concurrency:
+      group: forhandsvisning-${{ github.head_ref || 'main' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -86,12 +86,20 @@ jobs:
       # The default build mode talks to the test project; only --mode drift reaches drift.
       - run: npm run build
 
+      # The Cloudflare token lives only in the steps that need it, never in npm ci or the build.
       - name: Pages-projektet finns
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 91ecbef25f1216be12523b34ba303639
+          WRANGLER: wrangler@4.160.0
         run: bash scripts/pages-projekt.sh
 
       - name: Publicera
         id: publicera
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 91ecbef25f1216be12523b34ba303639
+          WRANGLER: wrangler@4.160.0
           BRANCH: ${{ github.event_name == 'push' && 'main' || github.head_ref }}
         run: |
           npx --yes "$WRANGLER" pages deploy dist --project-name tidrapporten --branch "$BRANCH" \
