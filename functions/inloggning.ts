@@ -6,7 +6,10 @@ import { KeysUnavailable, verifyAccessJwt } from './_lib/access.ts';
 import { parseSigner, signCustomToken } from './_lib/custom-token.ts';
 
 export interface Env {
-	/** The Access application's audience tag. */
+	/**
+	 * The Access applications' audience tags, comma-separated, so that a second application can be
+	 * added without a code change.
+	 */
 	ACCESS_AUD?: string;
 	/** JSON object, e-mail address → uid. The uid stays when the address changes. */
 	ANVANDARE?: string;
@@ -49,12 +52,16 @@ export async function handleSignIn(request: Request, env: Env, deps: Deps = {}):
 		write({ level: 'error', event: 'inloggning-fel', reason: 'konfiguration' });
 		return text(500, 'Inloggningen är inte uppsatt rätt.');
 	};
-	if (!env.ACCESS_AUD) return misconfigured();
+	const audiences = (env.ACCESS_AUD ?? '')
+		.split(',')
+		.map((tag) => tag.trim())
+		.filter(Boolean);
+	if (audiences.length === 0) return misconfigured();
 
 	let payload;
 	try {
 		payload = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
-			aud: env.ACCESS_AUD,
+			aud: audiences,
 			now,
 			fetchFn
 		});

@@ -56,3 +56,85 @@ jobs:
           name: playwright-report
           path: test-results/
           retention-days: 7
+
+  # Previews and the test environment (issue 12). A PR gets <branch>.tidrapporten.pages.dev, main
+  # gets test.tid.kodhast.com (the alias main.tidrapporten.pages.dev) and the Firestore rules and
+  # indexes in the test project. Dependabot and forks get no secrets, so they get no preview.
+  forhandsvisning:
+    name: forhandsvisning
+    needs: [verify, e2e]
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    # One publication per branch at a time, in order, so an older main never overwrites a newer.
+    concurrency:
+      group: forhandsvisning-${{ github.head_ref || 'main' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The default build mode talks to the test project; only --mode drift reaches drift.
+      - run: npm run build
+
+      # The Cloudflare token lives only in the steps that need it, never in npm ci or the build.
+      - name: Pages-projektet finns
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 91ecbef25f1216be12523b34ba303639
+          WRANGLER: wrangler@4.160.0
+        run: bash scripts/pages-projekt.sh
+
+      - name: Publicera
+        id: publicera
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 91ecbef25f1216be12523b34ba303639
+          WRANGLER: wrangler@4.160.0
+          BRANCH: ${{ github.event_name == 'push' && 'main' || github.head_ref }}
+        run: |
+          npx --yes "$WRANGLER" pages deploy dist --project-name tidrapporten --branch "$BRANCH" \
+            --commit-hash "$GITHUB_SHA" | tee deploy.log
+          url=$(grep -Eo 'https://[a-z0-9-]+\.tidrapporten\.pages\.dev' deploy.log | head -1)
+          alias=$(grep -Eo 'https://[a-z0-9-]+\.tidrapporten\.pages\.dev' deploy.log | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "alias=$alias" >> "$GITHUB_OUTPUT"
+          echo "Förhandsvisning: $alias ($url)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Adressen i PR:en
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.publicera.outputs.url }}
+          ALIAS: ${{ steps.publicera.outputs.alias }}
+        run: |
+          marker='<!-- forhandsvisning -->'
+          body=$(printf '%s\n**Förhandsvisning** mot testprojektet: %s\n\nDen här committen (%s): %s\n\nInloggning med Google genom Cloudflare Access.' \
+            "$marker" "$ALIAS" "${GITHUB_SHA::7}" "$URL")
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+
+      - name: Firestore-regler och index till testprojektet
+        if: github.event_name == 'push'
+        env:
+          KEY: ${{ secrets.FIREBASE_DEPLOY_TEST }}
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-test.json"
+          printf '%s' "$KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          trap 'rm -f "$GOOGLE_APPLICATION_CREDENTIALS"' EXIT
+          npx firebase deploy --only firestore:rules,firestore:indexes --project test --non-interactive

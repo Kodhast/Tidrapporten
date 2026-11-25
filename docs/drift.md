@@ -15,7 +15,7 @@ Varför det ser ut så här: [beslut 0009](beslut/0009-repo-ci-och-miljoer.md),
   `firestore.rules` driftsätts.
 - En webbapp per projekt, "Tidrapporten webb". Webbkonfigurationen står i
   `src/firebase/config.ts`; den är ingen hemlighet.
-- Planen är **Spark** (gratis). Blaze kopplas av ägaren när funktionerna kommer (issue 21, 22, 28).
+- Planen är **Blaze** i båda projekten, med budgeten 100 kr i månaden (beslut 0010).
 - Ange alltid aliaset, aldrig id:t: `npx firebase deploy --only firestore:rules --project test`.
   Id:t `dagboken-497114` liknar Dagbokens riktiga projekt.
 
@@ -38,17 +38,57 @@ kontrollerar att driftbygget saknar det.
 ## Inloggningen
 
 `/inloggning` är en Pages Function (`functions/inloggning.ts`, beslut 0017) bakom Cloudflare
-Access. Den behöver tre hemligheter i Pages-projektet (issue 12):
+Access. Den behöver tre hemligheter per Pages-miljö (Preview och Production):
 
-| Hemlighet         | Innehåll                                                               |
-| ----------------- | ---------------------------------------------------------------------- |
-| `ACCESS_AUD`      | Access-applikationens audience-tagg                                    |
-| `ANVANDARE`       | JSON, e-postadress till uid; uid står kvar om adressen byts            |
-| `FIREBASE_SIGNER` | JSON-nyckeln för tjänstekontot `tidrapporten-inloggning` (inga roller) |
+| Hemlighet         | Innehåll                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `ACCESS_AUD`      | Access-applikationernas audience-taggar, kommaseparerade                            |
+| `ANVANDARE`       | JSON, e-postadress till uid; uid står kvar om adressen byts                         |
+| `FIREBASE_SIGNER` | JSON-nyckeln för `tidrapporten-inloggning` (inga roller) i miljöns Firebase-projekt |
+
+Alla adresser ligger bakom samma Access-applikation, så båda miljöerna har samma tagg. Listan
+finns för att en andra applikation ska kunna läggas till utan kodändring.
 
 Provet mot testprojektet, med nyckeln i miljövariabeln `FIREBASE_SIGNER_TEST`:
 
     node scripts/prova-custom-token.mjs
+
+## Pages och Access
+
+Pages-projektet heter `tidrapporten` och publiceras bara från Actions (Direct Upload, ingen
+Git-integration). `scripts/pages-projekt.sh` skapar det första gången.
+
+| Adress                          | Pages-gren          | Firebase | Publiceras av                      |
+| ------------------------------- | ------------------- | -------- | ---------------------------------- |
+| `tid.kodhast.com`               | `produktion`        | drift    | `release.yml`                      |
+| `test.tid.kodhast.com`          | `main` (förhand)    | test     | `ci.yml` på main                   |
+| `<gren>.tidrapporten.pages.dev` | PR-grenen (förhand) | test     | `ci.yml` på en PR, utom Dependabot |
+
+`test.tid.kodhast.com` är en egen domän på aliaset `main.tidrapporten.pages.dev`.
+
+**Access** (team `kodhast`, Google, _Instant authentication_):
+
+- `Tidrapporten inloggning`, self-hosted: `tid.kodhast.com/inloggning`,
+  `test.tid.kodhast.com/inloggning` och `*.tidrapporten.pages.dev/inloggning`. Resten av
+  adresserna är öppna. Pages-projektet måste finnas innan `tidrapporten.pages.dev` går att
+  välja som domän i Access.
+
+Vem som får logga in avgör `ANVANDARE`, inte Access.
+
+**Webbnyckeln** i testprojektet tillåter `https://*.tidrapporten.pages.dev/*` utöver
+`*.kodhast.com` och localhost.
+
+## Hemligheter i GitHub
+
+| Hemlighet               | Var            | Innehåll                                                  |
+| ----------------------- | -------------- | --------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | repot          | token `Tidrapporten Pages`: bara _Cloudflare Pages: Edit_ |
+| `FIREBASE_DEPLOY_TEST`  | repot          | nyckel för `tidrapporten-deploy` i testprojektet          |
+| `FIREBASE_DEPLOY_DRIFT` | miljön `drift` | nyckel för `tidrapporten-deploy` i driftprojektet         |
+
+`tidrapporten-deploy` har rollerna Firebase Rules Admin, Cloud Datastore Index Admin och
+Service Usage Consumer. Miljön `drift` får bara köras från `main`. Kontots id står i
+workflowen; det är ingen hemlighet.
 
 ## Funktionerna
 
