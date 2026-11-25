@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.5.0
+
+- Molnbudgeten bevakas: från 90 % av budgeten visar appen en varning överst, och från 100 %
+  stängs betalningen av i testmiljön. Driften stoppas aldrig (#28).
+
 ## 0.4.1
 
 - Appen ligger på Cloudflare: varje ändring går att prova på en egen förhandsadress, och

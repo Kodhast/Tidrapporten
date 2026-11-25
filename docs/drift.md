@@ -87,10 +87,56 @@ Vem som får logga in avgör `ANVANDARE`, inte Access.
 | `FIREBASE_DEPLOY_DRIFT` | miljön `drift` | nyckel för `tidrapporten-deploy` i driftprojektet         |
 
 `tidrapporten-deploy` har rollerna Firebase Rules Admin, Cloud Datastore Index Admin och
-Service Usage Consumer. Miljön `drift` får bara köras från `main`. Kontots id står i
+Service Usage Consumer. I driftprojektet har det dessutom Cloud Functions Admin och Service
+Account User på `tidrapporten-budget` (issue 28), för att driftsätta budgetfunktionen. Miljön `drift` får bara köras från `main`. Kontots id står i
 workflowen; det är ingen hemlighet.
 
 ## Funktionerna
 
 Koden ligger i `firebase-functions/src/` och buntas med `npm run build:functions` till `firebase-functions/lib/`
-(beslut 0014). Ingen funktion är driftsatt än.
+(beslut 0014). Paketen den använder står i `firebase-functions/package.json` med en egen
+låsfil; `release.yml` installerar dem (`npm ci --prefix firebase-functions`), eftersom
+Firebase CLI läser funktionerna ur koden före driftsättningen. Funktionerna driftsätts bara
+till drift, av `release.yml`.
+
+## Budgeten och stoppet i test
+
+Beslut 0010 och issue 28. Budgeten **Tidrapporten 100 kr** gäller hela betalkontot, alltså båda
+projekten, med e-postlarm vid 50, 90, 100 och 150 % av faktisk kostnad.
+
+```
+Cloud Billing ──(var 20–30 min)──▶ Pub/Sub-ämnet budget (drift)
+                                        │
+                                        ▼
+                         funktionen budget (drift, europe-west1)
+                         körs som tidrapporten-budget
+                          ├─ från 90 %: skriver system/budget i driftens Firestore
+                          │             → banderollen överst i appen
+                          └─ från 100 %: stänger av betalningen i testprojektet
+```
+
+- **Drift stoppas aldrig.** Testprojektets id är det enda funktionen accepterar
+  (`TEST_PROJECT` i `firebase-functions/src/budget.ts`), och `tidrapporten-budget` har ingen
+  betalroll i drift. Provet `test/budget.spec.ts` läser id:na ur `.firebaserc`.
+- **`tidrapporten-budget`** finns bara i driftprojektet och har två roller: Cloud Datastore User
+  i drift och Project Billing Manager i testprojektet. Funktionen pekar ut kontot med
+  `tidrapporten-budget@`, så en driftsättning till test misslyckas.
+- **Fördröjning:** budgetdatan kommer flera timmar sent (Google: ibland över ett dygn), så stoppet
+  är inget exakt tak.
+- **En kostnad i drift kan stoppa test.** Budgeten är gemensam, och det är avsiktligt (beslut 0010).
+- Banderollen visas från 90 % så länge `month` i dokumentet är innevarande månad i svensk tid.
+  Funktionen skriver inget under 90 %, så ett gammalt dokument blir liggande men syns inte.
+
+**Slå på betalningen i test igen** när orsaken är åtgärdad eller en ny månad börjat:
+[Billing → Account management](https://console.cloud.google.com/billing)
+→ _Link a project_ → `dagboken-497114`. Funktionen slår aldrig på den själv.
+
+**Loggar** (beslut 0008): funktionen loggar `budget: betalningen avstängd` (info) när den
+stänger av, och `budget: avstängningen misslyckades`, `budget: vägrar stänga av betalningen`,
+`budget: statusen kunde inte skrivas` eller `budget: okänt meddelande` (error). Meddelanden
+under 90 % och upprepade meddelanden efter stoppet loggas inte.
+
+**API:er i drift** (påslagna 2026-11-25): Cloud Functions, Cloud Build, Artifact Registry,
+Cloud Run, Eventarc och Cloud Billing. Att `tidrapporten-deploy` har alla roller som en
+2nd gen-funktion kräver vid första driftsättningen är inte provat; provkör `release.yml` med
+_dry_run_ och läs felet om den skarpa körningen fallerar.

@@ -38,6 +38,8 @@ rules_version = '2';
 // devices/{id}: fcmToken string 1–4096, label string ≤ 100
 // state/timer: assignmentId, subject, start timestamp between 2020-01-01 and a day from now.
 //   Deleted when the timer stops.
+// system/budget (outside users/): percent, cost, budget, currency, month 'YYYY-MM',
+//   schemaVersion, updatedAt; written only by the budget function, read by the signed-in user.
 // state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
 //   remindEmptyDay bool, flexWarning int ≥ 0
 //
@@ -60,9 +62,13 @@ service cloud.firestore {
 
     // ---------- Helpers ----------
 
+    // Signed in with the custom token the login Worker makes, which only users in its list get.
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'custom';
+    }
+
     function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid
-        && request.auth.token.firebase.sign_in_provider == 'custom';
+      return isSignedIn() && request.auth.uid == uid;
     }
 
     function data() {
@@ -334,6 +340,14 @@ service cloud.firestore {
     }
 
     // ---------- Paths ----------
+
+    // The cloud budget's status (issue 28, decision 0010). Only the budget function writes it,
+    // through the Admin SDK, which these rules do not govern. It belongs to the project, not to a
+    // user, so everyone the login Worker lets in may read it.
+    match /system/budget {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
 
     match /users/{uid} {
       // Nothing is stored in the user document itself.

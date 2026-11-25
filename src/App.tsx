@@ -1,17 +1,22 @@
 import { Button } from '@kodhast/web-ui-react';
+import type { BudgetStatus } from './domain/budget';
 import { startSignIn } from './firebase/auth';
+import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 
 export interface AppProps {
 	/** The signed-in user's uid, null when nobody is, undefined while Firebase finds out. */
 	uid?: string | null;
 	/** Why the last sign-in failed. */
 	error?: string | null;
+	/** The cloud budget's status (issue 28); null or undefined when there is none. */
+	budget?: BudgetStatus | null;
 }
 
 /** The empty start page; the real one comes with issue 19. */
-export function App({ uid, error }: AppProps) {
+export function App({ uid, error, budget }: AppProps) {
 	return (
 		<main className="kh-page start">
+			<BudgetBanderoll status={budget ?? null} />
 			<h1 className="kh-text-screen-title">Tidrapporten</h1>
 			<p className="kh-text-body">Här kommer timern, dagen och veckan.</p>
 			{/* Shows that web-ui-react is installed from its tag; the timer itself comes with issue 18. */}

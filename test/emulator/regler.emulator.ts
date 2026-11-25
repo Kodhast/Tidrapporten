@@ -754,3 +754,41 @@ describe('the data layer’s writes pass the rules', () => {
 		expect(logs.docs.map((d) => d.data().path)).toEqual([`entries/${entry.id}`]);
 	});
 });
+
+describe('the budget status (issue 28)', () => {
+	const budget = (db: Firestore) => doc(db, 'system', 'budget');
+	const status = {
+		percent: 92,
+		cost: 92,
+		budget: 100,
+		currency: 'SEK',
+		month: '2026-11',
+		schemaVersion: 1,
+		updatedAt: Timestamp.now()
+	};
+	const seed = () =>
+		env.withSecurityRulesDisabled((ctx) =>
+			setDoc(doc(ctx.firestore(), 'system', 'budget'), status)
+		);
+
+	it('can be read by the signed-in user', async () => {
+		await seed();
+		await expect(assertSucceeds(getDoc(budget(owner())))).resolves.toBeDefined();
+	});
+
+	it('cannot be created, changed or deleted by the user', async () => {
+		await denied(setDoc(budget(owner()), status));
+		await seed();
+		await denied(updateDoc(budget(owner()), { percent: 10 }));
+		await denied(deleteDoc(budget(owner())));
+	});
+
+	it('cannot be read signed out or signed in some other way than the login Worker', async () => {
+		await seed();
+		const anonymousSignIn = env
+			.authenticatedContext(OTHER, { firebase: { sign_in_provider: 'anonymous', identities: {} } })
+			.firestore() as unknown as Firestore;
+		await denied(getDoc(budget(anonymousSignIn)));
+		await denied(getDoc(budget(anonymous())));
+	});
+});

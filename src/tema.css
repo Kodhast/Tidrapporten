@@ -117,3 +117,20 @@ body {
 	display: grid;
 	gap: var(--kh-space-m);
 }
+
+/*
+ * Tones (web-ui's README, "Toner"): a class per tone that a part with a tone takes.
+ * ton-varning: the cloud budget's warning (issue 28). Amber, provisional like the rest until the
+ * Kanel theme from issue 16 replaces it.
+ */
+.ton-varning {
+	--kh-tone-container: #ffe0b2;
+	--kh-tone-content: #4a2800;
+}
+
+@media (prefers-color-scheme: dark) {
+	.ton-varning {
+		--kh-tone-container: #5a3a00;
+		--kh-tone-content: #ffdcae;
+	}
+}
