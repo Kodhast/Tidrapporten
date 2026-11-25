@@ -185,12 +185,12 @@ describe('timeByDay and absence', () => {
 		expect(result?.bySubject.get(type)).toEqual({ kind: 'absence', clocked: 240, wholeDay: 0 });
 	});
 
-	it('keeps a whole day at the norm when the norm is not whole quarters', () => {
+	it('counts a whole day as the norm, rounded to a quarter', () => {
 		const part = assignment({
 			terms: [{ from: '2026-01-01', scopePercent: 80, workdayMinutes: 480 }]
 		});
 		const days = timeByDay(part, [absentAllDay('2026-11-25', 'semester')], none, countings);
-		expect(days.get('2026-11-25')?.actual).toBe(384);
+		expect(days.get('2026-11-25')?.actual).toBe(390); // 80 % = 6:24, rounded to 6:30
 	});
 
 	it('counts an unknown absence type as filling the norm', () => {

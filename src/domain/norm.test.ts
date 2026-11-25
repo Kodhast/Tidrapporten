@@ -9,9 +9,13 @@ describe('normMinutes', () => {
 	it.each([
 		[100, 480, 480],
 		[50, 480, 240],
-		[80, 480, 384],
+		[75, 480, 360],
+		[80, 480, 390], // 384 = 6:24 rounds to 6:30
+		[90, 480, 435], // 432 = 7:12 rounds to 7:15
 		[100, 450, 450], // a shorter workday set on the assignment
-		[33, 480, 158] // 158.4 rounds to a whole minute
+		[33, 480, 165], // 158.4 rounds to 2:45
+		[25, 450, 120], // 112.5 is exactly half a quarter and rounds up
+		[10, 480, 45] // 48 rounds down
 	])('%i %% of a %i-minute workday is %i minutes', (scopePercent, workdayMinutes, norm) => {
 		const a = assignment({ terms: [{ from: '2026-01-01', scopePercent, workdayMinutes }] });
 		expect(normMinutes(a, '2026-11-25', none)).toBe(norm);

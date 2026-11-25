@@ -1,6 +1,6 @@
 # 0012. Datamodell, låsning och flex
 
-- **Status:** Beslutat
+- **Status:** Beslutat; normens avrundning ersatt av 0013
 - **Datum:** 2026-11-25
 
 ## Sammanhang
