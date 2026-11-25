@@ -103,6 +103,8 @@ export async function handleBudget(json: unknown, effects: BudgetEffects): Promi
 	} catch (e) {
 		effects.error('budget: statusen kunde inte skrivas', { reason: reason(e) });
 	}
-	effects.info('budget: hanterat', { percent: Math.floor(percent), action });
+	// Notifications come every half hour; only the stop itself is worth a line (decision 0008).
+	if (action === 'stopped')
+		effects.info('budget: betalningen avstängd', { projectId: TEST_PROJECT });
 	return action;
 }

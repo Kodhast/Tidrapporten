@@ -85,13 +85,16 @@ describe('handleBudget', () => {
 			month: '2026-11'
 		});
 		expect(fx.disableBilling).not.toHaveBeenCalled();
-		expect(fx.info).toHaveBeenCalledWith('budget: hanterat', { percent: 92, action: 'warned' });
+		expect(fx.info).not.toHaveBeenCalled();
 	});
 
 	it('turns billing off for the test project from 100 %', async () => {
 		const fx = effects();
 		expect(await handleBudget(message(100), fx)).toBe('stopped');
 		expect(fx.disableBilling).toHaveBeenCalledExactlyOnceWith(TEST_PROJECT);
+		expect(fx.info).toHaveBeenCalledExactlyOnceWith('budget: betalningen avstängd', {
+			projectId: TEST_PROJECT
+		});
 		expect(fx.writeStatus).toHaveBeenCalledWith(expect.objectContaining({ percent: 100 }));
 	});
 
@@ -100,6 +103,7 @@ describe('handleBudget', () => {
 		expect(await handleBudget(message(150), fx)).toBe('alreadyStopped');
 		expect(fx.billingEnabled).toHaveBeenCalledWith(TEST_PROJECT);
 		expect(fx.disableBilling).not.toHaveBeenCalled();
+		expect(fx.info).not.toHaveBeenCalled();
 	});
 
 	it('logs a failed turn-off as an error and still writes the status', async () => {

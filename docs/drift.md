@@ -128,9 +128,15 @@ Cloud Billing ──(var 20–30 min)──▶ Pub/Sub-ämnet budget (drift)
   Funktionen skriver inget under 90 %, så ett gammalt dokument blir liggande men syns inte.
 
 **Slå på betalningen i test igen** när orsaken är åtgärdad eller en ny månad börjat:
-[Billing → Account management](https://console.cloud.google.com/billing/01194F-1763BE-26DBAE/manage)
+[Billing → Account management](https://console.cloud.google.com/billing)
 → _Link a project_ → `dagboken-497114`. Funktionen slår aldrig på den själv.
 
-**Loggar:** funktionen loggar `budget: hanterat` (info, procent och åtgärd) per meddelande och
-`budget: avstängningen misslyckades` eller `budget: vägrar stänga av betalningen` (error). Ett
-loggbaserat larm på error-raderna läggs i Cloud Monitoring i driftprojektet.
+**Loggar** (beslut 0008): funktionen loggar `budget: betalningen avstängd` (info) när den
+stänger av, och `budget: avstängningen misslyckades`, `budget: vägrar stänga av betalningen`,
+`budget: statusen kunde inte skrivas` eller `budget: okänt meddelande` (error). Meddelanden
+under 90 % och upprepade meddelanden efter stoppet loggas inte.
+
+**API:er i drift** (påslagna 2026-11-25): Cloud Functions, Cloud Build, Artifact Registry,
+Cloud Run, Eventarc och Cloud Billing. Att `tidrapporten-deploy` har alla roller som en
+2nd gen-funktion kräver vid första driftsättningen är inte provat; provkör `release.yml` med
+_dry_run_ och läs felet om den skarpa körningen fallerar.
