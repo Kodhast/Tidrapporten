@@ -21,7 +21,7 @@ describe('unsignedCustomToken', () => {
 			uid: 'testperson-1',
 			iat: now / 1000,
 			exp: now / 1000 + 3600,
-			claims: { testinloggning: true }
+			claims: { testSignIn: true }
 		});
 	});
 });

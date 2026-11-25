@@ -16,8 +16,8 @@ taket för antal projekt, så inga nya projekt gick att skapa.
 - **Projekten återanvänds** (ägarens val 2026-11-25): test är `dagboken-497114` med visningsnamnet
   "Tidrapporten test", drift är `device-streaming-5b35f7b8` med visningsnamnet "Tidrapporten
   drift" och miljötypen Production. Båda var tomma. Id:na går inte att byta.
-- Koden och `.firebaserc` använder aliasen `test` och `drift`; id:na står bara i `.firebaserc` och
-  `src/firebase/config.ts`.
+- Kommandon och skript använder aliasen `test` och `drift` i `.firebaserc`. Id:na står där, i
+  `src/firebase/config.ts` och i `docs/drift.md`.
 - **Spark tills vidare** (ägaren: slå inte på något som kostar). Blaze kopplas när något kräver det,
   först funktionerna i issue 21, 22 och 28.
 

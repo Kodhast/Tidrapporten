@@ -31,7 +31,7 @@ SDK:n eller emulatorerna når något riktigt projekt. Emulatorerna kräver Java 
     npx firebase emulators:start --only auth,firestore --project demo-tidrapporten
 
 Appen mot emulatorerna: `VITE_FIREBASE_EMULATOR=true npm run dev`. Då finns
-`window.testinloggning(uid)`, som loggar in med en osignerad custom token som bara Auth-emulatorn
+`window.testSignIn(uid)`, som loggar in med en osignerad custom token som bara Auth-emulatorn
 godtar. Ingenting av det finns i ett bygge utan variabeln, och `test/drift-bygge.spec.ts`
 kontrollerar att driftbygget saknar det.
 

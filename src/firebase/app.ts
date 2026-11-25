@@ -12,7 +12,7 @@ export interface Firebase {
 declare global {
 	interface Window {
 		/** Signs in as `uid` against the Auth emulator; exists only in emulator builds. */
-		testinloggning?: (uid: string) => Promise<string>;
+		testSignIn?: (uid: string) => Promise<string>;
 	}
 }
 
@@ -28,7 +28,7 @@ export function startFirebase(): Firebase {
 			disableWarnings: true
 		});
 		connectFirestoreEmulator(db, EMULATOR_HOST, EMULATOR_PORTS.firestore);
-		window.testinloggning = async (uid) => {
+		window.testSignIn = async (uid) => {
 			const { signInForTest } = await import('./testinloggning');
 			return (await signInForTest(auth, uid)).user.uid;
 		};

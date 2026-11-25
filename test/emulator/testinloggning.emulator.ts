@@ -16,6 +16,6 @@ describe('signInForTest', () => {
 	it('signs in to the Auth emulator with the given uid', async () => {
 		const { user } = await signInForTest(auth, 'testperson-1');
 		expect(user.uid).toBe('testperson-1');
-		expect((await user.getIdTokenResult()).claims.testinloggning).toBe(true);
+		expect((await user.getIdTokenResult()).claims.testSignIn).toBe(true);
 	});
 });

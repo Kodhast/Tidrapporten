@@ -19,7 +19,7 @@ export function unsignedCustomToken(uid: string, now = Date.now()): string {
 		iat,
 		exp: iat + 3600,
 		uid,
-		claims: { testinloggning: true }
+		claims: { testSignIn: true }
 	};
 	return `${base64url(header)}.${base64url(payload)}.`;
 }
