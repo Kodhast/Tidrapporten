@@ -88,16 +88,27 @@ export const saveReport = async (
 				})
 			);
 		}
-		const data = reportCodec.toData(saved);
-		if (before) tx.update(ref, { ...data, ...updateMeta() });
-		else tx.set(ref, { ...data, ...createMeta() });
+		if (change.action === 'unlock') {
+			// The rules let an unlock change only these fields, so the stored report is not
+			// rewritten (an older schemaVersion or a normalized field would be refused).
+			tx.update(ref, {
+				status: saved.status,
+				lastChangeId: saved.lastChangeId,
+				updatedAt: serverTimestamp()
+			});
+		} else if (before) {
+			tx.update(ref, { ...reportCodec.toData(saved), ...updateMeta() });
+		} else {
+			tx.set(ref, { ...reportCodec.toData(saved), ...createMeta() });
+		}
 		return saved;
 	});
 
 /**
  * Creates, changes or deletes an entry (`after` null). When the entry falls in a sent week a log
  * entry with before and after goes in the same batch; the reason may be empty. The rules do not
- * check this (ADR 0012), so it works offline too.
+ * check this (ADR 0012), and a batch is queued offline, so the caller must not offer a
+ * correction in a sent week while offline.
  */
 export const saveEntry = async (
 	db: Firestore,
@@ -109,6 +120,7 @@ export const saveEntry = async (
 ): Promise<void> => {
 	const id = after?.id ?? before?.id;
 	if (!id) throw new Error('An entry change needs an entry');
+	if (before && after && before.id !== after.id) throw new Error('An entry keeps its id');
 	const ref = userDoc(db, uid, userPath('entries', id));
 	const batch = writeBatch(db);
 	if (after === null) batch.delete(ref);
@@ -131,22 +143,38 @@ export const saveEntry = async (
 	await batch.commit();
 };
 
-/** The id of the entry a stopped timer becomes, so two devices stopping it write one entry. */
+const MINUTE = 60_000;
+const MAX_ENTRY = 24 * 60 * MINUTE;
+
+/**
+ * The id of the entry a stopped timer becomes. Two devices stopping the same timer give the same
+ * id; the second write is refused by the rules (it would change createdAt), so one entry remains
+ * and the second device gets permission-denied.
+ */
 export const timerEntryId = (timer: Timer): Id => `timer-${timer.start}`;
 
-/** Writes the timer's entry and empties `state/timer` in one batch. */
+/**
+ * Writes the timer's entry and empties `state/timer` in one batch, with a log entry when the
+ * week is sent. The end is kept between one minute and 24 hours after the start, the limits of
+ * an entry, so that a forgotten timer or a device clock behind the start can always be stopped.
+ */
 export const stopTimer = async (
 	db: Firestore,
 	uid: Id,
 	timer: Timer,
 	end: UtcMillis,
+	reports: readonly Report[] = [],
 	note = ''
 ): Promise<Entry> => {
 	const entry: Entry = {
 		id: timerEntryId(timer),
 		assignmentId: timer.assignmentId,
 		subject: timer.subject,
-		time: { kind: 'interval', start: timer.start, end },
+		time: {
+			kind: 'interval',
+			start: timer.start,
+			end: Math.min(Math.max(end, timer.start + MINUTE), timer.start + MAX_ENTRY)
+		},
 		note
 	};
 	const batch = writeBatch(db);
@@ -154,6 +182,20 @@ export const stopTimer = async (
 		...entryCodec.toData(entry),
 		...createMeta()
 	});
+	const change = entryChange(null, entry, reports);
+	if (change.logged) {
+		batch.set(
+			doc(collection(db, 'users', uid, 'changeLog')),
+			logData({
+				path: userPath('entries', entry.id),
+				action: 'create',
+				week: change.week,
+				before: null,
+				after: entryCodec.toData(entry),
+				reason: ''
+			})
+		);
+	}
 	batch.delete(userDoc(db, uid, userPath('state', 'timer')));
 	await batch.commit();
 	return entry;

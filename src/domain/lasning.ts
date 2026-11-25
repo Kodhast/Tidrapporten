@@ -34,7 +34,7 @@ export interface EntryLogNeed {
 	/** The change touches a sent or unlocked week, so the app writes a log entry with it. */
 	logged: boolean;
 	action: ChangeAction;
-	/** The first sent week the change touches, for the log entry. */
+	/** The first sent or unlocked week the change touches, for the log entry. */
 	week: IsoWeek | null;
 }
 
@@ -95,7 +95,16 @@ export const reportChange = (before: Report | null, after: Report | null): Repor
 	return { allowed: true, action: to === 'sent' ? 'send' : 'update', locked: true };
 };
 
-/** Everything but status and lastChangeId is the same. */
-const sameContent = (a: Report, b: Report): boolean =>
-	JSON.stringify({ ...a, status: null, lastChangeId: null }) ===
-	JSON.stringify({ ...b, status: null, lastChangeId: null });
+/** A JSON form with sorted keys, so that key order does not count. */
+const canonical = (value: unknown): string =>
+	JSON.stringify(value, (_, v: unknown) =>
+		v && typeof v === 'object' && !Array.isArray(v)
+			? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+			: v
+	);
+
+/** Everything but id, status and lastChangeId is the same. */
+const sameContent = (a: Report, b: Report): boolean => {
+	const content = (r: Report) => canonical({ ...r, id: null, status: null, lastChangeId: null });
+	return content(a) === content(b);
+};

@@ -423,7 +423,10 @@ describe('locking reports', () => {
 
 	it.each([
 		['an empty reason', { reason: '' }],
-		['another report’s path', { path: 'reports/a1_r2_2026-W48' }]
+		['a reason of only spaces', { reason: '   ' }],
+		['another report’s path', { path: 'reports/a1_r2_2026-W48' }],
+		['another week', { week: '2026-W47' }],
+		['another action', { action: 'update' }]
 	])('refuses an unlock whose log entry has %s', async (_, overrides) => {
 		await sendIt();
 		await denied(withLog({ ...sent(), status: 'unlocked' }, 'l1', overrides));
@@ -447,10 +450,14 @@ describe('locking reports', () => {
 		await sendIt();
 		await withLog({ ...sent(), status: 'unlocked' }, 'l1');
 		await expect(
-			assertSucceeds(withLog({ ...sent(), status: 'unlocked', mode: 'actualQuarter' }, 'l2'))
+			assertSucceeds(
+				withLog({ ...sent(), status: 'unlocked', mode: 'actualQuarter' }, 'l2', {
+					action: 'update'
+				})
+			)
 		).resolves.toBeUndefined();
 		await expect(
-			assertSucceeds(withLog({ ...sent(), mode: 'actualQuarter' }, 'l3'))
+			assertSucceeds(withLog({ ...sent(), mode: 'actualQuarter' }, 'l3', { action: 'send' }))
 		).resolves.toBeUndefined();
 		expect((await getDoc(ref())).data()?.status).toBe('sent');
 	});
@@ -530,5 +537,20 @@ describe('the data layer’s writes pass the rules', () => {
 		await denied(stopTimer(db, OWNER, timer, Date.UTC(2026, 10, 25, 16)));
 		const entries = await getDocs(collection(db, 'users', OWNER, 'entries'));
 		expect(entries.size).toBe(1);
+	});
+
+	it('stopTimer stops a timer left running for days, as 24 hours, logged in a sent week', async () => {
+		const db = owner();
+		const saved = await saveReport(db, OWNER, id, sent());
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 23, 7)
+		};
+		await create(db, 'state/timer', timerCodec.toData(timer));
+		const entry = await stopTimer(db, OWNER, timer, Date.UTC(2026, 10, 27, 7), [saved!]);
+		expect(entry.time).toMatchObject({ end: timer.start + 24 * 3_600_000 });
+		const logs = await getDocs(collection(db, 'users', OWNER, 'changeLog'));
+		expect(logs.docs.map((d) => d.data().path)).toEqual([`entries/${entry.id}`]);
 	});
 });
