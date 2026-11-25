@@ -10,7 +10,8 @@ export default defineConfig(
 		'dist',
 		'dev-dist',
 		'coverage',
-		'functions/lib',
+		'firebase-functions/lib',
+		'.wrangler',
 		'.claude/skills/vercel-react-best-practices'
 	]),
 	js.configs.recommended,

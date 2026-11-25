@@ -37,6 +37,12 @@ describe('the drift build', { timeout: 120_000 }, () => {
 		expect(code).not.toContain(marker);
 	});
 
+	it('lets the sign-in pass the service worker (decision 0017)', async () => {
+		const code = await buildAndRead('drift', false);
+		expect(code).toContain('/^\\/inloggning/');
+		expect(code).toContain('/^\\/cdn-cgi\\//');
+	});
+
 	it('is compared with an emulator build that has it', async () => {
 		expect(await buildAndRead('production', true)).toContain(marker);
 	});

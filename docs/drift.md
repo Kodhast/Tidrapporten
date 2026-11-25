@@ -35,7 +35,22 @@ Appen mot emulatorerna: `VITE_FIREBASE_EMULATOR=true npm run dev`. Då finns
 godtar. Ingenting av det finns i ett bygge utan variabeln, och `test/drift-bygge.spec.ts`
 kontrollerar att driftbygget saknar det.
 
+## Inloggningen
+
+`/inloggning` är en Pages Function (`functions/inloggning.ts`, beslut 0017) bakom Cloudflare
+Access. Den behöver tre hemligheter i Pages-projektet (issue 12):
+
+| Hemlighet         | Innehåll                                                               |
+| ----------------- | ---------------------------------------------------------------------- |
+| `ACCESS_AUD`      | Access-applikationens audience-tagg                                    |
+| `ANVANDARE`       | JSON, e-postadress till uid; uid står kvar om adressen byts            |
+| `FIREBASE_SIGNER` | JSON-nyckeln för tjänstekontot `tidrapporten-inloggning` (inga roller) |
+
+Provet mot testprojektet, med nyckeln i miljövariabeln `FIREBASE_SIGNER_TEST`:
+
+    node scripts/prova-custom-token.mjs
+
 ## Funktionerna
 
-Koden ligger i `functions/src/` och buntas med `npm run build:functions` till `functions/lib/`
+Koden ligger i `firebase-functions/src/` och buntas med `npm run build:functions` till `firebase-functions/lib/`
 (beslut 0014). Ingen funktion är driftsatt än.

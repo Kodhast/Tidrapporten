@@ -6,7 +6,8 @@
 ## Sammanhang
 
 Kodhästs appar på `*.kodhast.com` loggar in med Google genom Cloudflare Access (team `kodhast`),
-och Husjakt använder redan mönstret där Access-JWT:n byts mot en Firebase custom token. Intervjun
+och Husjakt kontrollerar redan Accessens JWT i en Worker. (Först stod det här att Husjakt byter
+JWT:n mot en Firebase custom token; Husjakt har ingen Firebase, så den delen är ny här.) Intervjun
 (issue 4) sa en separat Worker på `/inloggning`. När planen granskades 2026-11-25 ändrade ägaren
 det till en Pages Function, eftersom appen ändå ligger på Pages.
 
@@ -20,6 +21,6 @@ det till en Pages Function, eftersom appen ändå ligger på Pages.
 
 ## Följder
 
-- Att signera en custom token med WebCrypto i en Pages Function är inte provat. Det provas först,
-  lokalt mot testprojektet (issue 11).
+- Att signera en custom token med WebCrypto provades mot testprojektet i issue 11 och fungerar;
+  flödet i detalj står i beslut 0017.
 - Allt annat än `/inloggning` är statiska filer; Firestore-reglerna, inte Access, skyddar datan.
