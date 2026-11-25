@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
+import { monthOf } from './domain/budget';
 
 describe('App', () => {
 	it('shows the app name as the page heading', () => {
@@ -33,5 +34,16 @@ describe('App and the sign-in', () => {
 		expect(markup).toContain('Inloggad som testperson-1');
 		expect(markup).toContain('Det gick inte.');
 		expect(markup).not.toContain('Logga in');
+	});
+});
+
+describe('App and the cloud budget', () => {
+	it('warns at the top from 90 % this month, and not without a status', () => {
+		const month = monthOf(Date.now());
+		const budget = { percent: 95, cost: 95, budget: 100, currency: 'SEK', month };
+		expect(renderToStaticMarkup(<App budget={budget} />)).toMatch(
+			/^<main class="kh-page start"><div class="kh-notice ton-varning">/
+		);
+		expect(renderToStaticMarkup(<App />)).not.toContain('kh-notice');
 	});
 });
