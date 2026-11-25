@@ -37,6 +37,13 @@ import {
 	without
 } from './kodning.ts';
 
+/**
+ * Settings whose changes alter the flex of weeks already counted carry the id of the changeLog
+ * entry written with the latest such change (ADR 0016). The domain does not need it, so a plain
+ * write stores null and a logged write sets it.
+ */
+const NO_LOG = { lastChangeId: null };
+
 export interface Codec<T> {
 	/** The document's own fields, without schemaVersion, createdAt and updatedAt. */
 	toData(value: T): DocumentData;
@@ -59,7 +66,7 @@ const slot = (value: unknown): StandardDaySlot => {
 };
 
 export const assignmentCodec: Codec<Assignment> = {
-	toData: (value) => without(value, 'id'),
+	toData: (value) => ({ ...without(value, 'id'), ...NO_LOG }),
 	fromData: (id, d) => ({
 		id,
 		name: str(d.name),
@@ -91,7 +98,7 @@ const receiverCode = (value: unknown): ReceiverCode => {
 };
 
 export const receiverCodec: Codec<Receiver> = {
-	toData: (value) => without(value, 'id', 'assignmentId'),
+	toData: (value) => ({ ...without(value, 'id', 'assignmentId'), ...NO_LOG }),
 	fromData: (id, d, parentId = '') => ({
 		id,
 		assignmentId: parentId,
@@ -105,7 +112,7 @@ export const receiverCodec: Codec<Receiver> = {
 };
 
 export const absenceTypeCodec: Codec<AbsenceType> = {
-	toData: (value) => without(value, 'id'),
+	toData: (value) => ({ ...without(value, 'id'), ...NO_LOG }),
 	fromData: (id, d) => ({
 		id,
 		name: str(d.name),
@@ -116,7 +123,7 @@ export const absenceTypeCodec: Codec<AbsenceType> = {
 };
 
 export const freeDayCodec: Codec<FreeDay> = {
-	toData: (value) => without(value, 'date'),
+	toData: (value) => ({ ...without(value, 'date'), ...NO_LOG }),
 	fromData: (id, d) => ({ date: id, free: bool(d.free, true), name: str(d.name) })
 };
 

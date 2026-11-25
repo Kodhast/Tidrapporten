@@ -6,7 +6,9 @@ rules_version = '2';
 // Assumed data model
 // ===============================================================
 //
-// Everything lives under users/{uid}/…; only the owner (request.auth.uid == uid) reads or writes.
+// Everything lives under users/{uid}/…; only the owner (request.auth.uid == uid), signed in with
+// the custom token the login Worker makes (ADR 0006), reads or writes. Any other way of signing in
+// to the Firebase project is refused, even in the user's own tree.
 // The users/{uid} document itself is not used. Every document carries:
 //   - schemaVersion: int (>= 1)
 //   - createdAt: timestamp (= request.time on create, immutable)
@@ -14,16 +16,18 @@ rules_version = '2';
 // Days are strings 'YYYY-MM-DD', weeks 'YYYY-Www', clock times 'HH:MM'. Lengths are whole minutes.
 //
 // assignments/{id}: name string 1–100, startDate day, endDate day|null, terms list 1–50,
-//   openingFlex int, standardDay list ≤ 20, archived bool, order int
+//   openingFlex int, standardDay list ≤ 20, archived bool, order int, lastChangeId string|null
 // assignments/{id}/codes/{id}: name string 1–100, billable bool, archived bool, order int
 // assignments/{id}/receivers/{id}: name string 1–100, position int ≥ 1, suggestionMode
-//   'fillNorm'|'actualQuarter', codes list ≤ 100, mapping map ≤ 200 keys, archived bool
+//   'fillNorm'|'actualQuarter', codes list ≤ 100, mapping map ≤ 200 keys, archived bool,
+//   lastChangeId string|null
 // absenceTypes/{id}: name string 1–100, counting 'fillsNorm'|'flexWithdrawal'|'worked',
-//   archived bool, order int
-// freeDays/{day}: free bool, name string ≤ 100
+//   archived bool, order int, lastChangeId string|null
+// freeDays/{day}: free bool, name string ≤ 100, lastChangeId string|null
 // entries/{id}: assignmentId string, subject {kind 'code', codeId} | {kind 'absence',
 //   absenceTypeId}, time {kind 'interval', start, end: timestamp, 0 < end − start ≤ 24 h} |
-//   {kind 'allDay', date: day, only for absence}, note string ≤ 500
+//   {kind 'allDay', date: day, only for absence}, note string ≤ 500. Interval times lie between
+//   2020-01-01 and a year from now.
 // pauses/{day}: only the common fields
 // reports/{assignmentId_receiverId_week}: assignmentId, receiverId, week, status
 //   'draft'|'sent'|'unlocked', mode, lines list ≤ 100, snapshot map|null (set when sent),
@@ -32,14 +36,20 @@ rules_version = '2';
 //   'create'|'update'|'delete'|'send'|'unlock', week week|null, before map|null, after map|null,
 //   reason string ≤ 500, by 'app'. Create only; never updated or deleted.
 // devices/{id}: fcmToken string 1–4096, label string ≤ 100
-// state/timer: assignmentId, subject, start timestamp. Deleted when the timer stops.
+// state/timer: assignmentId, subject, start timestamp between 2020-01-01 and a day from now.
+//   Deleted when the timer stops.
 // state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
 //   remindEmptyDay bool, flexWarning int ≥ 0
 //
 // Locking (ADR 0012): a sent report can only be unlocked; an unlocked report can be changed or
 // sent again. Every such locked change writes a NEW changeLog entry in the same batch, named by
-// the report's lastChangeId, whose path is the report's and whose reason is not empty.
-// Corrections of entries in a sent week are logged by the app, not enforced here.
+// the report's lastChangeId, whose path is the report's, with before, after and a reason that
+// is not empty. A report that becomes sent carries the server time in snapshot.sentAt.
+// Changes that alter the flex of weeks already counted (ADR 0016) need a new changeLog entry the
+// same way, with before (on update) and after but a reason that may be empty: an assignment's
+// openingFlex, startDate, endDate or terms, an absence type's counting, a receiver's position or
+// a new receiver, and every create or update of a free day. Deleting a free day and corrections
+// of entries in a sent week are logged by the app, not enforced here.
 //
 // Lists are checked for type and size only; rules cannot look inside every element. The data
 // layer (src/data/) tolerates malformed elements when it reads.
@@ -51,7 +61,8 @@ service cloud.firestore {
     // ---------- Helpers ----------
 
     function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return request.auth != null && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider == 'custom';
     }
 
     function data() {
@@ -76,6 +87,17 @@ service cloud.firestore {
 
     function isName(value) {
       return value is string && value.size() > 0 && value.size() <= 100;
+    }
+
+    function isIdOrNull(value) {
+      return value == null || isId(value);
+    }
+
+    // Interval times and the timer: not before the app existed, and not far ahead of now. An
+    // interval may be planned (absence) up to a year ahead; the timer starts now.
+    function isTimeFrom2020(value, ahead) {
+      return value is timestamp && value >= timestamp.date(2020, 1, 1)
+        && value <= request.time + ahead;
     }
 
     function isClockOrNull(value) {
@@ -121,7 +143,8 @@ service cloud.firestore {
     function isValidTime(time, subject) {
       return time is map && (
         (time.keys().hasOnly(['kind', 'start', 'end']) && time.keys().hasAll(['kind', 'start', 'end'])
-          && time.kind == 'interval' && time.start is timestamp && time.end is timestamp
+          && time.kind == 'interval' && isTimeFrom2020(time.start, duration.value(366, 'd'))
+          && time.end is timestamp
           && time.end > time.start && time.end <= time.start + duration.value(24, 'h'))
         || (time.keys().hasOnly(['kind', 'date']) && time.keys().hasAll(['kind', 'date'])
           && time.kind == 'allDay' && isDay(time.date) && subject.kind == 'absence')
@@ -132,7 +155,7 @@ service cloud.firestore {
 
     function isValidAssignment() {
       return hasExactly(['name', 'startDate', 'endDate', 'terms', 'openingFlex', 'standardDay',
-          'archived', 'order'])
+          'archived', 'order', 'lastChangeId'])
         && isName(data().name)
         && isDay(data().startDate)
         && (data().endDate == null || (isDay(data().endDate) && data().endDate >= data().startDate))
@@ -140,7 +163,8 @@ service cloud.firestore {
         && data().openingFlex is int
         && data().standardDay is list && data().standardDay.size() <= 20
         && data().archived is bool
-        && data().order is int;
+        && data().order is int
+        && isIdOrNull(data().lastChangeId);
     }
 
     function isValidCode() {
@@ -152,28 +176,32 @@ service cloud.firestore {
     }
 
     function isValidReceiver() {
-      return hasExactly(['name', 'position', 'suggestionMode', 'codes', 'mapping', 'archived'])
+      return hasExactly(['name', 'position', 'suggestionMode', 'codes', 'mapping', 'archived',
+          'lastChangeId'])
         && isName(data().name)
         && data().position is int && data().position >= 1
         && data().suggestionMode in ['fillNorm', 'actualQuarter']
         && data().codes is list && data().codes.size() <= 100
         && data().mapping is map && data().mapping.size() <= 200
-        && data().archived is bool;
+        && data().archived is bool
+        && isIdOrNull(data().lastChangeId);
     }
 
     function isValidAbsenceType() {
-      return hasExactly(['name', 'counting', 'archived', 'order'])
+      return hasExactly(['name', 'counting', 'archived', 'order', 'lastChangeId'])
         && isName(data().name)
         && data().counting in ['fillsNorm', 'flexWithdrawal', 'worked']
         && data().archived is bool
-        && data().order is int;
+        && data().order is int
+        && isIdOrNull(data().lastChangeId);
     }
 
     function isValidFreeDay(day) {
-      return hasExactly(['free', 'name'])
+      return hasExactly(['free', 'name', 'lastChangeId'])
         && isDay(day)
         && data().free is bool
-        && data().name is string && data().name.size() <= 100;
+        && data().name is string && data().name.size() <= 100
+        && isIdOrNull(data().lastChangeId);
     }
 
     function isValidEntry() {
@@ -188,7 +216,7 @@ service cloud.firestore {
       return hasExactly(['assignmentId', 'subject', 'start'])
         && isId(data().assignmentId)
         && isValidSubject(data().subject)
-        && data().start is timestamp;
+        && isTimeFrom2020(data().start, duration.value(1, 'd'));
     }
 
     function isValidSettings() {
@@ -233,21 +261,43 @@ service cloud.firestore {
         && data().lines is list && data().lines.size() <= 100
         && (data().status == 'draft' || isValidSnapshot(data().snapshot))
         && (data().snapshot == null || isValidSnapshot(data().snapshot))
-        && (data().lastChangeId == null || isId(data().lastChangeId));
+        && isIdOrNull(data().lastChangeId)
+        && (data().status != 'sent' || data().snapshot.sentAt == request.time);
     }
 
-    // The locked change names a changeLog entry that is new in this batch, belongs to this
-    // report and week, names the change and gives a reason. A reused entry already exists and
-    // fails the first check.
-    function isLoggedChange(uid, reportId, action) {
+    // The write names, by lastChangeId, a changeLog entry that is new in this batch, belongs to
+    // this document (path below the user) and week, names the change and holds the document
+    // after it, and before it on an update. A reused entry already exists and fails the first
+    // check.
+    function logAfter(uid) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId)).data;
+    }
+
+    function isLogged(uid, path, action, week) {
       let logPath = /databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId);
       return isId(data().lastChangeId)
         && !exists(logPath)
         && existsAfter(logPath)
-        && getAfter(logPath).data.path == 'reports/' + reportId
-        && getAfter(logPath).data.week == data().week
-        && getAfter(logPath).data.action == action
-        && getAfter(logPath).data.reason.trim().size() > 0;
+        && logAfter(uid).path == path
+        && logAfter(uid).week == week
+        && logAfter(uid).action == action
+        && logAfter(uid).after != null
+        && (resource == null || logAfter(uid).before != null);
+    }
+
+    // A locked report change also needs a reason.
+    function isLoggedChange(uid, reportId, action) {
+      return isLogged(uid, 'reports/' + reportId, action, data().week)
+        && logAfter(uid).reason.trim().size() > 0;
+    }
+
+    // A change of a setting that alters the flex of weeks already counted (ADR 0016).
+    function isLoggedSetting(uid, path) {
+      return isLogged(uid, path, resource == null ? 'create' : 'update', null);
+    }
+
+    function changes(keys) {
+      return resource != null && data().diff(resource.data).affectedKeys().hasAny(keys);
     }
 
     function isUnlock() {
@@ -291,7 +341,9 @@ service cloud.firestore {
 
       match /assignments/{assignmentId} {
         allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid) && isValidMeta() && isValidAssignment();
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidAssignment()
+          && (!changes(['openingFlex', 'startDate', 'endDate', 'terms'])
+            || isLoggedSetting(uid, 'assignments/' + assignmentId));
         allow delete: if false; // issue 26
 
         match /codes/{codeId} {
@@ -302,20 +354,26 @@ service cloud.firestore {
 
         match /receivers/{receiverId} {
           allow read: if isOwner(uid);
-          allow create, update: if isOwner(uid) && isValidMeta() && isValidReceiver();
+          // A new receiver may take position 1, so creating one is logged too.
+          allow create, update: if isOwner(uid) && isValidMeta() && isValidReceiver()
+            && ((resource != null && !changes(['position']))
+              || isLoggedSetting(uid, 'assignments/' + assignmentId + '/receivers/' + receiverId));
           allow delete: if false;
         }
       }
 
       match /absenceTypes/{typeId} {
         allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid) && isValidMeta() && isValidAbsenceType();
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidAbsenceType()
+          && (!changes(['counting']) || isLoggedSetting(uid, 'absenceTypes/' + typeId));
         allow delete: if false;
       }
 
       match /freeDays/{day} {
         allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && isValidMeta() && isValidFreeDay(day);
+        // Deleting a free day cannot name a log entry; the app logs it (ADR 0016).
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidFreeDay(day)
+          && isLoggedSetting(uid, 'freeDays/' + day);
       }
 
       match /entries/{entryId} {
