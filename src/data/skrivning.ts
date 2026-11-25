@@ -90,7 +90,8 @@ export const saveReport = async (
 		}
 		if (change.action === 'unlock') {
 			// The rules let an unlock change only these fields, so the stored report is not
-			// rewritten (an older schemaVersion or a normalized field would be refused).
+			// rewritten from the decoded copy. The stored document must still pass the report
+			// validator, so a schema change needs a migration before old reports can be unlocked.
 			tx.update(ref, {
 				status: saved.status,
 				lastChangeId: saved.lastChangeId,

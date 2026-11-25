@@ -210,6 +210,13 @@ describe('field validation', () => {
 			'assignments/a1',
 			{ ...assignmentCodec.toData(assignment()), startDate: '1 jan' }
 		],
+		[
+			'month 13',
+			'assignments/a1',
+			{ ...assignmentCodec.toData(assignment()), startDate: '2026-13-01' }
+		],
+		['an id with an underscore', 'entries/e1', { ...entry, assignmentId: 'a_1' }],
+		['an empty id', 'entries/e1', { ...entry, assignmentId: '' }],
 		['no terms', 'assignments/a1', { ...assignmentCodec.toData(assignment()), terms: [] }],
 		[
 			'a decimal flex balance',
@@ -318,6 +325,12 @@ describe('the change log', () => {
 		['with its own time', { at: Timestamp.fromMillis(0) }],
 		['with an unknown action', { action: 'drop' }],
 		['with a reason over 500 characters', { reason: 'x'.repeat(501) }],
+		['with week 54', { week: '2026-W54' }],
+		['with week 00', { week: '2026-W00' }],
+		[
+			'with a before of more than 50 fields',
+			{ before: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`f${i}`, i])) }
+		],
 		['with an extra field', { extra: 1 }]
 	])('refuses an entry %s', async (_, overrides) => {
 		await denied(setDoc(at(owner(), 'changeLog/l1'), log(overrides)));
@@ -462,6 +475,14 @@ describe('locking reports', () => {
 		expect((await getDoc(ref())).data()?.status).toBe('sent');
 	});
 
+	it('refuses a change to an unlocked report logged as a send', async () => {
+		await sendIt();
+		await withLog({ ...sent(), status: 'unlocked' }, 'l1');
+		await denied(
+			withLog({ ...sent(), status: 'unlocked', mode: 'actualQuarter' }, 'l2', { action: 'send' })
+		);
+	});
+
 	it('refuses deleting an unlocked report', async () => {
 		await sendIt();
 		await withLog({ ...sent(), status: 'unlocked' }, 'l1');
@@ -537,6 +558,25 @@ describe('the data layer’s writes pass the rules', () => {
 		await denied(stopTimer(db, OWNER, timer, Date.UTC(2026, 10, 25, 16)));
 		const entries = await getDocs(collection(db, 'users', OWNER, 'entries'));
 		expect(entries.size).toBe(1);
+	});
+
+	it('saveEntry refuses to change an entry’s id', async () => {
+		const e = work('2026-11-25', '08:00', '12:00');
+		await expect(saveEntry(owner(), OWNER, e, { ...e, id: 'annan' }, [])).rejects.toThrow(
+			'An entry keeps its id'
+		);
+	});
+
+	it('stopTimer gives at least one minute when the clock is behind the start', async () => {
+		const db = owner();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await create(db, 'state/timer', timerCodec.toData(timer));
+		const entry = await stopTimer(db, OWNER, timer, timer.start - 3_600_000);
+		expect(entry.time).toMatchObject({ end: timer.start + 60_000 });
 	});
 
 	it('stopTimer stops a timer left running for days, as 24 hours, logged in a sent week', async () => {
