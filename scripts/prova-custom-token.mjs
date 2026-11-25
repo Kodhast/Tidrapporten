@@ -16,7 +16,14 @@ const REFERER = 'http://localhost:5173/';
 const aliases = JSON.parse(
 	readFileSync(new URL('../.firebaserc', import.meta.url), 'utf8')
 ).projects;
-const signer = parseSigner(process.env.FIREBASE_SIGNER_TEST);
+let signer;
+try {
+	signer = parseSigner(process.env.FIREBASE_SIGNER_TEST);
+} catch {
+	// JSON.parse quotes the input in its message, which would print part of the key.
+	console.error('FIREBASE_SIGNER_TEST saknas eller är inte en JSON-nyckelfil från Google.');
+	process.exit(1);
+}
 if (signer.projectId === aliases.drift) {
 	console.error('Vägrar: nyckeln hör till drift-projektet. Provet körs bara mot testprojektet.');
 	process.exit(1);

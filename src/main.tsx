@@ -17,12 +17,18 @@ const signInError = finishSignIn(auth);
 
 function Root() {
 	const [uid, setUid] = useState<string | null | undefined>(undefined);
+	// Firebase reports "nobody" before a sign-in from the address is done; until it is, the
+	// button stays hidden so that it cannot start a second sign-in.
+	const [signingIn, setSigningIn] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	useEffect(() => onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null)), []);
 	useEffect(() => {
-		void signInError.then(setError);
+		void signInError.then((message) => {
+			setError(message);
+			setSigningIn(false);
+		});
 	}, []);
-	return <App uid={uid} error={error} />;
+	return <App uid={signingIn ? undefined : uid} error={error} />;
 }
 
 createRoot(root).render(

@@ -147,6 +147,31 @@ describe('verifyAccessJwt', () => {
 		await verify(unknown, fetchFn, NOW + 60_000);
 		expect(calls).toEqual([CERTS, CERTS]);
 	});
+
+	it('keeps the cached keys, and tries at most once a minute, when a refetch fails', async () => {
+		const { fetchFn } = certs();
+		await verify(await accessJwt(), fetchFn, NOW);
+		let failures = 0;
+		const down = (async () => {
+			failures++;
+			throw new TypeError('nätet');
+		}) as unknown as typeof fetch;
+		const unknown = await accessJwt({}, { header: { kid: 'kid-ny' } });
+		expect(await verify(unknown, down, NOW + 60_000)).toBeNull();
+		expect(await verify(unknown, down, NOW + 90_000)).toBeNull();
+		expect(failures).toBe(1);
+		expect(await verify(await accessJwt({ exp: NOW_S + 3600 }), down, NOW + 90_000)).not.toBeNull();
+	});
+
+	it('fetches the keys again after an hour, so that a withdrawn key stops working', async () => {
+		const { fetchFn, calls } = certs();
+		const jwt = await accessJwt({ exp: NOW_S + 7200 });
+		await verify(jwt, fetchFn, NOW);
+		await verify(jwt, fetchFn, NOW + 59 * 60_000);
+		expect(calls).toHaveLength(1);
+		await verify(jwt, fetchFn, NOW + 60 * 60_000);
+		expect(calls).toHaveLength(2);
+	});
 });
 
 describe('/inloggning', () => {

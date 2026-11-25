@@ -10,7 +10,7 @@ En PWA byggd med React, Vite och TypeScript, med Firebase och Cloudflare Pages.
 
 ## Komma igång
 
-Kräver Node 22.13 eller senare (CI kör Node 24, se `.nvmrc`).
+Kräver Node 22.18 eller senare (CI kör Node 24, se `.nvmrc`).
 
     npm ci
     npm run dev        # http://localhost:5173

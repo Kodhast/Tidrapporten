@@ -24,7 +24,7 @@ export interface Deps {
 type Event =
 	| { level: 'info'; event: 'inloggning'; uid: string }
 	| { level: 'info'; event: 'inloggning-nekad'; reason: 'jwt' | 'okand-adress' }
-	| { level: 'error'; event: 'inloggning-fel'; reason: 'nycklar' | 'konfiguration' };
+	| { level: 'error'; event: 'inloggning-fel'; reason: 'nycklar' | 'konfiguration' | 'okant' };
 
 function text(status: number, body: string): Response {
 	return new Response(body, {
@@ -59,8 +59,9 @@ export async function handleSignIn(request: Request, env: Env, deps: Deps = {}):
 			fetchFn
 		});
 	} catch (error) {
-		if (!(error instanceof KeysUnavailable)) throw error;
-		write({ level: 'error', event: 'inloggning-fel', reason: 'nycklar' });
+		const reason = error instanceof KeysUnavailable ? 'nycklar' : 'okant';
+		write({ level: 'error', event: 'inloggning-fel', reason });
+		if (reason === 'okant') throw error;
 		return text(500, 'Inloggningen går inte att kontrollera just nu. Försök igen om en stund.');
 	}
 	if (!payload) {

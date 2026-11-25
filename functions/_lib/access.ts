@@ -10,10 +10,13 @@ export const teamUrl = (team: string) => `https://${team}.cloudflareaccess.com`;
 
 const CLOCK_SKEW_S = 60;
 const REFETCH_MS = 60_000;
+const MAX_AGE_MS = 60 * 60_000;
 
 interface Keys {
 	byKid: Map<string, Key>;
 	fetchedAt: number;
+	/** The last fetch for an unknown kid, successful or not; limits refetches to one a minute. */
+	triedAt: number;
 }
 let cached: Keys | null = null;
 
@@ -60,7 +63,7 @@ async function fetchKeys(fetchFn: typeof fetch, now: number): Promise<Keys> {
 		}
 	}
 	if (!byKid.size) throw new KeysUnavailable('no keys in the answer');
-	cached = { byKid, fetchedAt: now };
+	cached = { byKid, fetchedAt: now, triedAt: now };
 	return cached;
 }
 
@@ -101,13 +104,22 @@ export async function verifyAccessJwt(
 	if (!parts || parts.header.alg !== 'RS256' || typeof parts.header.kid !== 'string') return null;
 	const { kid } = parts.header;
 
-	let keys = cached ?? (await fetchKeys(fetchFn, now));
-	if (!keys.byKid.has(kid) && now - keys.fetchedAt >= REFETCH_MS) {
-		keys = await fetchKeys(fetchFn, now);
+	let keys = cached;
+	// Keys older than MAX_AGE_MS are not trusted, so that a key Cloudflare has withdrawn stops
+	// working in a long-lived isolate; failing to fetch them is a server fault.
+	if (!keys || now - keys.fetchedAt >= MAX_AGE_MS) keys = await fetchKeys(fetchFn, now);
+	else if (!keys.byKid.has(kid) && now - keys.triedAt >= REFETCH_MS) {
+		keys.triedAt = now;
+		try {
+			keys = await fetchKeys(fetchFn, now);
+		} catch (error) {
+			// The cached keys still hold; the unknown kid simply does not verify.
+			if (!(error instanceof KeysUnavailable)) throw error;
+		}
 	}
 	const key = keys.byKid.get(kid);
 	if (!key) return null;
-	const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, parts.signature, parts.signed);
+	const valid = await crypto.subtle.verify(RS256, key, parts.signature, parts.signed);
 	if (!valid) return null;
 
 	const p = parts.payload;
