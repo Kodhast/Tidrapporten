@@ -11,8 +11,10 @@ Underlag från issue 2. Själva datamodellen i Firestore bestäms i en egen ADR 
 
 ## Beslut
 
+- **Hierarki:** arbetsgivare, uppdrag och uppdragets egna interna tidkoder.
 - **Uppdrag** är det faktiska jobbet, med egna interna tidkoder och en norm (omfattning i
-  procent). Varje tidkod har en flagga för debiterbar ja/nej. Appen har inga timpriser.
+  procent). Varje tidkod har en flagga för debiterbar ja/nej, och debiteringsgraden visas per vecka
+  och per månad. Appen har inga timpriser.
 - **Rapportkedja:** ett uppdrag har 1..n mottagare. Varje mottagare har egen veckorapport och egna
   koder, och de interna koderna mappas mot mottagarens. Samma veckosumma går till alla, men
   rapporterna sparas per mottagare.
@@ -22,6 +24,7 @@ Underlag från issue 2. Själva datamodellen i Firestore bestäms i en egen ADR 
   saldo per uppdrag.
 - **Frånvaro och intern tid** är konfigurerbara listor. Från start: semester, sjukdom,
   tjänstledighet, komptid (uttag ur flex), utbildning, bänktid och interna möten (arbetad tid).
+  VAB och föräldraledighet ingår inte från start.
 - **Låsning:** en inskickad vecka låses som en ögonblicksbild. Den kan låsas upp, men varje
   ändring loggas med tid och skäl.
 

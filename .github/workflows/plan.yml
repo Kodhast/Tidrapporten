@@ -19,7 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      # The check comes from the base branch, so a PR cannot loosen the check that judges it.
+      # Only the PR that adds the check (base without it) runs its own copy.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: .claude/hooks
+      - name: Kontrollen finns på basen, annars PR:ens
+        if: hashFiles('.claude/hooks/plan-approved.mjs') == ''
+        uses: actions/checkout@v7
         with:
           sparse-checkout: .claude/hooks
       - run: node .claude/hooks/plan-approved.mjs --ci

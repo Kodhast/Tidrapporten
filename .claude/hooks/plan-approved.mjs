@@ -13,11 +13,9 @@ import { pathToFileURL } from 'node:url';
 export const APPROVED_LABEL = 'plan-godkänd';
 const REPO = process.env.GITHUB_REPOSITORY ?? 'Kodhast/Tidrapporten';
 
-/** Issue numbers the PR text links with Closes/Fixes/Resolves/Refs #N. */
+/** Issue numbers the PR text closes with Closes/Fixes/Resolves #N (a colon after the keyword is allowed). */
 export function linkedIssues(body) {
-	const matches = (body ?? '').matchAll(
-		/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\s+#(\d+)/gi
-	);
+	const matches = (body ?? '').matchAll(/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)/gi);
 	return [...new Set([...matches].map((match) => Number(match[1])))];
 }
 
@@ -43,22 +41,30 @@ export async function planProblem(body, getLabels) {
 	);
 }
 
-async function githubLabels(issue) {
+/** Reads the labels of an issue in `repo` (owner/name). */
+const githubLabels = (repo) => async (issue) => {
 	const headers = { accept: 'application/vnd.github+json' };
 	if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-	const response = await fetch(`https://api.github.com/repos/${REPO}/issues/${issue}/labels`, {
+	const response = await fetch(`https://api.github.com/repos/${repo}/issues/${issue}/labels`, {
 		headers,
 		signal: AbortSignal.timeout(10_000)
 	});
 	if (!response.ok) throw new Error(`GitHub svarade ${response.status} för #${issue}`);
 	return (await response.json()).map((label) => label.name);
+};
+
+/** True when the PR the tool creates is for this repo; other repos have their own check. */
+export function isThisRepo(toolInput) {
+	if (!toolInput?.owner || !toolInput?.repo) return true;
+	return `${toolInput.owner}/${toolInput.repo}`.toLowerCase() === REPO.toLowerCase();
 }
 
 async function runHook() {
 	const input = JSON.parse(readFileSync(0, 'utf8'));
+	if (!isThisRepo(input.tool_input)) return;
 	let problem;
 	try {
-		problem = await planProblem(input.tool_input?.body, githubLabels);
+		problem = await planProblem(input.tool_input?.body, githubLabels(REPO));
 	} catch (error) {
 		console.log(
 			JSON.stringify({
@@ -75,7 +81,7 @@ async function runHook() {
 
 async function runCi() {
 	const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-	const problem = await planProblem(event.pull_request?.body, githubLabels);
+	const problem = await planProblem(event.pull_request?.body, githubLabels(REPO));
 	if (problem) {
 		console.log(`::error::${problem}`);
 		process.exit(1);

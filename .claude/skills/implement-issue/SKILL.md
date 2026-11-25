@@ -62,7 +62,8 @@ beräkningar. Kör kontrollerna en sista gång efter sista rundan.
 
 - PR-texten följer `.github/pull_request_template.md` och säger också avvikelser från issuet.
 - Rött CI → agenten **`ci-doktor`**.
-- Merga bara när **Plan godkänd** också är grön.
+- Merga bara när **Plan godkänd** också är grön. Sattes etiketten efter att PR:en öppnades: kör om
+  kontrollen (den startar inte av sig själv när issuet får etiketten).
 
 ## Konflikter – Tidrapporten
 

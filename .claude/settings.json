@@ -55,7 +55,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"if": "Bash(git push:*)",
+						"if": "Bash(git *)",
 						"command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verify-before-push.mjs",
 						"timeout": 300,
 						"onFailure": "block"

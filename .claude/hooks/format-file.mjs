@@ -9,10 +9,14 @@ import path from 'node:path';
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const file = input.tool_input?.file_path;
 
-if (file) {
+const root = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+const relative = file ? path.relative(root, path.resolve(root, file)) : '';
+// Only files in this repo: a sibling repo or a scratch file has its own formatting.
+const inRepo = file && relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+if (inRepo) {
 	// --ignore-unknown skips files Prettier has no parser for; .prettierignore still applies.
 	// The local binary starts in a fraction of the time `npx` needs.
-	const root = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 	spawnSync(
 		path.join(root, 'node_modules', '.bin', 'prettier'),
 		['--write', '--ignore-unknown', file],

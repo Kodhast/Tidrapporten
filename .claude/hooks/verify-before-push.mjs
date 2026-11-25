@@ -12,7 +12,8 @@ import path from 'node:path';
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const command = input.tool_input?.command ?? '';
 
-if (!/\bgit\s+push\b/.test(command)) process.exit(0);
+// Also `git -C <dir> push` and `git -c key=value push`, which push without `push` right after `git`.
+if (!/\bgit(?:\s+-[cC]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+push\b/.test(command)) process.exit(0);
 
 const cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 

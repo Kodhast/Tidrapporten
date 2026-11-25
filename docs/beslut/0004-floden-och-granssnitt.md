@@ -12,7 +12,8 @@ dator. Underlag från issue 3.
 
 - **Telefon och dator** är lika viktiga, med samma funktioner. Timern synkas direkt mellan dem.
 - **Glömd timer och luckor:** en timer över cirka 10 timmar frågar när arbetet slutade. Luckor
-  syns och kan fyllas eller markeras som paus. Överlappande intervall varnar men förbjuds inte.
+  syns och kan fyllas eller markeras som paus. En arbetsdag utan tid ger ett förslag på en
+  standarddag, inställbar per uppdrag. Överlappande intervall varnar men förbjuds inte.
   Appen känner inte av inaktivitet.
 - **Veckoförslag** per uppdrag och mottagare: fyllt mot normen, eller faktisk tid avrundad till
   närmaste kvart. Avvikelsen går till flexen.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkedIssues, planProblem } from '../.claude/hooks/plan-approved.mjs';
+import { isThisRepo, linkedIssues, planProblem } from '../.claude/hooks/plan-approved.mjs';
 
 const labels =
 	(byIssue: Record<number, string[]>) =>
@@ -7,8 +7,12 @@ const labels =
 		byIssue[issue] ?? [];
 
 describe('linkedIssues', () => {
-	it('finds issues linked with closing and reference keywords', () => {
-		expect(linkedIssues('Closes #12\nFixes #3, refs #40. Resolved #12')).toEqual([12, 3, 40]);
+	it('finds issues closed with a closing keyword, with or without a colon', () => {
+		expect(linkedIssues('Closes #12\nFixes: #3. Resolved #12')).toEqual([12, 3]);
+	});
+
+	it('ignores issues that are only referenced', () => {
+		expect(linkedIssues('Closes #19\nRefs #8')).toEqual([19]);
 	});
 
 	it('ignores bare issue numbers', () => {
@@ -51,5 +55,17 @@ describe('planProblem', () => {
 	it('does not count a small change without a reason', async () => {
 		expect(await planProblem('Liten ändring:', labels({}))).not.toBeNull();
 		expect(await planProblem('Det här är en liten ändring: x', labels({}))).not.toBeNull();
+	});
+});
+
+describe('isThisRepo', () => {
+	it('checks a PR for this repo or one without owner and repo', () => {
+		expect(isThisRepo({ owner: 'Kodhast', repo: 'Tidrapporten' })).toBe(true);
+		expect(isThisRepo({ owner: 'kodhast', repo: 'tidrapporten' })).toBe(true);
+		expect(isThisRepo(undefined)).toBe(true);
+	});
+
+	it('leaves a PR for another repo to that repo', () => {
+		expect(isThisRepo({ owner: 'Kodhast', repo: 'VeckansMat' })).toBe(false);
 	});
 });
