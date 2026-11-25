@@ -7,8 +7,8 @@ import { parseSigner, signCustomToken } from './_lib/custom-token.ts';
 
 export interface Env {
 	/**
-	 * The Access applications' audience tags, comma-separated: a Pages environment can sit behind
-	 * more than one (main and the previews share Preview).
+	 * The Access applications' audience tags, comma-separated, so that a second application can be
+	 * added without a code change.
 	 */
 	ACCESS_AUD?: string;
 	/** JSON object, e-mail address → uid. The uid stays when the address changes. */

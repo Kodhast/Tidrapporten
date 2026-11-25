@@ -46,8 +46,8 @@ Access. Den behöver tre hemligheter per Pages-miljö (Preview och Production):
 | `ANVANDARE`       | JSON, e-postadress till uid; uid står kvar om adressen byts                         |
 | `FIREBASE_SIGNER` | JSON-nyckeln för `tidrapporten-inloggning` (inga roller) i miljöns Firebase-projekt |
 
-Preview har två taggar, eftersom `test.tid.kodhast.com` och förhandsvisningarna ligger bakom
-var sin Access-applikation (se Pages nedan). Production har en.
+Alla adresser ligger bakom samma Access-applikation, så båda miljöerna har samma tagg. Listan
+finns för att en andra applikation ska kunna läggas till utan kodändring.
 
 Provet mot testprojektet, med nyckeln i miljövariabeln `FIREBASE_SIGNER_TEST`:
 
@@ -68,11 +68,10 @@ Git-integration). `scripts/pages-projekt.sh` skapar det första gången.
 
 **Access** (team `kodhast`, Google, _Instant authentication_):
 
-- `Tidrapporten inloggning`, self-hosted: `tid.kodhast.com/inloggning` och
-  `test.tid.kodhast.com/inloggning`. Resten av adresserna är öppna.
-- Förhandsvisningarna: Pages egen _Enable access policy_ skyddar hela
-  `*.tidrapporten.pages.dev`. Access kan inte skydda bara en sökväg på `pages.dev`, som är
-  Cloudflares zon och inte vår.
+- `Tidrapporten inloggning`, self-hosted: `tid.kodhast.com/inloggning`,
+  `test.tid.kodhast.com/inloggning` och `*.tidrapporten.pages.dev/inloggning`. Resten av
+  adresserna är öppna. Pages-projektet måste finnas innan `tidrapporten.pages.dev` går att
+  välja som domän i Access.
 
 Vem som får logga in avgör `ANVANDARE`, inte Access.
 
