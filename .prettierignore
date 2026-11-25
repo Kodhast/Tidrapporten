@@ -3,6 +3,10 @@ package-lock.json
 coverage
 dist
 dev-dist
+functions/lib
 
 # Copied unchanged from upstream; see each SOURCE.md
 .claude/skills/vercel-react-best-practices/
+.claude/skills/firebase-basics/
+.claude/skills/firebase-auth-basics/
+.claude/skills/firebase-firestore/

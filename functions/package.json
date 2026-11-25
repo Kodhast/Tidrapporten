@@ -1,0 +1,11 @@
+{
+	"name": "tidrapporten-functions",
+	"private": true,
+	"description": "Cloud Functions för Tidrapporten; byggs av npm run build:functions i roten (beslut 0014)",
+	"type": "module",
+	"main": "lib/index.js",
+	"engines": {
+		"node": "22"
+	},
+	"dependencies": {}
+}

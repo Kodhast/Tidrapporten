@@ -6,7 +6,13 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 export default defineConfig(
-	globalIgnores(['dist', 'dev-dist', 'coverage', '.claude/skills/vercel-react-best-practices']),
+	globalIgnores([
+		'dist',
+		'dev-dist',
+		'coverage',
+		'functions/lib',
+		'.claude/skills/vercel-react-best-practices'
+	]),
 	js.configs.recommended,
 	ts.configs.recommended,
 	reactHooks.configs.flat['recommended-latest'],

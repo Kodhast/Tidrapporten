@@ -18,3 +18,5 @@ Code. 0002–0010 sammanfattar intervjun i issue 1–7.
 | [0011](0011-claude-code-och-arbetsflode.md) | Claude Code och arbetsflödet         | Beslutat                                      |
 | [0012](0012-datamodell.md)                  | Datamodell, låsning och flex         | Beslutat, normens avrundning ersatt av 0013   |
 | [0013](0013-normen-i-hela-kvartar.md)       | Normen i hela kvartar                | Beslutat                                      |
+| [0014](0014-functions-koden.md)             | Var Functions-koden bor              | Beslutat                                      |
+| [0015](0015-firebase-projekt-och-region.md) | Firebase-projekten och regionen      | Beslutat                                      |

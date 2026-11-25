@@ -26,6 +26,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+      # The Firestore and Auth emulators need Java; their downloads are cached per firebase-tools.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+      - run: npm run test:rules
 
   e2e:
     name: e2e
