@@ -12,6 +12,9 @@ updates:
       # Node types follow the Node major in .nvmrc, which is bumped deliberately.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # Kodhast's own libraries are git tags, which Dependabot orders wrongly (it offered web-ui
+      # v2.0.0 -> v1.13.1, PR 33). They are bumped deliberately in the PR that needs the new version.
+      - dependency-name: '@kodhast/*'
     commit-message:
       prefix: 'Beroenden'
 
