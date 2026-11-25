@@ -13,6 +13,7 @@ skill, agent och koppling kommer in står i issue 8 under "Skills, agenter och k
 | `release`                     | Versionshöjning i PR:en och release till drift | Egen, efter VeckansMat                           |
 | `adr`                         | Nytt beslut i `docs/beslut/`                   | Egen, efter VeckansMat                           |
 | `mockup`                      | Före ny eller ändrad GUI                       | Egen, efter VeckansMat                           |
+| `tidsregler`                  | Beräkningar i `src/domain/`: tid, norm, flex   | Egen, som `fondmatematik` i Fonder               |
 | `vercel-react-best-practices` | Skriva och granska React-kod                   | Vercel, oförändrad                               |
 
 Oförändrade kopior har `SOURCE.md` och `LICENSE.txt` i sin katalog och formateras inte av
