@@ -6,11 +6,10 @@ export interface AppProps {
 	uid?: string | null;
 	/** Why the last sign-in failed. */
 	error?: string | null;
-	onSignIn?: () => void;
 }
 
 /** The empty start page; the real one comes with issue 19. */
-export function App({ uid, error, onSignIn = startSignIn }: AppProps) {
+export function App({ uid, error }: AppProps) {
 	return (
 		<main className="kh-page start">
 			<h1 className="kh-text-screen-title">Tidrapporten</h1>
@@ -20,7 +19,7 @@ export function App({ uid, error, onSignIn = startSignIn }: AppProps) {
 				Starta timern
 			</Button>
 			{/* Provisional until the views in issue 19. */}
-			{uid === null && <Button onPress={() => onSignIn()}>Logga in</Button>}
+			{uid === null && <Button onPress={() => startSignIn()}>Logga in</Button>}
 			{uid && <p className="kh-text-body">Inloggad som {uid}</p>}
 			{error && <p className="kh-text-body">{error}</p>}
 		</main>

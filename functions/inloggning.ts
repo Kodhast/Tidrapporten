@@ -2,7 +2,7 @@
 // in with Google. The function checks Access's JWT, looks the e-mail address up in ANVANDARE and
 // redirects to /#token=<Firebase custom token>. The fragment never reaches a server; the app reads
 // it and signs in with signInWithCustomToken.
-import { ACCESS_TEAM, KeysUnavailable, verifyAccessJwt } from './_lib/access.ts';
+import { KeysUnavailable, verifyAccessJwt } from './_lib/access.ts';
 import { parseSigner, signCustomToken } from './_lib/custom-token.ts';
 
 export interface Env {
@@ -45,15 +45,15 @@ function lookUpUid(users: string | undefined, email: string): string | null {
 export async function handleSignIn(request: Request, env: Env, deps: Deps = {}): Promise<Response> {
 	const { now = Date.now(), fetchFn = fetch, log = console.log } = deps;
 	const write = (event: Event) => log(JSON.stringify(event));
-	if (!env.ACCESS_AUD) {
+	const misconfigured = () => {
 		write({ level: 'error', event: 'inloggning-fel', reason: 'konfiguration' });
 		return text(500, 'Inloggningen är inte uppsatt rätt.');
-	}
+	};
+	if (!env.ACCESS_AUD) return misconfigured();
 
 	let payload;
 	try {
 		payload = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
-			team: ACCESS_TEAM,
 			aud: env.ACCESS_AUD,
 			now,
 			fetchFn
@@ -69,17 +69,20 @@ export async function handleSignIn(request: Request, env: Env, deps: Deps = {}):
 	}
 
 	let uid: string | null;
-	let token: string;
 	try {
 		uid = lookUpUid(env.ANVANDARE, payload.email);
-		if (!uid) {
-			write({ level: 'info', event: 'inloggning-nekad', reason: 'okand-adress' });
-			return text(403, 'Det här kontot har ingen åtkomst till Tidrapporten.');
-		}
+	} catch {
+		return misconfigured();
+	}
+	if (!uid) {
+		write({ level: 'info', event: 'inloggning-nekad', reason: 'okand-adress' });
+		return text(403, 'Det här kontot har ingen åtkomst till Tidrapporten.');
+	}
+	let token: string;
+	try {
 		token = await signCustomToken(parseSigner(env.FIREBASE_SIGNER), uid, now);
 	} catch {
-		write({ level: 'error', event: 'inloggning-fel', reason: 'konfiguration' });
-		return text(500, 'Inloggningen är inte uppsatt rätt.');
+		return misconfigured();
 	}
 
 	write({ level: 'info', event: 'inloggning', uid });

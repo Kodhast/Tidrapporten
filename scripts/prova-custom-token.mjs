@@ -6,6 +6,7 @@
 //     node scripts/prova-custom-token.mjs
 import { readFileSync } from 'node:fs';
 import { parseSigner, signCustomToken } from '../functions/_lib/custom-token.ts';
+import { decodeJson } from '../functions/_lib/jwt.ts';
 import { firebaseOptions } from '../src/firebase/config.ts';
 
 const UID = 'prov-inloggning';
@@ -41,7 +42,7 @@ if (!response.ok) {
 	process.exit(1);
 }
 const [, payload = ''] = String(body.idToken).split('.');
-const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+const claims = decodeJson(payload);
 const ok = claims.user_id === UID && claims.firebase?.sign_in_provider === 'custom';
 console.log(
 	`uid: ${claims.user_id}, sign_in_provider: ${claims.firebase?.sign_in_provider} – ${ok ? 'godkänd' : 'FEL'}`

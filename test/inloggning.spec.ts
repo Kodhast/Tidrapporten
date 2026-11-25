@@ -1,18 +1,19 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { decodeJson, encodeBytes, encodeJson } from '../functions/_lib/base64url.ts';
-import { ACCESS_TEAM, forgetKeys, teamUrl, verifyAccessJwt } from '../functions/_lib/access.ts';
 import {
 	CUSTOM_TOKEN_AUDIENCE,
-	parseSigner,
-	signCustomToken
-} from '../functions/_lib/custom-token.ts';
+	decodeBytes,
+	decodeJson,
+	RS256,
+	signJwt
+} from '../functions/_lib/jwt.ts';
+import { ACCESS_TEAM, forgetKeys, teamUrl, verifyAccessJwt } from '../functions/_lib/access.ts';
+import { parseSigner, signCustomToken } from '../functions/_lib/custom-token.ts';
 import { handleSignIn, type Env } from '../functions/inloggning.ts';
 
 // Everything here is made up: keys are generated per run, addresses and uids are invented.
-const RSA = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const;
 const generate = () =>
 	crypto.subtle.generateKey(
-		{ ...RSA, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]) },
+		{ ...RS256, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]) },
 		true,
 		['sign', 'verify']
 	);
@@ -50,18 +51,19 @@ async function accessJwt(
 	payload: Record<string, unknown> = {},
 	{ key = accessKeys.privateKey, header = {} as Record<string, unknown> } = {}
 ): Promise<string> {
-	const h = encodeJson({ alg: 'RS256', kid: KID, typ: 'JWT', ...header });
-	const p = encodeJson({
-		iss: teamUrl(ACCESS_TEAM),
-		aud: [AUD],
-		email: 'person@example.com',
-		iat: NOW_S - 10,
-		nbf: NOW_S - 10,
-		exp: NOW_S + 600,
-		...payload
-	});
-	const signature = await crypto.subtle.sign(RSA, key, new TextEncoder().encode(`${h}.${p}`));
-	return `${h}.${p}.${encodeBytes(new Uint8Array(signature))}`;
+	return signJwt(
+		{ alg: 'RS256', kid: KID, typ: 'JWT', ...header },
+		{
+			iss: teamUrl(ACCESS_TEAM),
+			aud: [AUD],
+			email: 'person@example.com',
+			iat: NOW_S - 10,
+			nbf: NOW_S - 10,
+			exp: NOW_S + 600,
+			...payload
+		},
+		key
+	);
 }
 
 /** A fake fetch serving the team's keys; counts calls. */
@@ -92,9 +94,9 @@ describe('signCustomToken', () => {
 			uid: 'testperson-1'
 		});
 		const valid = await crypto.subtle.verify(
-			RSA,
+			RS256,
 			signerKeys.publicKey,
-			Buffer.from(signature, 'base64url'),
+			decodeBytes(signature),
 			new TextEncoder().encode(`${header}.${payload}`)
 		);
 		expect(valid).toBe(true);
@@ -111,7 +113,7 @@ describe('signCustomToken', () => {
 
 describe('verifyAccessJwt', () => {
 	const verify = (jwt: string | null, fetchFn = certs().fetchFn, now = NOW) =>
-		verifyAccessJwt(jwt, { team: ACCESS_TEAM, aud: AUD, now, fetchFn });
+		verifyAccessJwt(jwt, { aud: AUD, now, fetchFn });
 
 	it('accepts a valid token', async () => {
 		expect(await verify(await accessJwt())).toMatchObject({ email: 'person@example.com' });

@@ -3,10 +3,7 @@
 // unsigned. The team's keys are kept while the isolate lives and fetched again when an unknown
 // `kid` shows up (Cloudflare rotates them), at most once a minute so that made-up kids cannot
 // make every request fetch.
-import { decodeBytes, decodeJson } from './base64url.ts';
-
-// Written this way so that the type is the same under Workers' and Node's typings.
-type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
+import { decodeBytes, decodeJson, RS256, type Key } from './jwt.ts';
 
 export const ACCESS_TEAM = 'kodhast';
 export const teamUrl = (team: string) => `https://${team}.cloudflareaccess.com`;
@@ -18,7 +15,7 @@ interface Keys {
 	byKid: Map<string, Key>;
 	fetchedAt: number;
 }
-const cache = new Map<string, Keys>();
+let cached: Keys | null = null;
 
 /** The keys could not be fetched: a server fault, not a bad token. */
 export class KeysUnavailable extends Error {}
@@ -35,10 +32,10 @@ interface Jwk {
 	e?: string;
 }
 
-async function fetchKeys(team: string, fetchFn: typeof fetch, now: number): Promise<Keys> {
+async function fetchKeys(fetchFn: typeof fetch, now: number): Promise<Keys> {
 	let response: Response;
 	try {
-		response = await fetchFn(`${teamUrl(team)}/cdn-cgi/access/certs`);
+		response = await fetchFn(`${teamUrl(ACCESS_TEAM)}/cdn-cgi/access/certs`);
 	} catch {
 		throw new KeysUnavailable('the keys could not be reached');
 	}
@@ -53,7 +50,7 @@ async function fetchKeys(team: string, fetchFn: typeof fetch, now: number): Prom
 				await crypto.subtle.importKey(
 					'jwk',
 					{ kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
-					{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+					RS256,
 					false,
 					['verify']
 				)
@@ -63,9 +60,8 @@ async function fetchKeys(team: string, fetchFn: typeof fetch, now: number): Prom
 		}
 	}
 	if (!byKid.size) throw new KeysUnavailable('no keys in the answer');
-	const keys = { byKid, fetchedAt: now };
-	cache.set(team, keys);
-	return keys;
+	cached = { byKid, fetchedAt: now };
+	return cached;
 }
 
 function split(jwt: string) {
@@ -85,7 +81,6 @@ function split(jwt: string) {
 }
 
 export interface VerifyOptions {
-	team: string;
 	aud: string;
 	/** Milliseconds; replaceable so that the tests need no clock. */
 	now?: number;
@@ -99,16 +94,16 @@ export interface VerifyOptions {
  */
 export async function verifyAccessJwt(
 	jwt: string | null,
-	{ team, aud, now = Date.now(), fetchFn = fetch }: VerifyOptions
+	{ aud, now = Date.now(), fetchFn = fetch }: VerifyOptions
 ): Promise<AccessPayload | null> {
-	if (!jwt || !team || !aud) return null;
+	if (!jwt || !aud) return null;
 	const parts = split(jwt);
 	if (!parts || parts.header.alg !== 'RS256' || typeof parts.header.kid !== 'string') return null;
 	const { kid } = parts.header;
 
-	let keys = cache.get(team) ?? (await fetchKeys(team, fetchFn, now));
+	let keys = cached ?? (await fetchKeys(fetchFn, now));
 	if (!keys.byKid.has(kid) && now - keys.fetchedAt >= REFETCH_MS) {
-		keys = await fetchKeys(team, fetchFn, now);
+		keys = await fetchKeys(fetchFn, now);
 	}
 	const key = keys.byKid.get(kid);
 	if (!key) return null;
@@ -116,7 +111,7 @@ export async function verifyAccessJwt(
 	if (!valid) return null;
 
 	const p = parts.payload;
-	if (p.iss !== teamUrl(team)) return null;
+	if (p.iss !== teamUrl(ACCESS_TEAM)) return null;
 	const audiences = Array.isArray(p.aud) ? p.aud : [p.aud];
 	if (!audiences.includes(aud)) return null;
 	const seconds = now / 1000;
@@ -128,5 +123,5 @@ export async function verifyAccessJwt(
 
 /** Only for the tests: forget the keys. */
 export function forgetKeys(): void {
-	cache.clear();
+	cached = null;
 }

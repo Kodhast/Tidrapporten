@@ -21,7 +21,7 @@ export function takeToken(
 	const token = TOKEN.exec(location.hash)?.[1];
 	if (!token) return null;
 	history.replaceState(null, '', location.pathname + location.search);
-	return decodeURIComponent(token);
+	return token;
 }
 
 /** Signs in with a token from the address, if there is one; returns an error text or null. */

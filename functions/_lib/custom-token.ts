@@ -1,13 +1,8 @@
 // Signs a Firebase custom token locally with WebCrypto (decision 0017): RS256 with the service
 // account's private key, no call to Google. The same code runs in the Pages Function and in
 // scripts/prova-custom-token.mjs.
-import { decodeBytes, encodeBytes, encodeJson } from './base64url.ts';
+import { CUSTOM_TOKEN_AUDIENCE, decodeBytes, RS256, signJwt, type Key } from './jwt.ts';
 
-// Written this way so that the type is the same under Workers' and Node's typings.
-type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
-
-export const CUSTOM_TOKEN_AUDIENCE =
-	'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit';
 const LIFETIME_S = 3600;
 
 /** The fields used from Google's JSON key file. */
@@ -32,13 +27,7 @@ export function parseSigner(json: string | undefined): Signer {
 
 function importPrivateKey(pem: string): Promise<Key> {
 	const base64 = pem.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, '').replace(/\s+/g, '');
-	return crypto.subtle.importKey(
-		'pkcs8',
-		decodeBytes(base64),
-		{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-		false,
-		['sign']
-	);
+	return crypto.subtle.importKey('pkcs8', decodeBytes(base64), RS256, false, ['sign']);
 }
 
 /** A custom token for `uid` without extra claims, valid for an hour from `now` (ms). */
@@ -48,19 +37,16 @@ export async function signCustomToken(
 	now = Date.now()
 ): Promise<string> {
 	const iat = Math.floor(now / 1000);
-	const header = encodeJson({ alg: 'RS256', typ: 'JWT' });
-	const payload = encodeJson({
-		iss: signer.clientEmail,
-		sub: signer.clientEmail,
-		aud: CUSTOM_TOKEN_AUDIENCE,
-		iat,
-		exp: iat + LIFETIME_S,
-		uid
-	});
-	const signature = await crypto.subtle.sign(
-		'RSASSA-PKCS1-v1_5',
-		await importPrivateKey(signer.privateKey),
-		new TextEncoder().encode(`${header}.${payload}`)
+	return signJwt(
+		{ alg: 'RS256', typ: 'JWT' },
+		{
+			iss: signer.clientEmail,
+			sub: signer.clientEmail,
+			aud: CUSTOM_TOKEN_AUDIENCE,
+			iat,
+			exp: iat + LIFETIME_S,
+			uid
+		},
+		await importPrivateKey(signer.privateKey)
 	);
-	return `${header}.${payload}.${encodeBytes(new Uint8Array(signature))}`;
 }
