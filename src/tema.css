@@ -1,0 +1,119 @@
+/*
+ * Tidrapporten's theme for web-ui, as AppTheme in the Android apps.
+ *
+ * Only what the app sets is here: colours, typefaces, text sizes and the colours of the depth
+ * (web-ui's README, "Appen sätter"). Shapes, measures and the parts come from @kodhast/web-ui and are
+ * never written over here.
+ *
+ * PROVISIONAL: a neutral slate blue so that the skeleton has every colour web-ui needs. The look is
+ * decided by the mockup in issue 16; the manifest colours in vite.config.ts and index.html follow.
+ */
+
+:root {
+	--kh-font-body: Roboto, system-ui, sans-serif;
+	--kh-font-heading: Roboto, system-ui, sans-serif;
+	--kh-type-screen-title: 800 2.125rem/2.5rem var(--kh-font-heading);
+	--kh-type-big-number: 800 1.75rem/2rem var(--kh-font-heading);
+	--kh-type-headline: 800 1.375rem/1.75rem var(--kh-font-heading);
+	--kh-type-section-title: 700 1.125rem/1.5rem var(--kh-font-heading);
+	--kh-type-item-title: 600 1rem/1.375rem var(--kh-font-body);
+	--kh-type-item-subtitle: 400 0.875rem/1.25rem var(--kh-font-body);
+	--kh-type-body: 400 1rem/1.5rem var(--kh-font-body);
+	--kh-type-body-medium: 400 0.875rem/1.25rem var(--kh-font-body);
+	--kh-type-pill: 600 0.8125rem/1rem var(--kh-font-body);
+	--kh-type-caption: 700 0.75rem/1rem var(--kh-font-body);
+	--kh-type-button: 600 0.9375rem/1.25rem var(--kh-font-heading);
+	--kh-tracking-screen-title: -0.02em;
+	--kh-tracking-caption: 0.08em;
+}
+
+:root {
+	color-scheme: light;
+	--kh-primary: #2f5d8a;
+	--kh-on-primary: #ffffff;
+	--kh-primary-container: #d4e3f5;
+	--kh-on-primary-container: #12344f;
+	--kh-secondary: #4f5d6b;
+	--kh-on-secondary: #ffffff;
+	--kh-secondary-container: #dbe3ec;
+	--kh-on-secondary-container: #26323e;
+	--kh-tertiary: #6a5a8c;
+	--kh-on-tertiary: #ffffff;
+	--kh-background: #f4f6f9;
+	--kh-on-background: #191c20;
+	--kh-on-surface: #191c20;
+	--kh-surface-variant: #e2e6ec;
+	--kh-on-surface-variant: #454b53;
+	--kh-outline: #747a82;
+	--kh-outline-variant: #c8ced6;
+	--kh-error: #ba1a1a;
+	--kh-on-error: #ffffff;
+	--kh-error-container: #ffdad6;
+	--kh-on-error-container: #93000a;
+	--kh-inverse-surface: #2e3136;
+	--kh-inverse-on-surface: #eff1f5;
+	--kh-inverse-primary: #9fc7f0;
+	--kh-scrim: #000000;
+	--kh-card: #ffffff;
+	--kh-row-tint: #eef2f7;
+	--kh-toolbar: #1f2a36;
+	--kh-on-toolbar: #e8eef5;
+
+	--kh-depth-highlight: rgb(255 255 255 / 0.3);
+	--kh-depth-sheen: rgb(255 255 255 / 0.12);
+	--kh-depth-shadow: rgb(18 52 79 / 0.3);
+	--kh-depth-card-edge: rgb(18 52 79 / 0.07);
+	--kh-depth-card-shadow: rgb(18 52 79 / 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--kh-primary: #9fc7f0;
+		--kh-on-primary: #0b3150;
+		--kh-primary-container: #1d4a70;
+		--kh-on-primary-container: #d4e3f5;
+		--kh-secondary: #bcc7d3;
+		--kh-on-secondary: #26323e;
+		--kh-secondary-container: #3a4652;
+		--kh-on-secondary-container: #dbe3ec;
+		--kh-tertiary: #d1c1f5;
+		--kh-on-tertiary: #3a2c5a;
+		--kh-background: #14181d;
+		--kh-on-background: #e2e6ec;
+		--kh-on-surface: #e2e6ec;
+		--kh-surface-variant: #2a3038;
+		--kh-on-surface-variant: #c3c9d1;
+		--kh-outline: #8d939b;
+		--kh-outline-variant: #41474f;
+		--kh-error: #ffb4ab;
+		--kh-on-error: #690005;
+		--kh-error-container: #93000a;
+		--kh-on-error-container: #ffdad6;
+		--kh-inverse-surface: #e2e6ec;
+		--kh-inverse-on-surface: #2e3136;
+		--kh-inverse-primary: #2f5d8a;
+		--kh-scrim: #000000;
+		--kh-card: #1d2229;
+		--kh-row-tint: #222830;
+		--kh-toolbar: #e2e6ec;
+		--kh-on-toolbar: #1f2a36;
+
+		--kh-depth-highlight: rgb(255 255 255 / 0.4);
+		--kh-depth-sheen: rgb(255 255 255 / 0.14);
+		--kh-depth-shadow: rgb(0 0 0 / 0.55);
+		--kh-depth-card-edge: rgb(255 255 255 / 0.07);
+		--kh-depth-card-shadow: rgb(0 0 0 / 0.55);
+	}
+}
+
+body {
+	margin: 0;
+	min-height: 100dvh;
+}
+
+.start {
+	padding-block: var(--kh-space-xl);
+	display: grid;
+	gap: var(--kh-space-m);
+}

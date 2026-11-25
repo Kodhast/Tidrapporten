@@ -1,0 +1,8 @@
+package-lock.json
+/public/*.png
+coverage
+dist
+dev-dist
+
+# Copied unchanged from upstream; see each SOURCE.md
+.claude/skills/vercel-react-best-practices/
