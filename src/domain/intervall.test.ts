@@ -133,6 +133,13 @@ describe('forgotten timer', () => {
 		expect(suggestTimerEnd(timer, half, at('2026-11-26', '07:00'))).toBe(at('2026-11-25', '12:00'));
 	});
 
+	it('suggests the norm rounded to a quarter at 80 %', () => {
+		const part = assignment({
+			terms: [{ from: '2026-01-01', scopePercent: 80, workdayMinutes: 480 }]
+		});
+		expect(suggestTimerEnd(timer, part, at('2026-11-26', '07:00'))).toBe(at('2026-11-25', '14:30'));
+	});
+
 	it('suggests 8 hours when no terms are in force', () => {
 		const later = assignment({
 			terms: [{ from: '2026-12-01', scopePercent: 50, workdayMinutes: 480 }]

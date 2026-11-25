@@ -116,10 +116,10 @@ describe('suggestDay', () => {
 	});
 
 	it('never rounds whole-day absence, which is already the norm', () => {
-		const day = suggestDay(subjects([['semester', 384]], ['semester']), 'fillNorm', 384);
-		expect([...day]).toEqual([['semester', 384]]);
-		const actual = suggestDay(subjects([['semester', 384]], ['semester']), 'actualQuarter', 384);
-		expect([...actual]).toEqual([['semester', 384]]);
+		const day = suggestDay(subjects([['semester', 390]], ['semester']), 'fillNorm', 390);
+		expect([...day]).toEqual([['semester', 390]]);
+		const actual = suggestDay(subjects([['semester', 390]], ['semester']), 'actualQuarter', 390);
+		expect([...actual]).toEqual([['semester', 390]]);
 	});
 
 	it('leaves a day short when it has no internal code to fill', () => {
