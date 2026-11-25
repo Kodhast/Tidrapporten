@@ -134,8 +134,18 @@ describe('stored documents', () => {
 		expect(codeCodec.toData(code('c1'))).not.toHaveProperty('assignmentId');
 		expect(freeDayCodec.toData({ date: '2026-12-24', free: true, name: 'X' })).toEqual({
 			free: true,
-			name: 'X'
+			name: 'X',
+			lastChangeId: null
 		});
+	});
+
+	it('write the settings that alter the flex without a log entry, and read past the field', () => {
+		const data = assignmentCodec.toData(assignment());
+		expect(data.lastChangeId).toBeNull();
+		expect(receiverCodec.toData(receiver()).lastChangeId).toBeNull();
+		expect(assignmentCodec.fromData('a1', stored({ ...data, lastChangeId: 'logg-1' }))).toEqual(
+			assignment()
+		);
 	});
 
 	it('store instants as Firestore timestamps', () => {

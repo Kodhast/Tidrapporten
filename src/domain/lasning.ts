@@ -103,8 +103,13 @@ const canonical = (value: unknown): string =>
 			: v
 	);
 
-/** Everything but id, status and lastChangeId is the same. */
+/**
+ * Everything but id, status, lastChangeId and the snapshot is the same. An unlock keeps the
+ * stored snapshot, whose time the server set when the report was sent, so the caller's copy of it
+ * does not count.
+ */
 const sameContent = (a: Report, b: Report): boolean => {
-	const content = (r: Report) => canonical({ ...r, id: null, status: null, lastChangeId: null });
+	const content = (r: Report) =>
+		canonical({ ...r, id: null, status: null, lastChangeId: null, snapshot: null });
 	return content(a) === content(b);
 };

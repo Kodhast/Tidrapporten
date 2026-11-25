@@ -46,6 +46,14 @@ const logData = (input: LogInput): DocumentData => ({
 	...createMeta()
 });
 
+/** The stored report; when it is sent, the rules require the snapshot's time to be the server's. */
+const reportData = (report: Report, action: ChangeAction): DocumentData => {
+	const data = reportCodec.toData(report);
+	return action === 'send'
+		? { ...data, snapshot: { ...data.snapshot, sentAt: serverTimestamp() } }
+		: data;
+};
+
 /**
  * Saves a report: creates it, changes it, sends it, unlocks it or deletes a draft (`after`
  * null). Runs as a transaction, so it fails offline instead of being queued. A locked change
@@ -72,7 +80,9 @@ export const saveReport = async (
 			tx.delete(ref);
 			return null;
 		}
-		let saved: Report = { ...after, id };
+		// An unlock keeps the stored snapshot, whose time the server set.
+		let saved: Report =
+			change.action === 'unlock' ? { ...after, id, snapshot: before!.snapshot } : { ...after, id };
 		if (change.locked) {
 			const logRef = doc(collection(db, 'users', uid, 'changeLog'));
 			saved = { ...saved, lastChangeId: logRef.id };
@@ -98,9 +108,9 @@ export const saveReport = async (
 				updatedAt: serverTimestamp()
 			});
 		} else if (before) {
-			tx.update(ref, { ...reportCodec.toData(saved), ...updateMeta() });
+			tx.update(ref, { ...reportData(saved, change.action), ...updateMeta() });
 		} else {
-			tx.set(ref, { ...reportCodec.toData(saved), ...createMeta() });
+			tx.set(ref, { ...reportData(saved, change.action), ...createMeta() });
 		}
 		return saved;
 	});

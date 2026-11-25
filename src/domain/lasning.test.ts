@@ -77,6 +77,13 @@ describe('reportChange', () => {
 	const draft = r('draft');
 	const sent = { ...r('sent'), lastChangeId: null };
 	const unlocked = { ...r('unlocked'), lastChangeId: 'log1' };
+	const snapshot = {
+		sentAt: 1_000,
+		assignmentName: 'Exempeluppdraget',
+		receiverName: 'Mottagare ett',
+		codeNames: {},
+		actualMinutes: 2400
+	};
 	const changed = (x: Report): Report => ({
 		...x,
 		lines: [{ receiverCodeId: 'R-arbete', minutesPerDay: [480, 480, 480, 480, 420, 0, 0] }]
@@ -94,6 +101,12 @@ describe('reportChange', () => {
 			'sent unlocked',
 			sent,
 			{ ...sent, status: 'unlocked', lastChangeId: 'log1' },
+			{ allowed: true, action: 'unlock', locked: true }
+		],
+		[
+			'sent unlocked from a copy with the client’s send time',
+			{ ...sent, snapshot: { ...snapshot, sentAt: 2_000 } },
+			{ ...sent, snapshot: { ...snapshot, sentAt: 1_000 }, status: 'unlocked' },
 			{ allowed: true, action: 'unlock', locked: true }
 		],
 		['sent changed', sent, changed(sent), { allowed: false }],

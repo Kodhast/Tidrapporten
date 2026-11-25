@@ -69,6 +69,61 @@ const create = (db: Firestore, path: string, data: DocumentData) =>
 	setDoc(at(db, path), { ...data, ...createMeta() });
 
 const denied = (promise: Promise<unknown>) => expect(assertFails(promise)).resolves.toBeDefined();
+const allowed = (promise: Promise<unknown>) =>
+	expect(assertSucceeds(promise)).resolves.toBeUndefined();
+
+/** A changeLog entry as the data layer writes it. */
+const logEntry = (overrides: DocumentData = {}): DocumentData => ({
+	at: serverTimestamp(),
+	path: 'entries/e1',
+	action: 'update',
+	week: '2026-W48',
+	before: { note: '' },
+	after: { note: 'x' },
+	reason: '',
+	by: 'app',
+	...createMeta(),
+	...overrides
+});
+
+let logCount = 0;
+
+/**
+ * Writes a setting together with a new log entry for it, as ADR 0016 requires for the changes
+ * that alter the flex: a create, or an update when `update` is set.
+ */
+const logged = (
+	db: Firestore,
+	path: string,
+	data: DocumentData,
+	update = false,
+	logOverrides: DocumentData = {}
+) => {
+	const logId = `l-${++logCount}`;
+	const batch = writeBatch(db);
+	batch.set(
+		at(db, `changeLog/${logId}`),
+		logEntry({
+			path,
+			action: update ? 'update' : 'create',
+			week: null,
+			before: update ? { before: true } : null,
+			after: { after: true },
+			...logOverrides
+		})
+	);
+	const value = { ...data, lastChangeId: logId };
+	if (update) batch.update(at(db, path), { ...value, ...updateMeta() });
+	else batch.set(at(db, path), { ...value, ...createMeta() });
+	return batch.commit();
+};
+
+/** Receivers and free days are logged when they are created (ADR 0016). */
+const loggedOnCreate = (path: string) => /receivers|freeDays/.test(path);
+
+/** Creates any valid document, with a log entry where the rules need one. */
+const createAny = (db: Firestore, path: string, data: DocumentData) =>
+	loggedOnCreate(path) ? logged(db, path, data) : create(db, path, data);
 
 // A valid document of every kind, written as the data layer writes it.
 const valid: [string, DocumentData][] = [
@@ -109,11 +164,14 @@ const valid: [string, DocumentData][] = [
 
 describe('only the owner', () => {
 	it.each(valid)('can create, read and update %s', async (path, data) => {
-		await expect(assertSucceeds(create(owner(), path, data))).resolves.toBeUndefined();
+		await allowed(createAny(owner(), path, data));
 		await expect(assertSucceeds(getDoc(at(owner(), path)))).resolves.toBeDefined();
-		await expect(
-			assertSucceeds(updateDoc(at(owner(), path), { ...data, ...updateMeta() }))
-		).resolves.toBeUndefined();
+		// A free day is logged on every write; the others keep the fields that need a log.
+		await allowed(
+			path.startsWith('freeDays')
+				? logged(owner(), path, data, true)
+				: updateDoc(at(owner(), path), { ...data, ...updateMeta() })
+		);
 	});
 
 	it.each(valid)(
@@ -144,6 +202,17 @@ describe('only the owner', () => {
 		await expect(
 			assertSucceeds(getDocs(collection(owner(), 'users', OWNER, 'entries')))
 		).resolves.toBeDefined();
+	});
+
+	it('is refused in its own tree when signed in some other way than the login Worker', async () => {
+		const anonymousSignIn = env
+			.authenticatedContext(OWNER, { firebase: { sign_in_provider: 'anonymous', identities: {} } })
+			.firestore() as unknown as Firestore;
+		await denied(create(anonymousSignIn, 'entries/e1', valid[5]![1]));
+		await env.withSecurityRulesDisabled((ctx) =>
+			setDoc(doc(ctx.firestore(), 'users', OWNER, 'entries/e1'), { ...valid[5]![1] })
+		);
+		await denied(getDoc(at(anonymousSignIn, 'entries/e1')));
 	});
 
 	it('cannot use the user document itself', async () => {
@@ -193,6 +262,25 @@ describe('field validation', () => {
 			'an unknown subject kind',
 			'entries/e1',
 			{ ...entry, subject: { kind: 'other', codeId: 'c1' } }
+		],
+		[
+			'an interval before 2020',
+			'entries/e1',
+			{ ...entryCodec.toData(work('2019-12-31', '08:00', '17:00')) }
+		],
+		[
+			'an interval more than a year ahead',
+			'entries/e1',
+			{ ...entryCodec.toData(work('2028-01-10', '08:00', '17:00')) }
+		],
+		[
+			'a timer that starts days ahead',
+			'state/timer',
+			timerCodec.toData({
+				assignmentId: 'a1',
+				subject: { kind: 'code', codeId: 'c1' },
+				start: Date.now() + 3 * 86_400_000
+			})
 		],
 		['a number as a name', 'assignments/a1', { ...assignmentCodec.toData(assignment()), name: 42 }],
 		[
@@ -288,25 +376,14 @@ describe('field validation', () => {
 		for (const [path, data] of valid.filter(([p]) =>
 			/^(assignments|absenceTypes|state\/settings)/.test(p)
 		)) {
-			await create(owner(), path, data);
+			await createAny(owner(), path, data);
 			await denied(deleteDoc(at(owner(), path)));
 		}
 	});
 });
 
 describe('the change log', () => {
-	const log = (overrides: DocumentData = {}) => ({
-		at: serverTimestamp(),
-		path: 'entries/e1',
-		action: 'update',
-		week: '2026-W48',
-		before: { note: '' },
-		after: { note: 'x' },
-		reason: '',
-		by: 'app',
-		...createMeta(),
-		...overrides
-	});
+	const log = logEntry;
 
 	it('can be created', async () => {
 		await expect(
@@ -358,22 +435,24 @@ describe('locking reports', () => {
 	const withLog = async (r: Report, logId: string, logOverrides: DocumentData = {}) => {
 		const db = owner();
 		const batch = writeBatch(db);
-		batch.set(at(db, `changeLog/${logId}`), {
-			at: serverTimestamp(),
-			path: `reports/${id}`,
-			action: 'unlock',
-			week: '2026-W48',
-			before: null,
-			after: null,
-			reason: 'Fel kod på fredag',
-			by: 'app',
-			...createMeta(),
-			...logOverrides
-		});
-		batch.update(at(db, `reports/${id}`), {
-			...reportCodec.toData({ ...r, lastChangeId: logId }),
-			...updateMeta()
-		});
+		batch.set(
+			at(db, `changeLog/${logId}`),
+			logEntry({
+				path: `reports/${id}`,
+				action: 'unlock',
+				before: { status: 'sent' },
+				after: { status: r.status },
+				reason: 'Fel kod på fredag',
+				...logOverrides
+			})
+		);
+		const data = reportCodec.toData({ ...r, lastChangeId: logId });
+		// Sending sets the server's time; otherwise the stored snapshot stays.
+		const snapshot =
+			r.status === 'sent'
+				? { ...data.snapshot, sentAt: serverTimestamp() }
+				: (await getDoc(ref())).data()?.snapshot;
+		batch.update(at(db, `reports/${id}`), { ...data, snapshot, ...updateMeta() });
 		return batch.commit();
 	};
 
@@ -439,7 +518,9 @@ describe('locking reports', () => {
 		['a reason of only spaces', { reason: '   ' }],
 		['another report’s path', { path: 'reports/a1_r2_2026-W48' }],
 		['another week', { week: '2026-W47' }],
-		['another action', { action: 'update' }]
+		['another action', { action: 'update' }],
+		['no before', { before: null }],
+		['no after', { after: null }]
 	])('refuses an unlock whose log entry has %s', async (_, overrides) => {
 		await sendIt();
 		await denied(withLog({ ...sent(), status: 'unlocked' }, 'l1', overrides));
@@ -483,10 +564,89 @@ describe('locking reports', () => {
 		);
 	});
 
+	it('refuses a send whose snapshot time is not the server’s', async () => {
+		await saveReport(owner(), OWNER, id, draft());
+		await denied(write(sent()));
+		await sendIt();
+		expect((await getDoc(ref())).data()?.snapshot.sentAt).toBeInstanceOf(Timestamp);
+	});
+
 	it('refuses deleting an unlocked report', async () => {
 		await sendIt();
 		await withLog({ ...sent(), status: 'unlocked' }, 'l1');
 		await denied(deleteDoc(ref()));
+	});
+});
+
+describe('changes that alter the flex (ADR 0016)', () => {
+	const changed: [string, string, DocumentData, DocumentData][] = [
+		['openingFlex', 'assignments/a1', assignmentCodec.toData(assignment()), { openingFlex: 120 }],
+		[
+			'startDate',
+			'assignments/a1',
+			assignmentCodec.toData(assignment()),
+			{ startDate: '2026-02-01' }
+		],
+		['endDate', 'assignments/a1', assignmentCodec.toData(assignment()), { endDate: '2026-12-31' }],
+		[
+			'terms',
+			'assignments/a1',
+			assignmentCodec.toData(assignment()),
+			{ terms: [{ from: '2026-01-01', scopePercent: 80, workdayMinutes: 480 }] }
+		],
+		['counting', 'absenceTypes/komp', valid[3]![1], { counting: 'flexWithdrawal' }],
+		['position', 'assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { position: 2 }]
+	];
+
+	it.each(changed)(
+		'%s: refused without a new log entry, allowed with one',
+		async (_, path, data, change) => {
+			await createAny(owner(), path, data);
+			await denied(updateDoc(at(owner(), path), { ...data, ...change, ...updateMeta() }));
+			await allowed(logged(owner(), path, { ...data, ...change }, true));
+			// The entry just written cannot be used again, to change the field back.
+			const lastChangeId = (await getDoc(at(owner(), path))).data()?.lastChangeId as string;
+			await denied(updateDoc(at(owner(), path), { ...data, lastChangeId, ...updateMeta() }));
+		}
+	);
+
+	it.each([
+		['another path', { path: 'assignments/a2' }],
+		['a week', { week: '2026-W48' }],
+		['another action', { action: 'create' }],
+		['no before', { before: null }],
+		['no after', { after: null }]
+	])('refuses a logged change whose log entry has %s', async (_, overrides) => {
+		const data = assignmentCodec.toData(assignment());
+		await create(owner(), 'assignments/a1', data);
+		await denied(logged(owner(), 'assignments/a1', { ...data, openingFlex: 60 }, true, overrides));
+	});
+
+	it('lets names, archiving and order change without a log entry', async () => {
+		for (const [path, data, change] of [
+			['assignments/a1', assignmentCodec.toData(assignment()), { name: 'Nytt namn', order: 2 }],
+			['absenceTypes/semester', valid[3]![1], { archived: true }],
+			['assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { name: 'Ny mottagare' }]
+		] as [string, DocumentData, DocumentData][]) {
+			await createAny(owner(), path, data);
+			await allowed(updateDoc(at(owner(), path), { ...data, ...change, ...updateMeta() }));
+		}
+	});
+
+	it('needs a log entry for a new receiver and every new or changed free day', async () => {
+		await denied(create(owner(), 'assignments/a1/receivers/r2', receiverCodec.toData(receiver())));
+		await allowed(logged(owner(), 'assignments/a1/receivers/r2', receiverCodec.toData(receiver())));
+		const day = valid[4]![1];
+		await denied(create(owner(), 'freeDays/2026-12-24', day));
+		await allowed(logged(owner(), 'freeDays/2026-12-24', day));
+		await denied(updateDoc(at(owner(), 'freeDays/2026-12-24'), { ...day, ...updateMeta() }));
+		// Deleting a free day cannot name a log entry; the app logs it.
+		await allowed(deleteDoc(at(owner(), 'freeDays/2026-12-24')));
+	});
+
+	it('lets a new assignment and a new absence type be created without a log entry', async () => {
+		await allowed(create(owner(), 'assignments/a1', assignmentCodec.toData(assignment())));
+		await allowed(create(owner(), 'absenceTypes/semester', valid[3]![1]));
 	});
 });
 
