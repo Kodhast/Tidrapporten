@@ -84,6 +84,16 @@ describe('isDayOff', () => {
 		expect(isDayOff('2026-12-31', freeDays)).toBe(false);
 	});
 
+	it('keeps a holiday free; only eves can be worked', () => {
+		const freeDays = freeDaysByDate([{ date: '2026-12-25', free: false, name: 'Juldagen' }]);
+		expect(isDayOff('2026-12-25', freeDays)).toBe(true);
+	});
+
+	it('shares a frozen list that callers cannot change', () => {
+		expect(Object.isFrozen(daysOffOf(2026))).toBe(true);
+		expect(Object.isFrozen(daysOffOf(2026)[0])).toBe(true);
+	});
+
 	it('keeps a weekend free whatever the exceptions say', () => {
 		const freeDays = freeDaysByDate([{ date: '2026-12-26', free: false, name: 'Annandag jul' }]);
 		expect(isDayOff('2026-12-26', freeDays)).toBe(true);

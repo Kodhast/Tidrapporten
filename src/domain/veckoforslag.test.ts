@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { absenceCountings, timeByDay } from './flex';
 import { freeDaysByDate } from './helgdagar';
-import { absenceTypes, absentAllDay, assignment, code, receiver, workFor } from './testdata';
-import type { Entry, SuggestionMode } from './types';
+import { absenceTypes, absentAllDay, assignment, receiver, workFor } from './testdata';
+import type { SubjectTime } from './flex';
+import type { Entry, Id, SuggestionMode } from './types';
 import { roundToQuarter, suggestDay, suggestWeek } from './veckoforslag';
 
 const none = freeDaysByDate([]);
 const countings = absenceCountings(absenceTypes);
-const codes = [code('c1'), code('c2')];
 
 const suggest = (week: string, entries: Entry[], mode: SuggestionMode, r = receiver()) => {
 	const a = assignment();
@@ -17,7 +17,6 @@ const suggest = (week: string, entries: Entry[], mode: SuggestionMode, r = recei
 		week,
 		days: timeByDay(a, entries, none, countings),
 		freeDays: none,
-		codes,
 		mode
 	});
 };
@@ -38,17 +37,27 @@ describe('roundToQuarter', () => {
 });
 
 describe('suggestDay', () => {
-	const codeIds = new Set(['c1', 'c2']);
+	// Codes are clocked time; the ids starting with a lower-case word are absence types.
+	const subjects = (entries: [Id, number][], wholeDay: Id[] = []): Map<Id, SubjectTime> =>
+		new Map(
+			entries.map(([id, minutes]) => [
+				id,
+				id.startsWith('c')
+					? { kind: 'code', clocked: minutes, wholeDay: 0 }
+					: wholeDay.includes(id)
+						? { kind: 'absence', clocked: 0, wholeDay: minutes }
+						: { kind: 'absence', clocked: minutes, wholeDay: 0 }
+			])
+		);
 
 	it('rounds each subject in actual mode', () => {
 		const day = suggestDay(
-			new Map([
+			subjects([
 				['c1', 247],
 				['c2', 232]
 			]),
 			'actualQuarter',
-			480,
-			codeIds
+			480
 		);
 		expect([...day]).toEqual([
 			['c1', 240],
@@ -58,13 +67,12 @@ describe('suggestDay', () => {
 
 	it('fills the code with the most time up to the norm', () => {
 		const day = suggestDay(
-			new Map([
+			subjects([
 				['c1', 60],
 				['c2', 300]
 			]),
 			'fillNorm',
-			480,
-			codeIds
+			480
 		);
 		expect([...day]).toEqual([
 			['c1', 60],
@@ -74,14 +82,13 @@ describe('suggestDay', () => {
 
 	it('takes the excess from the largest codes first, never below zero, absence untouched', () => {
 		const day = suggestDay(
-			new Map([
+			subjects([
 				['semester', 240],
 				['c1', 120],
 				['c2', 180]
 			]),
 			'fillNorm',
-			240,
-			codeIds
+			240
 		);
 		expect([...day]).toEqual([
 			['semester', 240],
@@ -92,24 +99,30 @@ describe('suggestDay', () => {
 
 	it('picks the code with the lower id when two have the same time', () => {
 		const day = suggestDay(
-			new Map([
+			subjects([
 				['c2', 120],
 				['c1', 120]
 			]),
 			'fillNorm',
-			300,
-			codeIds
+			300
 		);
 		expect(day.get('c1')).toBe(180);
 		expect(day.get('c2')).toBe(120);
 	});
 
 	it('reports nothing on a day without norm', () => {
-		expect(suggestDay(new Map([['c1', 300]]), 'fillNorm', 0, codeIds).size).toBe(0);
+		expect(suggestDay(subjects([['c1', 300]]), 'fillNorm', 0).size).toBe(0);
+	});
+
+	it('keeps whole-day absence at a norm that is not whole quarters', () => {
+		const day = suggestDay(subjects([['semester', 384]], ['semester']), 'fillNorm', 384);
+		expect([...day]).toEqual([['semester', 384]]);
+		const actual = suggestDay(subjects([['semester', 384]], ['semester']), 'actualQuarter', 384);
+		expect([...actual]).toEqual([['semester', 384]]);
 	});
 
 	it('leaves a day short when it has no internal code to fill', () => {
-		const day = suggestDay(new Map([['semester', 240]]), 'fillNorm', 480, codeIds);
+		const day = suggestDay(subjects([['semester', 240]]), 'fillNorm', 480);
 		expect([...day]).toEqual([['semester', 240]]);
 	});
 });
@@ -206,8 +219,7 @@ describe('suggestWeek', () => {
 			receiver: receiver({ suggestionMode: 'actualQuarter' }),
 			week: '2026-W48',
 			days: timeByDay(a, [workFor('2026-11-23', '8:30')], none, countings),
-			freeDays: none,
-			codes
+			freeDays: none
 		});
 		expect(result.lines[0]?.minutesPerDay[0]).toBe(510);
 	});

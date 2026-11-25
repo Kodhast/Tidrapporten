@@ -23,11 +23,20 @@ export type AbsenceCountings = ReadonlyMap<Id, AbsenceCounting>;
 export const absenceCountings = (types: readonly AbsenceType[]): AbsenceCountings =>
 	new Map(types.map((t) => [t.id, t.counting]));
 
+/** One internal code's or absence type's time on a day, as a report shows it. */
+export interface SubjectTime {
+	kind: 'code' | 'absence';
+	/** Time from intervals. */
+	clocked: Minutes;
+	/** Whole-day absence, counted as the day's norm; never rounded. */
+	wholeDay: Minutes;
+}
+
 export interface DayTime {
 	/** Actual time for flex: worked time plus absence as its counting says. */
 	actual: Minutes;
-	/** Time per internal code or absence type id as a report shows it; whole-day absence = norm. */
-	bySubject: Map<Id, Minutes>;
+	/** Time per internal code or absence type id as a report shows it. */
+	bySubject: Map<Id, SubjectTime>;
 }
 
 export const subjectId = (entry: Entry): Id =>
@@ -44,16 +53,24 @@ export const timeByDay = (
 	countings: AbsenceCountings
 ): Map<IsoDate, DayTime> => {
 	const days = new Map<IsoDate, DayTime>();
-	const add = (date: IsoDate, subject: Id, reported: Minutes, actual: Minutes) => {
+	const add = (
+		date: IsoDate,
+		entry: Entry,
+		part: 'clocked' | 'wholeDay',
+		reported: Minutes,
+		actual: Minutes
+	) => {
 		if (!isWithinAssignment(assignment, date)) return;
 		const day = days.get(date) ?? { actual: 0, bySubject: new Map() };
+		const id = subjectId(entry);
+		const time = day.bySubject.get(id) ?? { kind: entry.subject.kind, clocked: 0, wholeDay: 0 };
+		time[part] += reported;
 		day.actual += actual;
-		day.bySubject.set(subject, (day.bySubject.get(subject) ?? 0) + reported);
+		day.bySubject.set(id, time);
 		days.set(date, day);
 	};
 	for (const entry of entries) {
 		if (entry.assignmentId !== assignment.id) continue;
-		const subject = subjectId(entry);
 		const counting =
 			entry.subject.kind === 'code'
 				? 'worked'
@@ -61,21 +78,25 @@ export const timeByDay = (
 		const counts = (minutes: Minutes) => (counting === 'flexWithdrawal' ? 0 : minutes);
 		if (entry.time.kind === 'allDay') {
 			const norm = normMinutes(assignment, entry.time.date, freeDays);
-			add(entry.time.date, subject, norm, counts(norm));
+			add(entry.time.date, entry, 'wholeDay', norm, counts(norm));
 		} else {
 			for (const part of splitByDay(entry.time)) {
-				add(part.date, subject, part.minutes, counts(part.minutes));
+				add(part.date, entry, 'clocked', part.minutes, counts(part.minutes));
 			}
 		}
 	}
 	return days;
 };
 
-/** The first receiver in the chain (`position` 1, or the lowest), whose report counts for flex. */
+/**
+ * The first receiver in the chain (`position` 1, or the lowest), whose report counts for flex.
+ * Archived receivers count too, so that archiving one does not recount earlier weeks.
+ */
 export const firstReceiver = (receivers: readonly Receiver[]): Receiver | undefined =>
-	receivers
-		.filter((r) => !r.archived)
-		.reduce<Receiver | undefined>((a, r) => (!a || r.position < a.position ? r : a), undefined);
+	receivers.reduce<Receiver | undefined>(
+		(a, r) => (!a || r.position < a.position ? r : a),
+		undefined
+	);
 
 export const isSent = (report: Report | undefined): report is Report =>
 	report?.status === 'sent' || report?.status === 'unlocked';

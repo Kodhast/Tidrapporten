@@ -28,7 +28,7 @@ proven och vid behov ADR:en i samma PR – och ett nytt räknat exempel skrivs s
 - Aftnarna – midsommarafton (fredagen 19–25 juni), julafton och nyårsafton – är lediga som
   standard.
 - Ägarens avvikelser (`freeDays`): `free: true` gör en vardag ledig (klämdag), `free: false` gör
-  en helgdag eller afton till arbetsdag. Lördag och söndag är alltid lediga.
+  en afton till arbetsdag. Helgdagar, lördag och söndag är alltid lediga.
 - Facit för 2024–2035 står i `helgdagar.test.ts`.
 
 ## Norm (`norm.ts`)
@@ -62,7 +62,8 @@ dag ger 0.
   norm.
 - **Skickad vecka** (första mottagarens rapport `sent` eller `unlocked`): faktisk tid minus
   rapporterad tid.
-- **Första mottagaren** = den aktiva mottagaren med lägst `position`.
+- **Första mottagaren** = mottagaren med lägst `position`, även om den är arkiverad, så att en
+  arkivering inte räknar om tidigare veckor.
 - **Saldo** = `openingFlex` + varje veckas flex från veckan med `startDate` till i dag eller
   `endDate`. Totalen är summan över uppdragen.
 - Har en annan skickad rapport samma vecka en annan summa visar appen en varning
@@ -73,8 +74,9 @@ dag ger 0.
 Varje intern kod och frånvarotyp avrundas eller fylls **före** mappningen till mottagarens koder,
 så att alla mottagare med samma läge får samma summa.
 
-- **`actualQuarter`:** varje kod och frånvarotyp per dag avrundad till närmaste kvart. Minuterna
-  är hela, så 7 min blir 0 och 8 min blir 15.
+- **`actualQuarter`:** varje kods och frånvarotyps tid från intervall avrundad till närmaste
+  kvart per dag. Minuterna är hela, så 7 min blir 0 och 8 min blir 15. Hel dags frånvaro
+  avrundas aldrig – den är exakt dagens norm, också när normen inte är hela kvartar (80 % = 6:24).
 - **`fillNorm`:** samma avrundning, sedan görs dagen lika med normen genom att den interna kod
   som har mest tid ändras (lika mycket → lägst id); blir den 0 tas resten från nästa.
   Frånvaro ändras inte. En dag med norm 0 (helg, helgdag) rapporterar inget, så arbete då hamnar
@@ -86,8 +88,9 @@ så att alla mottagare med samma läge får samma summa.
 - **Luckor:** mellan dagens första start och sista slut, där inget intervall pågår. Hel dags
   frånvaro räknas inte.
 - **Överlapp:** två intervall som delar tid; slut som möter start är inget överlapp.
-- **Glömd timer:** har gått mer än 10 timmar. Förslaget på sluttid är starten plus en arbetsdag
-  enligt villkoren den dagen (8 h utan villkor), men aldrig efter midnatt eller nu.
+- **Glömd timer:** har gått mer än 10 timmar. Förslaget på sluttid är starten plus dagens norm
+  enligt villkoren (arbetsdag × omfattning, även en ledig dag; 8 h utan villkor), men aldrig efter
+  midnatt eller nu.
 
 ## Räknade exempel
 

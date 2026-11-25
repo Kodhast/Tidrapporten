@@ -44,8 +44,9 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			include: ['src/**/*.{ts,tsx}'],
-			// The entry point only mounts the app in a browser; Playwright covers it.
-			exclude: ['src/main.tsx', 'src/**/*.test.{ts,tsx}'],
+			// The entry point only mounts the app in a browser; Playwright covers it. testdata.ts is
+			// made-up data for the tests and would only inflate the figure.
+			exclude: ['src/main.tsx', 'src/**/*.test.{ts,tsx}', 'src/domain/testdata.ts'],
 			thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 }
 		}
 	}

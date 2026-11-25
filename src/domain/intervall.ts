@@ -4,7 +4,6 @@ import { addDays, dateOf, startOfDay } from './tid';
 import type { Assignment, Entry, Id, IsoDate, Minutes, Timer, UtcMillis } from './types';
 
 const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
 
 export interface Span {
 	start: UtcMillis;
@@ -82,8 +81,9 @@ export const isTimerForgotten = (timer: Timer, now: UtcMillis): boolean =>
 	now - timer.start > FORGOTTEN_TIMER_AFTER * MINUTE;
 
 /**
- * A suggested end for a forgotten timer: the start plus a full workday under the assignment's
- * terms on the start day (8 h when there are none), but never past midnight or now.
+ * A suggested end for a forgotten timer: the start plus the assignment's daily norm under the
+ * terms on the start day (workday × scope; 8 h when there are none), but never past midnight
+ * or now.
  */
 export const suggestTimerEnd = (
 	timer: Timer,
@@ -93,5 +93,5 @@ export const suggestTimerEnd = (
 	const startDate = dateOf(timer.start);
 	const terms = termsOn(assignment, startDate);
 	const workday = terms ? fullDayNorm(terms) : 8 * 60;
-	return Math.min(timer.start + (workday / 60) * HOUR, startOfDay(addDays(startDate, 1)), now);
+	return Math.min(timer.start + workday * MINUTE, startOfDay(addDays(startDate, 1)), now);
 };

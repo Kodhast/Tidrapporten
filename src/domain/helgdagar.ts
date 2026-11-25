@@ -36,10 +36,10 @@ export const easterSunday = (year: number): IsoDate => {
 const firstWeekdayFrom = (date: IsoDate, isoWeekday: number): IsoDate =>
 	addDays(date, (isoWeekday - weekday(date) + 7) % 7);
 
-const cache = new Map<number, DayOff[]>();
+const cache = new Map<number, readonly DayOff[]>();
 
-/** Public holidays and the default free eves of a year, in date order. */
-export const daysOffOf = (year: number): DayOff[] => {
+/** Public holidays and the default free eves of a year, in date order. Frozen: it is shared. */
+export const daysOffOf = (year: number): readonly DayOff[] => {
 	const cached = cache.get(year);
 	if (cached) return cached;
 	const easter = easterSunday(year);
@@ -63,7 +63,10 @@ export const daysOffOf = (year: number): DayOff[] => {
 		holiday(on(year, 12, 25), 'Juldagen'),
 		holiday(on(year, 12, 26), 'Annandag jul'),
 		eve(on(year, 12, 31), 'Nyårsafton')
-	].sort((x, y) => x.date.localeCompare(y.date));
+	]
+		.sort((x, y) => x.date.localeCompare(y.date))
+		.map((d) => Object.freeze(d));
+	Object.freeze(days);
 	cache.set(year, days);
 	return days;
 };
@@ -80,11 +83,13 @@ export const freeDaysByDate = (freeDays: readonly FreeDay[]): FreeDays =>
 
 /**
  * Whether the date is a day without norm: Saturday, Sunday, a holiday, a free eve or an extra day
- * off. An exception with `free: false` makes a holiday or eve a workday; weekends stay free.
+ * off. An exception with `free: false` makes an eve a workday (ADR 0012); weekends and holidays
+ * stay free.
  */
 export const isDayOff = (date: IsoDate, freeDays: FreeDays): boolean => {
 	if (isWeekend(date)) return true;
+	const dayOff = dayOffOn(date);
 	const exception = freeDays.get(date);
-	if (exception) return exception.free;
-	return dayOffOn(date) !== undefined;
+	if (dayOff?.kind === 'eve' && exception?.free === false) return false;
+	return dayOff !== undefined || exception?.free === true;
 };

@@ -144,6 +144,23 @@ describe('weekFlex, open week', () => {
 	});
 });
 
+describe('weekFlex over a change of summer time', () => {
+	it('counts the real length of a night shift in 2026-W13, when the clocks go forward', () => {
+		// Friday 22:00 to Saturday 06:00 is 8 hours; Saturday night to Sunday 06:00 only 7.
+		const entries = [
+			work('2026-03-27', '22:00', '06:00', 'c1', '2026-03-28'),
+			work('2026-03-28', '22:00', '06:00', 'c1', '2026-03-29')
+		];
+		const now = at('2026-03-30', '10:00');
+		expect(flexOf('2026-W13', entries, now)).toBe(hm('15:00') - hm('40:00'));
+	});
+
+	it('counts the extra hour in 2026-W43, when the clocks go back', () => {
+		const entries = [work('2026-10-24', '22:00', '06:00', 'c1', '2026-10-25')];
+		expect(flexOf('2026-W43', entries, at('2026-10-26', '10:00'))).toBe(hm('9:00') - hm('40:00'));
+	});
+});
+
 describe('timeByDay and absence', () => {
 	const a = assignment();
 	const day = (entries: Entry[]) => timeByDay(a, entries, none, countings).get('2026-11-25');
@@ -155,7 +172,7 @@ describe('timeByDay and absence', () => {
 	])('a whole day of %s (%s) counts %i actual and reports %i', (type, _counting, actual, shown) => {
 		const result = day([absentAllDay('2026-11-25', type)]);
 		expect(result?.actual).toBe(actual);
-		expect(result?.bySubject.get(type)).toBe(shown);
+		expect(result?.bySubject.get(type)).toEqual({ kind: 'absence', clocked: 0, wholeDay: shown });
 	});
 
 	it.each([
@@ -165,7 +182,15 @@ describe('timeByDay and absence', () => {
 	])('four hours of %s count %i actual', (type, actual) => {
 		const result = day([absentBetween('2026-11-25', '08:00', '12:00', type)]);
 		expect(result?.actual).toBe(actual);
-		expect(result?.bySubject.get(type)).toBe(240);
+		expect(result?.bySubject.get(type)).toEqual({ kind: 'absence', clocked: 240, wholeDay: 0 });
+	});
+
+	it('keeps a whole day at the norm when the norm is not whole quarters', () => {
+		const part = assignment({
+			terms: [{ from: '2026-01-01', scopePercent: 80, workdayMinutes: 480 }]
+		});
+		const days = timeByDay(part, [absentAllDay('2026-11-25', 'semester')], none, countings);
+		expect(days.get('2026-11-25')?.actual).toBe(384);
 	});
 
 	it('counts an unknown absence type as filling the norm', () => {
@@ -257,11 +282,10 @@ describe('assignmentFlex and the total', () => {
 });
 
 describe('firstReceiver', () => {
-	it('is the active receiver with the lowest position', () => {
+	it('is the receiver with the lowest position, archived or not', () => {
 		const receivers = [
 			receiver({ id: 'r2', position: 2 }),
-			receiver({ id: 'r0', position: 0, archived: true }),
-			receiver({ id: 'r1', position: 1 })
+			receiver({ id: 'r1', position: 1, archived: true })
 		];
 		expect(firstReceiver(receivers)?.id).toBe('r1');
 		expect(firstReceiver([])).toBeUndefined();
