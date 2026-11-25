@@ -15,6 +15,9 @@ skill, agent och koppling kommer in står i issue 8 under "Skills, agenter och k
 | `mockup`                      | Före ny eller ändrad GUI                       | Egen, efter VeckansMat                           |
 | `tidsregler`                  | Beräkningar i `src/domain/`: tid, norm, flex   | Egen, som `fondmatematik` i Fonder               |
 | `vercel-react-best-practices` | Skriva och granska React-kod                   | Vercel, oförändrad                               |
+| `firebase-basics`             | Firebase CLI, projekt och `firebase use`       | Google, oförändrad                               |
+| `firebase-auth-basics`        | Firebase Authentication och inloggning         | Google, oförändrad                               |
+| `firebase-firestore`          | Firestore: datamodell, frågor, index och SDK   | Google, oförändrad                               |
 
 Oförändrade kopior har `SOURCE.md` och `LICENSE.txt` i sin katalog och formateras inte av
 Prettier (`.prettierignore`), så att de kan bytas mot en ny version rakt av.
@@ -22,6 +25,8 @@ Prettier (`.prettierignore`), så att de kan bytas mot en ny version rakt av.
 Arbetsflödets stomme, när en plan krävs, modellvalet, webbreglerna och designreglerna kommer från
 pluginen `android@claude-android`: `android:arbetsflode`, `android:arbetsregler`,
 `android:ai-model-choice`, `android:webb`, `android:designregler` och `android:ux-granskning`.
+Firestore-reglerna skrivs och granskas med pluginens `android:firestore-rules-creation` och
+`android:firebase-security-rules-auditor`.
 
 ## Agenter
 

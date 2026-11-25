@@ -3,6 +3,7 @@ node_modules
 # Output
 dist
 dev-dist
+functions/lib
 coverage
 *.local
 

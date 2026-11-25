@@ -17,18 +17,25 @@
 		"icons": "node scripts/make-icons.mjs",
 		"test": "vitest --run --coverage",
 		"test:e2e": "playwright test",
+		"test:rules": "firebase emulators:exec --only auth,firestore --project demo-tidrapporten \"vitest --run --config vitest.emulator.config.ts\"",
+		"build:functions": "vite build --config vite.functions.config.ts",
 		"verify": "npm run check && npm run lint && npm run test"
 	},
 	"dependencies": {
 		"@kodhast/web-ui": "github:Kodhast/web-ui#v2.0.0",
+		"firebase": "^13.4.0",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1"
 	},
 	"allowScripts": {
-		"esbuild": true
+		"esbuild": true,
+		"@firebase/util": false,
+		"protobufjs": false,
+		"re2": false
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
+		"@firebase/rules-unit-testing": "^6.0.0",
 		"@playwright/test": "^1.65.1",
 		"@types/node": "^24.19.4",
 		"@types/react": "^19.3.2",
@@ -38,6 +45,7 @@
 		"eslint": "^10.15.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-react-hooks": "^7.1.1",
+		"firebase-tools": "^15.37.0",
 		"globals": "^17.14.0",
 		"prettier": "^3.10.1",
 		"typescript": "^6.0.3",

@@ -24,5 +24,11 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedIndexedAccess": true
 	},
-	"include": ["vite.config.ts", "playwright.config.ts", "test"]
+	"include": [
+		"vite.config.ts",
+		"vitest.emulator.config.ts",
+		"vite.functions.config.ts",
+		"playwright.config.ts",
+		"test"
+	]
 }
