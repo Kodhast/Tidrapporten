@@ -37,4 +37,25 @@ Agenten `tidrapporten-granskare` kontrollerar höjningen.
 - **Starta först när CI på `main` är grönt** för HEAD.
 - **Taggar pushas aldrig från en Claude-session.** Release-workflowen skapar taggen själv.
 
-Stegen, workflowen och hur en release backas skrivs här när driften finns (issue 12).
+### Stegen
+
+1. Kontrollera att `version` i `package.json` på `main` har en rubrik i `CHANGELOG.md` och att
+   taggen inte finns.
+2. Actions → **Release** → Run workflow på `main`, först med **Provkör** ikryssad (förval). Den
+   bygger med `--mode drift`, provar Firestore-reglerna mot driftprojektet (`--dry-run`) och
+   rör inget.
+3. Grönt → kör igen utan Provkör. Workflowen driftsätter regler och index till driftprojektet,
+   publicerar Pages på produktionsgrenen `produktion` (`tid.kodhast.com`), skapar taggen
+   `vX.Y.Z` och en GitHub Release med raderna ur `CHANGELOG.md`.
+4. Svara med länken till releasen och `https://tid.kodhast.com`.
+
+Jobbet kör i GitHub-miljön `drift`, som bara får köras från `main` och har driftprojektets
+nyckel (`FIREBASE_DEPLOY_DRIFT`). Uppsättningen: [docs/drift.md](../../../docs/drift.md).
+
+### Backa en release
+
+- **Pages:** Cloudflare → Workers & Pages → tidrapporten → Deployments, välj den förra
+  produktionspubliceringen → **Rollback**. Påverkar inte Firestore.
+- **Regler och index:** en ny PR som återställer `firestore.rules` eller
+  `firestore.indexes.json`, och en ny release (patch).
+- Taggen och GitHub Release står kvar; nästa release får nästa version.

@@ -113,7 +113,7 @@ describe('signCustomToken', () => {
 
 describe('verifyAccessJwt', () => {
 	const verify = (jwt: string | null, fetchFn = certs().fetchFn, now = NOW) =>
-		verifyAccessJwt(jwt, { aud: AUD, now, fetchFn });
+		verifyAccessJwt(jwt, { aud: [AUD], now, fetchFn });
 
 	it('accepts a valid token', async () => {
 		expect(await verify(await accessJwt())).toMatchObject({ email: 'person@example.com' });
@@ -223,6 +223,14 @@ describe('/inloggning', () => {
 		expect((await signIn(request(forged))).status).toBe(401);
 	});
 
+	it('accepts any of the comma-separated audience tags in ACCESS_AUD', async () => {
+		const jwt = await accessJwt();
+		const both = { ...env(), ACCESS_AUD: `forhandsvisning-aud, ${AUD}` };
+		expect((await signIn(request(jwt), both)).status).toBe(302);
+		const other = { ...env(), ACCESS_AUD: 'forhandsvisning-aud,annan-app' };
+		expect((await signIn(request(jwt), other)).status).toBe(401);
+	});
+
 	it('answers 403 to an address that is not in ANVANDARE', async () => {
 		const response = await signIn(request(await accessJwt({ email: 'annan@example.com' })));
 		expect(response.status).toBe(403);
@@ -240,6 +248,7 @@ describe('/inloggning', () => {
 
 	it.each([
 		['ACCESS_AUD', { ACCESS_AUD: undefined }],
+		['ACCESS_AUD', { ACCESS_AUD: ' , ' }],
 		['ANVANDARE', { ANVANDARE: 'inte json' }],
 		['FIREBASE_SIGNER', { FIREBASE_SIGNER: undefined }]
 	])('answers 500 when %s is missing or broken', async (_, change) => {

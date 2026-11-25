@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.4.1
+
+- Appen ligger på Cloudflare: varje ändring går att prova på en egen förhandsadress, och
+  testmiljön finns på test.tid.kodhast.com (#12).
+
 ## 0.4.0
 
 - Inloggningen finns: knappen Logga in på startsidan loggar in med Google genom kodhast.com och

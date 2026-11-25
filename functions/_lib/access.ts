@@ -84,7 +84,8 @@ function split(jwt: string) {
 }
 
 export interface VerifyOptions {
-	aud: string;
+	/** The audience tags of the Access applications this function sits behind; one must match. */
+	aud: readonly string[];
 	/** Milliseconds; replaceable so that the tests need no clock. */
 	now?: number;
 	fetchFn?: typeof fetch;
@@ -92,14 +93,14 @@ export interface VerifyOptions {
 
 /**
  * The payload of an Access JWT that holds – right signature, issued by the team, for this
- * application (`aud`), within its validity and with an e-mail address – otherwise null.
+ * one of the applications (`aud`), within its validity and with an e-mail address – otherwise null.
  * Throws KeysUnavailable when the team's keys cannot be fetched.
  */
 export async function verifyAccessJwt(
 	jwt: string | null,
 	{ aud, now = Date.now(), fetchFn = fetch }: VerifyOptions
 ): Promise<AccessPayload | null> {
-	if (!jwt || !aud) return null;
+	if (!jwt || aud.length === 0) return null;
 	const parts = split(jwt);
 	if (!parts || parts.header.alg !== 'RS256' || typeof parts.header.kid !== 'string') return null;
 	const { kid } = parts.header;
@@ -125,7 +126,7 @@ export async function verifyAccessJwt(
 	const p = parts.payload;
 	if (p.iss !== teamUrl(ACCESS_TEAM)) return null;
 	const audiences = Array.isArray(p.aud) ? p.aud : [p.aud];
-	if (!audiences.includes(aud)) return null;
+	if (!audiences.some((a) => aud.includes(a))) return null;
 	const seconds = now / 1000;
 	if (typeof p.exp !== 'number' || p.exp + CLOCK_SKEW_S <= seconds) return null;
 	if (typeof p.nbf === 'number' && p.nbf - CLOCK_SKEW_S > seconds) return null;
