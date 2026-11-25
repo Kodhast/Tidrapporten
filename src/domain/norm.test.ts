@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { freeDaysByDate } from './helgdagar';
-import { normMinutes, termsOn } from './norm';
-import { assignment } from './testdata';
+import { freeDaysByDate } from './helgdagar.ts';
+import { normMinutes, termsOn } from './norm.ts';
+import { assignment } from './testdata.ts';
 
 const none = freeDaysByDate([]);
 

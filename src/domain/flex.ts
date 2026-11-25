@@ -1,8 +1,8 @@
 // Actual time and flex per assignment and week (ADR 0012, skill tidsregler).
-import type { FreeDays } from './helgdagar';
-import { splitByDay } from './intervall';
-import { isWithinAssignment, normMinutes } from './norm';
-import { dateOf, daysOfWeek, weeksBetween } from './tid';
+import type { FreeDays } from './helgdagar.ts';
+import { splitByDay } from './intervall.ts';
+import { isWithinAssignment, normMinutes } from './norm.ts';
+import { dateOf, daysOfWeek, weeksBetween } from './tid.ts';
 import type {
 	AbsenceCounting,
 	AbsenceType,
@@ -15,7 +15,7 @@ import type {
 	Receiver,
 	Report,
 	UtcMillis
-} from './types';
+} from './types.ts';
 
 /** How each absence type counts, by id. An unknown id counts as `fillsNorm`. */
 export type AbsenceCountings = ReadonlyMap<Id, AbsenceCounting>;

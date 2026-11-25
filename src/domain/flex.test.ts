@@ -7,8 +7,8 @@ import {
 	timeByDay,
 	totalFlex,
 	weekFlex
-} from './flex';
-import { freeDaysByDate } from './helgdagar';
+} from './flex.ts';
+import { freeDaysByDate } from './helgdagar.ts';
 import {
 	absenceTypes,
 	absentAllDay,
@@ -20,9 +20,9 @@ import {
 	report,
 	work,
 	workFor
-} from './testdata';
-import { weeksBetween } from './tid';
-import type { Entry, IsoWeek, Report, UtcMillis } from './types';
+} from './testdata.ts';
+import { weeksBetween } from './tid.ts';
+import type { Entry, IsoWeek, Report, UtcMillis } from './types.ts';
 
 const none = freeDaysByDate([]);
 const countings = absenceCountings(absenceTypes);

@@ -1,5 +1,5 @@
 // Made-up data for the domain tests. Imported only by tests; nothing here is real.
-import { atLocalTime } from './tid';
+import { atLocalTime } from './tid.ts';
 import type {
 	AbsenceType,
 	Assignment,
@@ -14,7 +14,7 @@ import type {
 	ReportStatus,
 	TimeCode,
 	UtcMillis
-} from './types';
+} from './types.ts';
 
 export const at = (date: IsoDate, time: ClockTime): UtcMillis => atLocalTime(date, time);
 

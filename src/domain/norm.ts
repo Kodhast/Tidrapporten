@@ -1,6 +1,6 @@
 // The norm: how many minutes an assignment expects on a day (ADR 0012, skill tidsregler).
-import { type FreeDays, isDayOff } from './helgdagar';
-import type { Assignment, AssignmentTerms, IsoDate, Minutes } from './types';
+import { type FreeDays, isDayOff } from './helgdagar.ts';
+import type { Assignment, AssignmentTerms, IsoDate, Minutes } from './types.ts';
 
 export const DEFAULT_WORKDAY_MINUTES: Minutes = 480;
 

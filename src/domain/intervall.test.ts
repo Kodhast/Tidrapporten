@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { gapsOnDay, isTimerForgotten, overlaps, splitByDay, suggestTimerEnd } from './intervall';
-import { absentAllDay, assignment, at, work } from './testdata';
-import type { Timer } from './types';
+import { gapsOnDay, isTimerForgotten, overlaps, splitByDay, suggestTimerEnd } from './intervall.ts';
+import { absentAllDay, assignment, at, work } from './testdata.ts';
+import type { Timer } from './types.ts';
 
 const HOUR = 3_600_000;
 

@@ -1,10 +1,360 @@
 rules_version = '2';
 
-// Deny everything until the real rules arrive in issue 15.
+// Tidrapportens regler (ADR 0012, issue 15). Prototype: review before real data is stored.
+//
+// ===============================================================
+// Assumed data model
+// ===============================================================
+//
+// Everything lives under users/{uid}/…; only the owner (request.auth.uid == uid) reads or writes.
+// The users/{uid} document itself is not used. Every document carries:
+//   - schemaVersion: int (>= 1)
+//   - createdAt: timestamp (= request.time on create, immutable)
+//   - updatedAt: timestamp (= request.time on every write)
+// Days are strings 'YYYY-MM-DD', weeks 'YYYY-Www', clock times 'HH:MM'. Lengths are whole minutes.
+//
+// assignments/{id}: name string 1–100, startDate day, endDate day|null, terms list 1–50,
+//   openingFlex int, standardDay list ≤ 20, archived bool, order int
+// assignments/{id}/codes/{id}: name string 1–100, billable bool, archived bool, order int
+// assignments/{id}/receivers/{id}: name string 1–100, position int ≥ 1, suggestionMode
+//   'fillNorm'|'actualQuarter', codes list ≤ 100, mapping map ≤ 200 keys, archived bool
+// absenceTypes/{id}: name string 1–100, counting 'fillsNorm'|'flexWithdrawal'|'worked',
+//   archived bool, order int
+// freeDays/{day}: free bool, name string ≤ 100
+// entries/{id}: assignmentId string, subject {kind 'code', codeId} | {kind 'absence',
+//   absenceTypeId}, time {kind 'interval', start, end: timestamp, 0 < end − start ≤ 24 h} |
+//   {kind 'allDay', date: day, only for absence}, note string ≤ 500
+// pauses/{day}: only the common fields
+// reports/{assignmentId_receiverId_week}: assignmentId, receiverId, week, status
+//   'draft'|'sent'|'unlocked', mode, lines list ≤ 100, snapshot map|null (set when sent),
+//   lastChangeId string|null
+// changeLog/{id}: at timestamp (= request.time), path string ≤ 300, action
+//   'create'|'update'|'delete'|'send'|'unlock', week week|null, before map|null, after map|null,
+//   reason string ≤ 500, by 'app'. Create only; never updated or deleted.
+// devices/{id}: fcmToken string 1–4096, label string ≤ 100
+// state/timer: assignmentId, subject, start timestamp. Deleted when the timer stops.
+// state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
+//   remindEmptyDay bool, flexWarning int ≥ 0
+//
+// Locking (ADR 0012): a sent report can only be unlocked; an unlocked report can be changed or
+// sent again. Every such locked change writes a NEW changeLog entry in the same batch, named by
+// the report's lastChangeId, whose path is the report's and whose reason is not empty.
+// Corrections of entries in a sent week are logged by the app, not enforced here.
+//
+// Lists are checked for type and size only; rules cannot look inside every element. The data
+// layer (src/data/) tolerates malformed elements when it reads.
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+
+    // ---------- Helpers ----------
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function data() {
+      return request.resource.data;
+    }
+
+    function isDay(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isWeek(value) {
+      return value is string && value.matches('^[0-9]{4}-W[0-9]{2}$');
+    }
+
+    function isClock(value) {
+      return value is string && value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+    }
+
+    function isId(value) {
+      return value is string && value.size() > 0 && value.size() <= 100;
+    }
+
+    function isName(value) {
+      return value is string && value.size() > 0 && value.size() <= 100;
+    }
+
+    function isClockOrNull(value) {
+      return value == null || isClock(value);
+    }
+
+    // The common fields on create: schemaVersion, and both times set by the server.
+    function isValidCreateMeta() {
+      return data().schemaVersion is int && data().schemaVersion >= 1
+        && data().createdAt == request.time
+        && data().updatedAt == request.time;
+    }
+
+    // The common fields on update: createdAt kept, updatedAt set by the server.
+    function isValidUpdateMeta() {
+      return data().schemaVersion is int && data().schemaVersion >= 1
+        && data().createdAt == resource.data.createdAt
+        && data().updatedAt == request.time;
+    }
+
+    function isValidMeta() {
+      return resource == null ? isValidCreateMeta() : isValidUpdateMeta();
+    }
+
+    function fields(own) {
+      return own.concat(['schemaVersion', 'createdAt', 'updatedAt']);
+    }
+
+    function hasExactly(own) {
+      return data().keys().hasOnly(fields(own)) && data().keys().hasAll(fields(own));
+    }
+
+    function isValidSubject(subject) {
+      return subject is map && (
+        (subject.keys().hasOnly(['kind', 'codeId']) && subject.keys().hasAll(['kind', 'codeId'])
+          && subject.kind == 'code' && isId(subject.codeId))
+        || (subject.keys().hasOnly(['kind', 'absenceTypeId'])
+          && subject.keys().hasAll(['kind', 'absenceTypeId'])
+          && subject.kind == 'absence' && isId(subject.absenceTypeId))
+      );
+    }
+
+    function isValidTime(time, subject) {
+      return time is map && (
+        (time.keys().hasOnly(['kind', 'start', 'end']) && time.keys().hasAll(['kind', 'start', 'end'])
+          && time.kind == 'interval' && time.start is timestamp && time.end is timestamp
+          && time.end > time.start && time.end <= time.start + duration.value(24, 'h'))
+        || (time.keys().hasOnly(['kind', 'date']) && time.keys().hasAll(['kind', 'date'])
+          && time.kind == 'allDay' && isDay(time.date) && subject.kind == 'absence')
+      );
+    }
+
+    // ---------- Validators ----------
+
+    function isValidAssignment() {
+      return hasExactly(['name', 'startDate', 'endDate', 'terms', 'openingFlex', 'standardDay',
+          'archived', 'order'])
+        && isName(data().name)
+        && isDay(data().startDate)
+        && (data().endDate == null || (isDay(data().endDate) && data().endDate >= data().startDate))
+        && data().terms is list && data().terms.size() >= 1 && data().terms.size() <= 50
+        && data().openingFlex is int
+        && data().standardDay is list && data().standardDay.size() <= 20
+        && data().archived is bool
+        && data().order is int;
+    }
+
+    function isValidCode() {
+      return hasExactly(['name', 'billable', 'archived', 'order'])
+        && isName(data().name)
+        && data().billable is bool
+        && data().archived is bool
+        && data().order is int;
+    }
+
+    function isValidReceiver() {
+      return hasExactly(['name', 'position', 'suggestionMode', 'codes', 'mapping', 'archived'])
+        && isName(data().name)
+        && data().position is int && data().position >= 1
+        && data().suggestionMode in ['fillNorm', 'actualQuarter']
+        && data().codes is list && data().codes.size() <= 100
+        && data().mapping is map && data().mapping.size() <= 200
+        && data().archived is bool;
+    }
+
+    function isValidAbsenceType() {
+      return hasExactly(['name', 'counting', 'archived', 'order'])
+        && isName(data().name)
+        && data().counting in ['fillsNorm', 'flexWithdrawal', 'worked']
+        && data().archived is bool
+        && data().order is int;
+    }
+
+    function isValidFreeDay(day) {
+      return hasExactly(['free', 'name'])
+        && isDay(day)
+        && data().free is bool
+        && data().name is string && data().name.size() <= 100;
+    }
+
+    function isValidEntry() {
+      return hasExactly(['assignmentId', 'subject', 'time', 'note'])
+        && isId(data().assignmentId)
+        && isValidSubject(data().subject)
+        && isValidTime(data().time, data().subject)
+        && data().note is string && data().note.size() <= 500;
+    }
+
+    function isValidTimer() {
+      return hasExactly(['assignmentId', 'subject', 'start'])
+        && isId(data().assignmentId)
+        && isValidSubject(data().subject)
+        && data().start is timestamp;
+    }
+
+    function isValidSettings() {
+      return hasExactly(['noTimerBy', 'timerRunningAt', 'remindEmptyDay',
+          'reportReminderFridayAt', 'flexWarning'])
+        && isClockOrNull(data().noTimerBy)
+        && isClockOrNull(data().timerRunningAt)
+        && data().remindEmptyDay is bool
+        && isClockOrNull(data().reportReminderFridayAt)
+        && data().flexWarning is int && data().flexWarning >= 0;
+    }
+
+    function isValidDevice() {
+      return hasExactly(['fcmToken', 'label'])
+        && data().fcmToken is string && data().fcmToken.size() > 0
+        && data().fcmToken.size() <= 4096
+        && data().label is string && data().label.size() <= 100;
+    }
+
+    function isValidSnapshot(snapshot) {
+      return snapshot is map
+        && snapshot.keys().hasOnly(['sentAt', 'assignmentName', 'receiverName', 'codeNames',
+          'actualMinutes'])
+        && snapshot.keys().hasAll(['sentAt', 'assignmentName', 'receiverName', 'codeNames',
+          'actualMinutes'])
+        && snapshot.sentAt is timestamp
+        && isName(snapshot.assignmentName)
+        && isName(snapshot.receiverName)
+        && snapshot.codeNames is map && snapshot.codeNames.size() <= 200
+        && snapshot.actualMinutes is int;
+    }
+
+    function isValidReport(reportId) {
+      return hasExactly(['assignmentId', 'receiverId', 'week', 'status', 'mode', 'lines',
+          'snapshot', 'lastChangeId'])
+        && isId(data().assignmentId)
+        && isId(data().receiverId)
+        && isWeek(data().week)
+        && reportId == data().assignmentId + '_' + data().receiverId + '_' + data().week
+        && data().status in ['draft', 'sent', 'unlocked']
+        && data().mode in ['fillNorm', 'actualQuarter']
+        && data().lines is list && data().lines.size() <= 100
+        && (data().status == 'draft' || isValidSnapshot(data().snapshot))
+        && (data().snapshot == null || isValidSnapshot(data().snapshot))
+        && (data().lastChangeId == null || isId(data().lastChangeId));
+    }
+
+    // The locked change names a changeLog entry that is new in this batch, belongs to this
+    // report and gives a reason. A reused entry already exists and fails the first check.
+    function isLoggedChange(uid, reportId) {
+      let logPath = /databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId);
+      return isId(data().lastChangeId)
+        && !exists(logPath)
+        && existsAfter(logPath)
+        && getAfter(logPath).data.path == 'reports/' + reportId
+        && getAfter(logPath).data.reason.size() > 0;
+    }
+
+    function isUnlock() {
+      return resource.data.status == 'sent'
+        && data().status == 'unlocked'
+        && data().diff(resource.data).affectedKeys().hasOnly(['status', 'lastChangeId', 'updatedAt']);
+    }
+
+    // Allowed status changes. Draft is free; a sent report can only be unlocked; an unlocked
+    // report can be changed or sent again. Everything except draft needs a new log entry.
+    function isAllowedReportUpdate(uid, reportId) {
+      let from = resource.data.status;
+      let to = data().status;
+      return (from == 'draft' && to in ['draft', 'sent'])
+        || (isUnlock() && isLoggedChange(uid, reportId))
+        || (from == 'unlocked' && to in ['unlocked', 'sent'] && isLoggedChange(uid, reportId));
+    }
+
+    function isValidChangeLog() {
+      return data().keys().hasOnly(['at', 'path', 'action', 'week', 'before', 'after', 'reason',
+          'by', 'schemaVersion', 'createdAt', 'updatedAt'])
+        && data().keys().hasAll(['at', 'path', 'action', 'week', 'before', 'after', 'reason',
+          'by', 'schemaVersion', 'createdAt', 'updatedAt'])
+        && isValidCreateMeta()
+        && data().at == request.time
+        && data().path is string && data().path.size() > 0 && data().path.size() <= 300
+        && data().action in ['create', 'update', 'delete', 'send', 'unlock']
+        && (data().week == null || isWeek(data().week))
+        && (data().before == null || data().before is map)
+        && (data().after == null || data().after is map)
+        && data().reason is string && data().reason.size() <= 500
+        && data().by == 'app';
+    }
+
+    // ---------- Paths ----------
+
+    match /users/{uid} {
+      // Nothing is stored in the user document itself.
       allow read, write: if false;
+
+      match /assignments/{assignmentId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidAssignment();
+        allow delete: if false; // issue 26
+
+        match /codes/{codeId} {
+          allow read: if isOwner(uid);
+          allow create, update: if isOwner(uid) && isValidMeta() && isValidCode();
+          allow delete: if false;
+        }
+
+        match /receivers/{receiverId} {
+          allow read: if isOwner(uid);
+          allow create, update: if isOwner(uid) && isValidMeta() && isValidReceiver();
+          allow delete: if false;
+        }
+      }
+
+      match /absenceTypes/{typeId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidAbsenceType();
+        allow delete: if false;
+      }
+
+      match /freeDays/{day} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidFreeDay(day);
+      }
+
+      match /entries/{entryId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidEntry();
+      }
+
+      match /pauses/{day} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isDay(day) && isValidMeta() && hasExactly([]);
+      }
+
+      match /reports/{reportId} {
+        allow read: if isOwner(uid);
+        // A new report starts as a draft or is sent at once; neither is a locked change.
+        allow create: if isOwner(uid) && isValidCreateMeta() && isValidReport(reportId)
+          && data().status in ['draft', 'sent'];
+        allow update: if isOwner(uid) && isValidUpdateMeta() && isValidReport(reportId)
+          && isAllowedReportUpdate(uid, reportId);
+        allow delete: if isOwner(uid) && resource.data.status == 'draft';
+      }
+
+      match /changeLog/{changeId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidChangeLog();
+        allow update, delete: if false;
+      }
+
+      match /devices/{deviceId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidDevice();
+      }
+
+      match /state/timer {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidTimer();
+      }
+
+      match /state/settings {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidSettings();
+        allow delete: if false;
+      }
     }
   }
 }

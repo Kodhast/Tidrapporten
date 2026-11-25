@@ -14,7 +14,7 @@ import {
 	utcOffsetMinutes,
 	weekday,
 	weeksBetween
-} from './tid';
+} from './tid.ts';
 
 describe('local days in Europe/Stockholm', () => {
 	it.each([

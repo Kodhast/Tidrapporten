@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { absenceCountings, timeByDay } from './flex';
-import { freeDaysByDate } from './helgdagar';
-import { absenceTypes, absentAllDay, assignment, receiver, workFor } from './testdata';
-import type { SubjectTime } from './flex';
-import type { Entry, Id, SuggestionMode } from './types';
-import { roundToQuarter } from './norm';
-import { suggestDay, suggestWeek } from './veckoforslag';
+import { absenceCountings, timeByDay } from './flex.ts';
+import { freeDaysByDate } from './helgdagar.ts';
+import { absenceTypes, absentAllDay, assignment, receiver, workFor } from './testdata.ts';
+import type { SubjectTime } from './flex.ts';
+import type { Entry, Id, SuggestionMode } from './types.ts';
+import { roundToQuarter } from './norm.ts';
+import { suggestDay, suggestWeek } from './veckoforslag.ts';
 
 const none = freeDaysByDate([]);
 const countings = absenceCountings(absenceTypes);
