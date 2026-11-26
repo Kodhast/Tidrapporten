@@ -24,7 +24,7 @@ registerRoute(
 );
 
 self.addEventListener('push', (event) => {
-	let payload: unknown = null;
+	let payload: unknown;
 	try {
 		payload = event.data?.json();
 	} catch {

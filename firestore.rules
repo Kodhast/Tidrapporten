@@ -47,6 +47,8 @@ rules_version = '2';
 //   schemaVersion, updatedAt; written only by the budget function, read by the signed-in user.
 // state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
 //   remindEmptyDay bool, flexWarning int ≥ 0
+// state/reminders: written and read only by the reminder function (issue 22); no rule, so the
+//   app can neither read nor write it.
 //
 // Locking (ADR 0012): a sent report can only be unlocked; an unlocked report can be changed or
 // sent again. Every such locked change writes a NEW changeLog entry in the same batch, named by

@@ -96,6 +96,7 @@ avataren initialerna. Driftloggens `inloggning` säger `"bild": true` eller `fal
 Service Usage Consumer. I driftprojektet har det dessutom, för att driftsätta funktionerna,
 Cloud Functions Admin, Firebase Viewer, Cloud Run Admin och Pub/Sub Editor, och Service
 Account User på `tidrapporten-budget` (issue 28), `tidrapporten-aterstall` (issue 57),
+`tidrapporten-paminnelser` (issue 22, med Cloud Scheduler Admin),
 standardkontot `device-streaming-5b35f7b8@appspot.gserviceaccount.com` och standardkontot för
 Compute `324013256111-compute@developer.gserviceaccount.com` (Firebase CLI kräver dem även när
 funktionerna har egna konton). Miljön `drift` får bara köras från `main`. Kontots id står i
@@ -130,6 +131,59 @@ En anropbar funktion ska kunna anropas av alla (den kontrollerar själv inloggni
 _dry_run_ prövar inte rättigheterna. Fallerar första driftsättningen på anroparen behöver kontot
 rollen Cloud Run Admin. I testmiljön finns funktionen inte, så återställningen ger där "Det gick inte
 att återställa".
+
+## Påminnelserna
+
+Issue 22. **`paminnelser`** körs var 15:e minut (Cloud Scheduler, svensk tid) och skickar de
+påminnelser som är på tur till användarens enheter med Cloud Messaging; **`provnotis`** är den
+anropbara funktionen bakom "Skicka en provnotis". Båda körs som **`tidrapporten-paminnelser`**
+med rollerna Cloud Datastore User och Firebase Cloud Messaging API Admin i drift, och finns bara
+i drift som de andra funktionerna. I testmiljön kommer alltså inga påminnelser, och provnotisen
+svarar "Provnotisen gick inte att skicka".
+
+Vad som är skickat står i `users/{uid}/state/reminders` (`handled`: nyckel per påminnelse och dag
+eller vecka, med tiden). Det skrivs bara av funktionen, före sändningen, så att en påminnelse
+aldrig kommer två gånger; reglerna släpper inte in klienten, och dokumentet är inte med i
+JSON-exporten (det är härlett och rensas efter 14 dagar).
+
+**Före första releasen med påminnelserna** gör projektets ägare detta en gång:
+
+1. Web Push-nycklar i båda projekten: Firebase-konsolen → Project settings → Cloud Messaging →
+   Web Push certificates → _Generate key pair_. Den publika nyckeln läggs i
+   `src/firebase/config.ts` (`vapidKeys`); den är ingen hemlighet.
+2. Kontot och rättigheterna i Cloud Shell:
+
+        gcloud services enable cloudscheduler.googleapis.com fcm.googleapis.com \
+          --project=device-streaming-5b35f7b8
+        gcloud iam service-accounts create tidrapporten-paminnelser --project=device-streaming-5b35f7b8
+        for role in roles/datastore.user roles/firebasecloudmessaging.admin; do
+          gcloud projects add-iam-policy-binding device-streaming-5b35f7b8 \
+            --member=serviceAccount:tidrapporten-paminnelser@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+            --role=$role
+        done
+        gcloud iam service-accounts add-iam-policy-binding \
+          tidrapporten-paminnelser@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+          --project=device-streaming-5b35f7b8 \
+          --member=serviceAccount:tidrapporten-deploy@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+          --role=roles/iam.serviceAccountUser
+        gcloud projects add-iam-policy-binding device-streaming-5b35f7b8 \
+          --member=serviceAccount:tidrapporten-deploy@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+          --role=roles/cloudscheduler.admin
+
+   Inte provat: att detta räcker för den schemalagda funktionen. Den skarpa driftsättningen
+   skriver ut en roll som saknas.
+
+3. **Larm:** Logs Explorer i drift med frågan
+   `resource.labels.service_name="paminnelser" AND severity>=ERROR` → _Create alert_, med
+   e-post till ägaren som kanal.
+
+**Kostnad:** 96 körningar om dygnet. En körning läser bara inställningarna och det skickade per
+användare med enhet; hela datan läses bara när en påminnelse är på tur, högst fem gånger om
+dagen. Cloud Scheduler-jobbet är ett av tre fria per betalkonto, och Cloud Messaging är gratis.
+
+**Loggar:** `paminnelser: skickade` (info, med uid, vilka slags påminnelser och antal enheter),
+`paminnelser: misslyckades` (error, uid), `provnotis: skickad` och `provnotis: misslyckades`.
+Aldrig vad påminnelserna säger.
 
 ## Budgeten och stoppet i test
 

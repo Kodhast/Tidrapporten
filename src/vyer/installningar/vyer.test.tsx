@@ -6,7 +6,9 @@ import type { Receiver } from '../../domain/types.ts';
 import { FranvaroVy } from './FranvaroVy';
 import { InstallningarVy } from './InstallningarVy';
 import { MottagareVy } from './MottagareVy';
+import { PaminnelserVy } from './PaminnelserVy';
 import { PartVy } from './PartVy';
+import { DEFAULT_SETTINGS } from '../../data/dokument.ts';
 import { UppdragVy } from './UppdragVy';
 
 // The views' first render with made-up data; what the forms do is tested in the domain and in
@@ -246,5 +248,53 @@ describe('PartVy', () => {
 		expect(markup).toContain('Ny kund');
 		expect(markup).not.toContain('Veckorapporten till arbetsgivaren');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);
+	});
+});
+
+describe('PaminnelserVy', () => {
+	const props = {
+		settings: DEFAULT_SETTINGS,
+		device: { id: 'e1', fcmToken: 't', label: 'Chrome på Android' },
+		notificationsConfigured: true,
+		online: true,
+		onSave: noSave,
+		onEnableDevice: () => Promise.resolve('on' as const),
+		onDisableDevice: noSave,
+		onTest: () => Promise.resolve(1)
+	};
+
+	it('shows the device and the values of the settings', () => {
+		const markup = renderToStaticMarkup(<PaminnelserVy {...props} />);
+		expect(markup).toContain('Notiser på den här enheten');
+		expect(markup).toContain('Chrome på Android');
+		expect(markup).toContain('>09:30<');
+		expect(markup).toContain('>19:00<');
+		expect(markup).toContain('Dagen efter, kl. 09:30');
+		expect(markup).toContain('fredag 15:00');
+		expect(markup).toContain('±20 h');
+		expect(markup).toContain('Skicka en provnotis');
+		expect(markup).toContain('Notiserna visar inga uppdrag eller mottagare, bara tider och antal.');
+	});
+
+	it('shows a reminder that is off without a value, and no test button without a device', () => {
+		const markup = renderToStaticMarkup(
+			<PaminnelserVy
+				{...props}
+				device={null}
+				settings={{ ...DEFAULT_SETTINGS, timerRunningAt: null, flexWarning: 0 }}
+			/>
+		);
+		expect(markup).not.toContain('>19:00<');
+		expect(markup).not.toContain('±');
+		expect(markup).toContain('Få påminnelserna även när appen är stängd');
+		expect(markup).not.toContain('Skicka en provnotis');
+	});
+
+	it('keeps the device switch off without a key', () => {
+		const markup = renderToStaticMarkup(
+			<PaminnelserVy {...props} device={null} notificationsConfigured={false} />
+		);
+		expect(markup).toContain('Notiser är inte inställda här än.');
+		expect(markup).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
 	});
 });

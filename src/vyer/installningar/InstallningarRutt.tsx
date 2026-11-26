@@ -1,5 +1,6 @@
 // Connects the settings views to Firestore: follows what each view shows and saves through the
 // data layer. The views themselves get plain values and can be tested without Firebase.
+import type { FirebaseApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { restoreFile } from '../../data/aterstall.ts';
@@ -40,17 +41,30 @@ import { replaceRoute, type Route } from '../rutter.ts';
 import { FranvaroVy } from './FranvaroVy';
 import { InstallningarVy } from './InstallningarVy';
 import { MottagareVy } from './MottagareVy';
+import { PaminnelserRutt } from './PaminnelserRutt';
 import { PartVy } from './PartVy';
 import { UppdragVy } from './UppdragVy';
 
 type SettingsRoute = Extract<
 	Route,
-	{ view: 'installningar' | 'uppdrag' | 'mottagare' | 'franvaro' | 'arbetsgivare' | 'kund' }
+	{
+		view:
+			| 'installningar'
+			| 'uppdrag'
+			| 'mottagare'
+			| 'franvaro'
+			| 'paminnelser'
+			| 'arbetsgivare'
+			| 'kund';
+	}
 >;
 
 export interface InstallningarRuttProps {
 	db: Firestore;
 	functions: Functions;
+	app: FirebaseApp;
+	/** The Web Push key for the reminders; null where it is not set up. */
+	vapidKey: string | null;
 	uid: Id;
 	route: SettingsRoute;
 	online: boolean;
@@ -90,7 +104,15 @@ const download = (name: string, value: unknown) => {
 
 const Loading = () => <p className="kh-text-body innehall">Hämtar …</p>;
 
-export function InstallningarRutt({ db, functions, uid, route, online }: InstallningarRuttProps) {
+export function InstallningarRutt({
+	db,
+	functions,
+	app,
+	vapidKey,
+	uid,
+	route,
+	online
+}: InstallningarRuttProps) {
 	// The day when the view opened; settings rarely stay open over midnight.
 	const [today] = useState(() => dateOf(Date.now()));
 	const assignmentId =
@@ -114,6 +136,19 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 	);
 	const employers = useCollection(db, uid, employersPath, employerCodec);
 	const customers = useCollection(db, uid, customersPath, customerCodec);
+
+	// The reminders need none of the collections below.
+	if (route.view === 'paminnelser')
+		return (
+			<PaminnelserRutt
+				db={db}
+				functions={functions}
+				app={app}
+				vapidKey={vapidKey}
+				uid={uid}
+				online={online}
+			/>
+		);
 
 	if (!assignments || !absenceTypes || !freeDays || !employers || !customers) return <Loading />;
 

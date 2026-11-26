@@ -12,7 +12,10 @@ import { exportFile } from '../../data/exportformat.ts';
 import { Export } from './Export';
 import { FranvaroVy } from './FranvaroVy';
 import { MottagareVy } from './MottagareVy';
+import { PaminnelserVy } from './PaminnelserVy';
 import { PartVy } from './PartVy';
+import { DEFAULT_SETTINGS } from '../../data/dokument.ts';
+import { CLOCK_ERROR } from '../../domain/dag.ts';
 import { UppdragVy } from './UppdragVy';
 
 beforeAll(() => {
@@ -418,5 +421,125 @@ describe('Export', () => {
 		);
 		expect(await screen.findByText('Inget saknades')).toBeTruthy();
 		expect(screen.getByText('2 dokument fanns redan och lämnades orörda.')).toBeTruthy();
+	});
+});
+
+describe('PaminnelserVy', () => {
+	const device = { id: 'e1', fcmToken: 't', label: 'Chrome på dator' };
+	const setup = (overrides: Partial<React.ComponentProps<typeof PaminnelserVy>> = {}) => {
+		const props = {
+			settings: DEFAULT_SETTINGS,
+			device,
+			notificationsConfigured: true,
+			online: true,
+			onSave: vi.fn().mockResolvedValue(undefined),
+			onEnableDevice: vi.fn().mockResolvedValue('on'),
+			onDisableDevice: vi.fn().mockResolvedValue(undefined),
+			onTest: vi.fn().mockResolvedValue(1),
+			...overrides
+		};
+		render(<PaminnelserVy {...props} />);
+		return props;
+	};
+
+	it('saves null, 0 and false when a reminder is turned off', async () => {
+		const user = userEvent.setup();
+		const { onSave } = setup();
+		await user.click(screen.getByRole('switch', { name: 'Ingen timer igång' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, noTimerBy: null });
+		await user.click(screen.getByRole('switch', { name: 'Timern går sent' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, timerRunningAt: null });
+		await user.click(screen.getByRole('switch', { name: /^Dag utan tid/ }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, remindEmptyDay: false });
+		await user.click(screen.getByRole('switch', { name: 'Veckorapporten inte skickad' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, reportReminderFridayAt: null });
+		await user.click(screen.getByRole('switch', { name: 'Flexsaldo över' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, flexWarning: 0 });
+	});
+
+	it('saves the default when a reminder is turned on again', async () => {
+		const user = userEvent.setup();
+		const off = {
+			noTimerBy: null,
+			timerRunningAt: null,
+			remindEmptyDay: false,
+			reportReminderFridayAt: null,
+			flexWarning: 0
+		};
+		const { onSave } = setup({ settings: off });
+		await user.click(screen.getByRole('switch', { name: 'Timern går sent' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...off, timerRunningAt: '19:00' });
+		await user.click(screen.getByRole('switch', { name: 'Flexsaldo över' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...off, flexWarning: 1200 });
+		await user.click(screen.getByRole('switch', { name: 'Veckorapporten inte skickad' }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...off, reportReminderFridayAt: '15:00' });
+		await user.click(screen.getByRole('switch', { name: /^Dag utan tid/ }));
+		expect(onSave).toHaveBeenLastCalledWith({ ...off, remindEmptyDay: true });
+	});
+
+	it('saves a changed time, and says CLOCK_ERROR for a wrong one', async () => {
+		const user = userEvent.setup();
+		const { onSave } = setup();
+		await user.click(screen.getByRole('button', { name: /^Ändra timern går sent/ }));
+		const field = within(sheet()).getByLabelText('Klockslag');
+		await user.clear(field);
+		await user.type(field, '25:99');
+		expect(within(sheet()).getByText(CLOCK_ERROR)).toBeTruthy();
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		await user.clear(field);
+		await user.type(field, '18.30');
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, timerRunningAt: '18:30' });
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+	});
+
+	it('saves a changed flex limit in minutes', async () => {
+		const user = userEvent.setup();
+		const { onSave } = setup();
+		await user.click(screen.getByRole('button', { name: /^Ändra flexsaldo över/ }));
+		const field = within(sheet()).getByLabelText('Gräns i timmar (±)');
+		expect((field as HTMLInputElement).value).toBe('20');
+		await user.clear(field);
+		await user.type(field, '12,5');
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, flexWarning: 750 });
+	});
+
+	it('turns everything off offline', () => {
+		setup({ online: false });
+		for (const name of ['Ingen timer igång', /^Dag utan tid/, 'Flexsaldo över'])
+			expect((screen.getByRole('switch', { name }) as HTMLInputElement).disabled).toBe(true);
+		expect(
+			(screen.getByRole('switch', { name: /^Notiser på den här/ }) as HTMLInputElement).disabled
+		).toBe(true);
+		expect(
+			(screen.getByRole('button', { name: 'Skicka en provnotis' }) as HTMLButtonElement).disabled
+		).toBe(true);
+	});
+
+	it('turns notifications on and off on the device, and says when Chrome blocks them', async () => {
+		const user = userEvent.setup();
+		const { onDisableDevice } = setup();
+		await user.click(screen.getByRole('switch', { name: /^Notiser på den här/ }));
+		expect(onDisableDevice).toHaveBeenCalledOnce();
+		cleanup();
+
+		const denied = setup({ device: null, onEnableDevice: vi.fn().mockResolvedValue('denied') });
+		await user.click(screen.getByRole('switch', { name: /^Notiser på den här/ }));
+		expect(denied.onEnableDevice).toHaveBeenCalledOnce();
+		expect(await screen.findByText('Notiser är blockerade i Chrome')).toBeTruthy();
+		cleanup();
+
+		setup({ device: null, onEnableDevice: vi.fn().mockResolvedValue('unsupported') });
+		await user.click(screen.getByRole('switch', { name: /^Notiser på den här/ }));
+		expect(await screen.findByText('Den här webbläsaren kan inte ta emot notiser')).toBeTruthy();
+	});
+
+	it('sends a test notice and tells how many devices it reached', async () => {
+		const user = userEvent.setup();
+		const { onTest } = setup();
+		await user.click(screen.getByRole('button', { name: 'Skicka en provnotis' }));
+		expect(onTest).toHaveBeenCalledOnce();
+		expect(await screen.findByText('Skickad till 1 enhet')).toBeTruthy();
 	});
 });

@@ -56,6 +56,7 @@ import {
 } from '../../src/data/skrivning.ts';
 import { startDocuments } from '../../src/domain/komigang.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
+import { removeDevice, saveDevice, saveSettings } from '../../src/data/paminnelser.ts';
 import type { Report } from '../../src/domain/types.ts';
 import { EMULATOR_HOST, EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/firebase/config.ts';
 
@@ -1097,5 +1098,26 @@ describe('the budget status (issue 28)', () => {
 			.firestore() as unknown as Firestore;
 		await denied(getDoc(budget(anonymousSignIn)));
 		await denied(getDoc(budget(anonymous())));
+	});
+});
+
+describe('the reminders (issue 22)', () => {
+	it('saves the settings and a device, the first time and again', async () => {
+		const off = { ...DEFAULT_SETTINGS, timerRunningAt: null, flexWarning: 0 };
+		await allowed(saveSettings(owner(), OWNER, DEFAULT_SETTINGS));
+		await allowed(saveSettings(owner(), OWNER, off));
+		expect((await getDoc(at(owner(), 'state/settings'))).get('timerRunningAt')).toBeNull();
+		const device = { id: 'd1', fcmToken: 'token-1', label: 'Chrome på Android' };
+		await allowed(saveDevice(owner(), OWNER, device));
+		await allowed(saveDevice(owner(), OWNER, { ...device, fcmToken: 'token-2' }));
+		await allowed(removeDevice(owner(), OWNER, 'd1'));
+	});
+
+	it('keeps state/reminders to the function: the app can neither read nor write it', async () => {
+		await env.withSecurityRulesDisabled((ctx) =>
+			setDoc(doc(ctx.firestore(), 'users', OWNER, 'state/reminders'), { handled: {} })
+		);
+		await denied(getDoc(at(owner(), 'state/reminders')));
+		await denied(setDoc(at(owner(), 'state/reminders'), { handled: {}, ...createMeta() }));
 	});
 });

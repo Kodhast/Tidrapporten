@@ -12,6 +12,7 @@ export type Route =
 	| { view: 'uppdrag'; id: Id | null } // null: a new assignment
 	| { view: 'mottagare'; assignmentId: Id; id: Id | null } // null: a new receiver
 	| { view: 'franvaro' }
+	| { view: 'paminnelser' } // the reminders and this device's notifications (issue 22)
 	| { view: 'arbetsgivare'; id: Id | null } // null: a new employer
 	| { view: 'kund'; id: Id | null } // null: a new customer
 	| { view: 'dag'; date: IsoDate }
@@ -45,6 +46,7 @@ export const parseRoute = (hash: string): Route => {
 	if (path === '/kom-igang') return { view: 'kom-igang' };
 	if (path === '/om') return { view: 'om' };
 	if (path === '/installningar/franvaro') return { view: 'franvaro' };
+	if (path === '/installningar/paminnelser') return { view: 'paminnelser' };
 	const day = /^\/dag\/(\d{4}-\d{2}-\d{2})$/.exec(path);
 	if (day && isValidDate(day[1]!)) return { view: 'dag', date: day[1]! };
 	if (path === '/vecka') return { view: 'vecka', week: null };
@@ -82,6 +84,8 @@ export const href = (route: Route): string => {
 			return '#/om';
 		case 'franvaro':
 			return '#/installningar/franvaro';
+		case 'paminnelser':
+			return '#/installningar/paminnelser';
 		case 'uppdrag':
 			return `#/installningar/uppdrag/${route.id ?? 'ny'}`;
 		case 'arbetsgivare':

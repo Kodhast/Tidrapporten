@@ -8,6 +8,7 @@ describe('the routes', () => {
 		['#/kom-igang', { view: 'kom-igang' }],
 		['#/om', { view: 'om' }],
 		['#/installningar/franvaro', { view: 'franvaro' }],
+		['#/installningar/paminnelser', { view: 'paminnelser' }],
 		['#/dag/2026-11-24', { view: 'dag', date: '2026-11-24' }],
 		['#/installningar/uppdrag/ny', { view: 'uppdrag', id: null }],
 		['#/installningar/uppdrag/a1', { view: 'uppdrag', id: 'a1' }],

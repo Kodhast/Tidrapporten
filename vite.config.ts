@@ -66,6 +66,9 @@ export default defineConfig({
 			exclude: [
 				'src/main.tsx',
 				'firebase-functions/src/index.ts',
+				'firebase-functions/src/paminnelser-effekter.ts',
+				'firebase-functions/src/firestore-shim.ts',
+				'src/sw.ts',
 				'src/**/*.test.{ts,tsx}',
 				'src/domain/testdata.ts',
 				'src/data/fixturer.ts'
