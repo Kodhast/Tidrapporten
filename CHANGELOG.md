@@ -3,6 +3,14 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.6.0
+
+- Inställningarna finns: lägg till uppdrag med omfattning, arbetsdag, startdatum och ingående
+  flexsaldo, tidkoder som är debiterbara eller inte, och mottagarna i kedjan med egna koder,
+  kodmappning och förslagsläge. Frånvarotyperna finns från början och går att ändra, och
+  aftnarna och egna lediga dagar ställs in under Frånvaro och lediga dagar. Inget går att spara
+  utan nät. En flikrad längst ner leder mellan Idag och Inställningar (#17).
+
 ## 0.5.0
 
 - Molnbudgeten bevakas: från 90 % av budgeten visar appen en varning överst, och från 100 %

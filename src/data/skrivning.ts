@@ -25,11 +25,11 @@ import { createMeta, updateMeta } from './kodning.ts';
 /** The document path below the user, as the log stores it: `reports/a1_r1_2026-W48`. */
 export const userPath = (...segments: string[]): string => segments.join('/');
 
-const userDoc = (db: Firestore, uid: Id, path: string) => doc(db, 'users', uid, path);
+export const userDoc = (db: Firestore, uid: Id, path: string) => doc(db, 'users', uid, path);
 
 export class LockedChangeError extends Error {}
 
-interface LogInput {
+export interface LogInput {
 	path: string;
 	action: ChangeAction;
 	week: IsoWeek | null;
@@ -39,7 +39,7 @@ interface LogInput {
 }
 
 /** A new changeLog document; the rules require `at` to be the server time and `by` to be app. */
-const logData = (input: LogInput): DocumentData => ({
+export const logData = (input: LogInput): DocumentData => ({
 	...input,
 	at: serverTimestamp(),
 	by: 'app',

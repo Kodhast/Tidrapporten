@@ -11,7 +11,7 @@ Cloudflare Pages. Planen för första versionen: issue 8. Varför saker är som 
 
     npm run dev        # utvecklingsserver
     npm run verify     # typkontroll + lint + enhetstester med täckning – kör före varje push (en hook spärrar)
-    npm run test:e2e   # Playwright mot ett bygge (Chrome på dator och Android)
+    npm run test:e2e   # Playwright mot ett bygge och emulatorerna (Chrome på dator och Android; kräver Java 21)
     npm run format     # Prettier på allt
     npm run icons      # PNG-ikonerna i public/ efter ändrad SVG
 

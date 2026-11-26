@@ -6,9 +6,13 @@ import '@kodhast/web-ui/kh.css';
 import './tema.css';
 import { App } from './App';
 import { watchBudget } from './data/budget';
+import { ensureDefaultAbsenceTypes } from './data/installningar';
+import { watchOnline } from './data/uppkoppling';
 import type { BudgetStatus } from './domain/budget';
 import { startFirebase } from './firebase/app';
 import { finishSignIn } from './firebase/auth';
+import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
+import { useRoute } from './vyer/rutter';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
@@ -34,13 +38,37 @@ function Root() {
 			setBudget(null);
 		};
 	}, [uid]);
+	const [online, setOnline] = useState(false);
+	useEffect(() => {
+		if (!uid) return;
+		return watchOnline(db, uid, setOnline);
+	}, [uid]);
+	// The default absence types are made at the first sign-in (issue 17). Offline the transaction
+	// fails and the next start tries again.
+	useEffect(() => {
+		if (uid) ensureDefaultAbsenceTypes(db, uid).catch(() => {});
+	}, [uid]);
+	const route = useRoute();
 	useEffect(() => {
 		void signInError.then((message) => {
 			setError(message);
 			setSigningIn(false);
 		});
 	}, []);
-	return <App uid={signingIn ? undefined : uid} error={error} budget={budget} />;
+	const shownUid = signingIn ? undefined : uid;
+	return (
+		<App
+			uid={shownUid}
+			error={error}
+			budget={budget}
+			route={route}
+			settings={
+				shownUid && route.view !== 'idag' ? (
+					<InstallningarRutt db={db} uid={shownUid} route={route} online={online} />
+				) : null
+			}
+		/>
+	);
 }
 
 createRoot(root).render(
