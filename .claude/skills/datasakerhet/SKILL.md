@@ -47,7 +47,10 @@ Som ett fält, och dessutom:
 - JSON skiljer inte på heltal och decimaltal. Appen lagrar bara heltal, så en återställning
   skriver tillbaka samma typ.
 - `toJson` vägrar värden appen inte lagrar (`Date`, `NaN`, `undefined`, referenser) hellre än att
-  tappa dem. Lagras en ny sorts värde ska `toJson` och `fromJson` lära sig den, med prov.
+  tappa dem. Lagras en ny sorts värde ska `toJson`, `fromJson` och `toValue` i
+  `scripts/aterstall.mjs` lära sig den, med prov.
+- Återställningen provas i varje PR: `test/e2e/export.e2e.ts` exporterar, återställer till en ny
+  användare och jämför varje dokument.
 
 ## Aldrig
 

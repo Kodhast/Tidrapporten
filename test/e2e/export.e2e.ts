@@ -1,10 +1,13 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { seed, seedAssignment, signIn, stored, uid } from './hjalp.ts';
+import { restore } from '../../scripts/aterstall.mjs';
+import type { ExportFile } from '../../src/data/export.ts';
+import { DOCUMENTS, seed, seedAssignment, signIn, stored, uid, type StoredDoc } from './hjalp.ts';
 
 // The JSON export against the emulators (issue 21): the downloaded file holds every document the
 // server has below the user, the changeLog and the nested codes and receivers included, with
-// the times exact. Made-up data.
+// the times exact; and restored with scripts/aterstall.mjs to another user, it is the same data.
+// Made-up data.
 
 const COLLECTIONS = [
 	'assignments',
@@ -19,8 +22,8 @@ const COLLECTIONS = [
 	'devices'
 ];
 
-test('the export holds every document the server has', async ({ page, request }) => {
-	const user = uid('export');
+/** Made-up documents in every collection below the user. */
+const seedEverything = async (request: APIRequestContext, user: string) => {
 	await seedAssignment(request, user, ['Utveckling']);
 	await seed(request, user, 'assignments/a1/receivers/r1', {
 		name: 'Arbetsgivaren',
@@ -63,30 +66,41 @@ test('the export holds every document the server has', async ({ page, request })
 	});
 	await seed(request, user, 'state/settings', { flexWarning: 600 });
 	await seed(request, user, 'devices/d1', { fcmToken: 'token-1', label: 'Telefon' });
+};
 
+/** Signs in, presses the export button and returns the downloaded file. */
+const exportAll = async (page: Page, user: string) => {
 	await signIn(page, user);
 	await page.goto('/#/installningar');
+	// The first sign-in writes the default absence types; the export waits for them.
+	await expect(page.getByText(/^6 frånvarotyper/)).toBeVisible();
 	const button = page.getByRole('button', { name: 'Exportera all data' });
 	await expect(button).toBeEnabled({ timeout: 10_000 });
 	const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
 	expect(download.suggestedFilename()).toMatch(/^tidrapporten-\d{4}-\d{2}-\d{2}\.json$/);
-	const file = JSON.parse(await readFile((await download.path())!, 'utf8')) as {
-		app: string;
-		schemaVersion: number;
-		documents: Record<string, Record<string, unknown>>;
-	};
+	return JSON.parse(await readFile((await download.path())!, 'utf8')) as ExportFile;
+};
 
+/** Every document's path below the user, as the server has them. */
+const onServer = async (request: APIRequestContext, user: string) => {
+	const docs: Record<string, StoredDoc['fields']> = {};
+	// The rules let the app read state document by document; the admin lists the collection.
+	for (const path of [...COLLECTIONS, 'state']) {
+		for (const d of await stored(request, user, path)) docs[`${path}/${d.id}`] = d.fields;
+	}
+	return docs;
+};
+
+test('the export holds every document the server has', async ({ page, request }) => {
+	const user = uid('export');
+	await seedEverything(request, user);
+	const file = await exportAll(page, user);
 	expect(file.app).toBe('Tidrapporten');
 	expect(file.schemaVersion).toBe(1);
-	const onServer: string[] = [];
-	for (const path of COLLECTIONS) {
-		for (const d of await stored(request, user, path)) onServer.push(`${path}/${d.id}`);
-	}
-	// The rules let the app read state document by document; the admin lists the collection.
-	for (const d of await stored(request, user, 'state')) onServer.push(`state/${d.id}`);
-	expect(Object.keys(file.documents).sort()).toEqual(onServer.sort());
+	const paths = Object.keys(await onServer(request, user));
+	expect(Object.keys(file.documents).sort()).toEqual(paths.sort());
 	// The first sign-in wrote the default absence types; the seeded documents are all there.
-	expect(onServer).toEqual(
+	expect(paths).toEqual(
 		expect.arrayContaining([
 			'absenceTypes/semester',
 			'assignments/a1/codes/c1',
@@ -107,4 +121,27 @@ test('the export holds every document the server has', async ({ page, request })
 		}
 	});
 	expect(file.documents['changeLog/l1']).toMatchObject({ reason: 'Fel kod', action: 'unlock' });
+});
+
+test('a restored export is the same data, and the app shows it', async ({ page, request }) => {
+	const user = uid('aterstall-fran');
+	await seedEverything(request, user);
+	const file = await exportAll(page, user);
+
+	// Restored to a new, empty user: every document comes back with the same fields.
+	const restoredUser = uid('aterstall-till');
+	const count = await restore({ file, uid: restoredUser, base: DOCUMENTS, token: 'owner' });
+	expect(count).toBe(Object.keys(file.documents).length);
+	expect(await onServer(request, restoredUser)).toEqual(await onServer(request, user));
+	// A user with data is never restored over.
+	await expect(
+		restore({ file, uid: restoredUser, base: DOCUMENTS, token: 'owner' })
+	).rejects.toThrow('har redan data');
+
+	const other = await page.context().browser()!.newContext();
+	const restoredPage = await other.newPage();
+	await signIn(restoredPage, restoredUser);
+	await restoredPage.goto('/#/installningar');
+	await expect(restoredPage.getByRole('link', { name: /Exempeluppdraget/ })).toBeVisible();
+	await other.close();
 });

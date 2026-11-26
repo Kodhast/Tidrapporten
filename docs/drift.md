@@ -186,5 +186,13 @@ raderar den återställda databasen:
 ```
 
 Nycklarna i `documents` är dokumentens sökvägar under användaren. Tider skrivs med nio decimaler
-och läses tillbaka exakt med `fromJson` i `src/data/export.ts`. Vad som ska med när datan ändras:
+och läses tillbaka exakt med `fromJson` i `src/data/export.ts`.
+
+**Återställa en JSON-export** till en tom användare, i Cloud Shell med projektets ägare
+inloggad. Drift kräver dessutom `--drift` och ägarens uttryckliga ok (beslut 0009):
+
+    node scripts/aterstall.mjs tidrapporten-<datum>.json <uid> test
+
+Skriptet vägrar en användare som redan har data. `test/e2e/export.e2e.ts` exporterar, återställer
+till en ny användare och jämför varje dokument mot emulatorerna i varje PR. Vad som ska med när datan ändras:
 skill `datasakerhet`.
