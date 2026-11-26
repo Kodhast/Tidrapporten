@@ -15,7 +15,8 @@ export interface AppProps {
 	budget?: BudgetStatus | null;
 	/** The view in the address; the start page when left out. */
 	route?: Route;
-	/** The settings view for the route, made by the caller, which has Firestore (issue 17). */
+	/** The view for a route below the start page, made by the caller, which has Firestore: the
+	 * settings (issue 17) and the day (issue 29). */
 	settings?: ReactNode;
 	/** The start page with the timer for a signed-in user, made by the caller (issue 18). */
 	start?: ReactNode;
@@ -68,7 +69,11 @@ export function App({
 					settings
 				) : (
 					<div className="innehall">
-						<p className="kh-text-body">Logga in för att se inställningarna.</p>
+						<p className="kh-text-body">
+							{route.view === 'dag'
+								? 'Logga in för att se dagen.'
+								: 'Logga in för att se inställningarna.'}
+						</p>
 						<SignIn uid={uid} />
 					</div>
 				)}

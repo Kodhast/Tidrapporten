@@ -3,7 +3,7 @@
 // useStart connects it to Firestore.
 import { buttonClass, Chip, EmptyState, Header, Notice } from '@kodhast/web-ui-react';
 import { useState, type ReactNode } from 'react';
-import { longDate } from '../../domain/installningar.ts';
+import { dayName } from '../../domain/dag.ts';
 import { clockOf, isoWeekOf } from '../../domain/tid.ts';
 import {
 	choiceNames,
@@ -44,7 +44,7 @@ export interface StartVyProps {
 
 /** `2026-11-25` → `Onsdag 25 november · vecka 48`. */
 const daySubtitle = (date: IsoDate): string =>
-	`${longDate(date).replace(/ \d{4}$/, '')} · vecka ${Number(isoWeekOf(date).slice(6))}`;
+	`${dayName(date)} · vecka ${Number(isoWeekOf(date).slice(6))}`;
 
 export function StartVy({
 	today,
@@ -124,6 +124,13 @@ export function StartVy({
 								? `Startad ${clockOf(timer.start)}${names?.assignment ? ` · ${names.assignment}` : ''}`
 								: 'Timern står still'}
 						</span>
+						{/* Until the day's intervals are on the start page (issue 19). */}
+						<a
+							className={buttonClass({ variant: 'text' })}
+							href={href({ view: 'dag', date: today })}
+						>
+							Dagens intervall
+						</a>
 					</div>
 				)}
 			</div>

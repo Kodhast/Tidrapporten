@@ -4,8 +4,9 @@
 import type { ToolbarAction } from '@kodhast/web-ui-react';
 import type { Firestore } from 'firebase/firestore';
 import { useEffect, useState, type ReactNode } from 'react';
-import { codeCodec, assignmentCodec } from '../../data/dokument.ts';
-import { assignmentsPath, codesPath, watchCollection } from '../../data/installningar.ts';
+import { assignmentCodec } from '../../data/dokument.ts';
+import { assignmentsPath, watchCollection } from '../../data/installningar.ts';
+import { useCodes } from '../lyssnare.ts';
 import { startTimer, stopTimer, switchTimer } from '../../data/skrivning.ts';
 import { watchLatestEntries, watchReportsFrom, watchTimer } from '../../data/timer.ts';
 import { isTimerForgotten, suggestTimerEnd } from '../../domain/intervall.ts';
@@ -53,29 +54,6 @@ const useNow = (): UtcMillis => {
 		};
 	}, []);
 	return now;
-};
-
-/** The codes of every assignment, by assignment id. */
-const useCodes = (db: Firestore, uid: Id, assignmentIds: readonly Id[]) => {
-	const [codes, setCodes] = useState<Record<Id, TimeCode[]>>({});
-	const key = assignmentIds.join(',');
-	useEffect(() => {
-		const stops = key
-			.split(',')
-			.filter(Boolean)
-			.map((id) =>
-				watchCollection(
-					db,
-					uid,
-					codesPath(id),
-					codeCodec,
-					(values) => setCodes((c) => ({ ...c, [id]: values })),
-					id
-				)
-			);
-		return () => stops.forEach((stop) => stop());
-	}, [db, uid, key]);
-	return codes;
 };
 
 export interface Start {

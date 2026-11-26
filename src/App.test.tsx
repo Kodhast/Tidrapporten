@@ -85,6 +85,16 @@ describe('App and the views', () => {
 		expect(markup).not.toContain('Inställningarna</p>');
 	});
 
+	it('shows the day it is given, and asks for a sign-in before it', () => {
+		const route = { view: 'dag', date: '2026-11-24' } as const;
+		expect(
+			renderToStaticMarkup(<App uid="testperson-1" route={route} settings={<p>Dagen</p>} />)
+		).toContain('<p>Dagen</p>');
+		expect(renderToStaticMarkup(<App uid={null} route={route} />)).toContain(
+			'Logga in för att se dagen.'
+		);
+	});
+
 	it('has no tab row in a view below a tab, which has its back arrow', () => {
 		const markup = renderToStaticMarkup(
 			<App uid="testperson-1" route={{ view: 'uppdrag', id: null }} />

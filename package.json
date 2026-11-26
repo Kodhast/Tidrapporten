@@ -1,7 +1,7 @@
 {
 	"name": "tidrapporten",
 	"private": true,
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"description": "Tidrapportering för en IT-konsult: faktisk tid, veckorapporter och flex",
 	"type": "module",
 	"engines": {

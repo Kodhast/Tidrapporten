@@ -6,6 +6,7 @@ describe('the routes', () => {
 		['#/', { view: 'idag' }],
 		['#/installningar', { view: 'installningar' }],
 		['#/installningar/franvaro', { view: 'franvaro' }],
+		['#/dag/2026-11-24', { view: 'dag', date: '2026-11-24' }],
 		['#/installningar/uppdrag/ny', { view: 'uppdrag', id: null }],
 		['#/installningar/uppdrag/a1', { view: 'uppdrag', id: 'a1' }],
 		[
@@ -23,10 +24,16 @@ describe('the routes', () => {
 		expect(href(route)).toBe(hash);
 	});
 
-	it.each(['', '#', '#/okand', '#/installningar/uppdrag/a b', '#/installningar/uppdrag/'])(
-		'opens the start page for %j',
-		(hash) => {
-			expect(parseRoute(hash)).toEqual({ view: 'idag' });
-		}
-	);
+	it.each([
+		'',
+		'#',
+		'#/okand',
+		'#/installningar/uppdrag/a b',
+		'#/installningar/uppdrag/',
+		'#/dag/2026-02-30',
+		'#/dag/2026-13-45',
+		'#/dag/igar'
+	])('opens the start page for %j', (hash) => {
+		expect(parseRoute(hash)).toEqual({ view: 'idag' });
+	});
 });

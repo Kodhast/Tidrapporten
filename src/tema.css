@@ -194,3 +194,42 @@ body {
 	gap: var(--kh-space-s);
 	padding-block: var(--kh-space-xl);
 }
+
+/* The day view (issue 29, mockup "Dagvy"). */
+.dag {
+	gap: var(--kh-space-l);
+	/* Room for the add button at the bottom. */
+	padding-bottom: calc(var(--kh-space-xl) * 3);
+}
+
+.tabular {
+	font-variant-numeric: tabular-nums;
+}
+
+.accent-fel {
+	--kh-accent: var(--kh-error);
+}
+
+.summa {
+	display: flex;
+	flex-direction: column;
+	gap: var(--kh-space-xs);
+}
+
+.knappar {
+	display: flex;
+	gap: var(--kh-space-xs);
+}
+
+.dag-fot {
+	position: fixed;
+	inset-inline: var(--kh-space-l);
+	bottom: var(--kh-space-xl);
+}
+
+.ark-fot {
+	flex: 1;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}

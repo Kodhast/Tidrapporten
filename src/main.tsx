@@ -12,6 +12,7 @@ import type { BudgetStatus } from './domain/budget';
 import type { Id } from './domain/types';
 import { startFirebase } from './firebase/app';
 import { finishSignIn } from './firebase/auth';
+import { DagRutt } from './vyer/dag/DagRutt';
 import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
@@ -67,7 +68,9 @@ function Root() {
 			uid={shownUid}
 			online={online}
 			settings={
-				route.view !== 'idag' ? (
+				route.view === 'dag' ? (
+					<DagRutt db={db} uid={shownUid} date={route.date} online={online} />
+				) : route.view !== 'idag' ? (
 					<InstallningarRutt db={db} uid={shownUid} route={route} online={online} />
 				) : null
 			}
