@@ -237,7 +237,7 @@ export const changeLogCodec: Codec<ChangeLogEntry> = {
 		id,
 		at: millis(d.at),
 		path: str(d.path),
-		action: oneOf(d.action, ['create', 'update', 'delete', 'send', 'unlock'], 'update'),
+		action: oneOf(d.action, ['create', 'update', 'delete', 'send', 'unlock', 'restore'], 'update'),
 		week: strOrNull(d.week),
 		before: plainMap(d.before),
 		after: plainMap(d.after),

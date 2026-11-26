@@ -6,7 +6,8 @@ import type { Assignment, Id } from '../../domain/types.ts';
 import { ClockIcon } from '../ikoner';
 import { href } from '../rutter.ts';
 import { OfflineNotice } from './delar';
-import { Export } from './Export';
+import { Export, type RestoreResult } from './Export';
+import type { ExportFile } from '../../data/exportformat.ts';
 
 export interface AssignmentCounts {
 	codes: number;
@@ -21,6 +22,7 @@ export interface InstallningarVyProps {
 	scopeToday: Readonly<Record<Id, number>>;
 	online: boolean;
 	onExport: () => Promise<void>;
+	onRestore: (file: ExportFile) => Promise<RestoreResult>;
 }
 
 export function InstallningarVy({
@@ -30,7 +32,8 @@ export function InstallningarVy({
 	freeDays,
 	scopeToday,
 	online,
-	onExport
+	onExport,
+	onRestore
 }: InstallningarVyProps) {
 	const sorted = [...assignments].sort(
 		(a, b) => Number(a.archived) - Number(b.archived) || a.order - b.order
@@ -84,7 +87,7 @@ export function InstallningarVy({
 					</div>
 				</section>
 
-				<Export online={online} onExport={onExport} />
+				<Export online={online} onExport={onExport} onRestore={onRestore} />
 			</div>
 		</>
 	);

@@ -97,7 +97,29 @@ Koden ligger i `firebase-functions/src/` och buntas med `npm run build:functions
 (beslut 0014). Paketen den använder står i `firebase-functions/package.json` med en egen
 låsfil; `release.yml` installerar dem (`npm ci --prefix firebase-functions`), eftersom
 Firebase CLI läser funktionerna ur koden före driftsättningen. Funktionerna driftsätts bara
-till drift, av `release.yml`.
+till drift, av `release.yml`. I e2e körs de i Functions-emulatorn; `npm run test:e2e` buntar dem
+först, och paketen installeras med `npm ci --prefix firebase-functions`.
+
+**`aterstall`** (issue 57) är en anropbar funktion som lägger tillbaka det som saknas från en
+JSON-export, bara för den inloggade. Den körs som **`tidrapporten-aterstall`**, med bara rollen
+Cloud Datastore User i drift. Kontot och rätten för `tidrapporten-deploy` att driftsätta
+funktionen som det skapas av projektets ägare före första releasen med funktionen:
+
+    gcloud iam service-accounts create tidrapporten-aterstall --project=device-streaming-5b35f7b8
+    gcloud projects add-iam-policy-binding device-streaming-5b35f7b8 \
+      --member=serviceAccount:tidrapporten-aterstall@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --role=roles/datastore.user
+    gcloud iam service-accounts add-iam-policy-binding \
+      tidrapporten-aterstall@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --project=device-streaming-5b35f7b8 \
+      --member=serviceAccount:tidrapporten-deploy@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --role=roles/iam.serviceAccountUser
+
+En anropbar funktion ska kunna anropas av alla (den kontrollerar själv inloggningen). Om
+`tidrapporten-deploy` får sätta det på Cloud Run-tjänsten är inte provat, och en körning med
+_dry_run_ prövar inte rättigheterna. Fallerar första driftsättningen på anroparen behöver kontot
+rollen Cloud Run Admin. I testmiljön finns funktionen inte, så återställningen ger där "Det gick inte
+att återställa".
 
 ## Budgeten och stoppet i test
 
@@ -193,6 +215,8 @@ inloggad. Drift kräver dessutom `--drift` och ägarens uttryckliga ok (beslut 0
 
     node scripts/aterstall.mjs tidrapporten-<datum>.json <uid> test
 
-Skriptet vägrar en användare som redan har data. `test/e2e/export.e2e.ts` exporterar, återställer
+Skriptet vägrar en användare som redan har data. I appen gör knappen **Återställ från fil** samma
+sak för den inloggade, men lägger bara tillbaka det som saknas och skriver aldrig över
+(funktionen `aterstall` ovan). `test/e2e/export.e2e.ts` exporterar, återställer
 till en ny användare och jämför varje dokument mot emulatorerna i varje PR. Vad som ska med när datan ändras:
 skill `datasakerhet`.

@@ -7,12 +7,20 @@ import {
 	persistentMultipleTabManager,
 	type Firestore
 } from 'firebase/firestore';
-import { EMULATOR_HOST, EMULATOR_PORTS, environmentFor, firebaseOptions } from './config';
+import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
+import {
+	EMULATOR_HOST,
+	EMULATOR_PORTS,
+	environmentFor,
+	firebaseOptions,
+	FUNCTIONS_REGION
+} from './config';
 
 export interface Firebase {
 	app: FirebaseApp;
 	auth: Auth;
 	db: Firestore;
+	functions: Functions;
 }
 
 declare global {
@@ -33,15 +41,17 @@ export function startFirebase(): Firebase {
 	const db = initializeFirestore(app, {
 		localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 	});
+	const functions = getFunctions(app, FUNCTIONS_REGION);
 	if (import.meta.env.VITE_FIREBASE_EMULATOR === 'true') {
 		connectAuthEmulator(auth, `http://${EMULATOR_HOST}:${EMULATOR_PORTS.auth}`, {
 			disableWarnings: true
 		});
 		connectFirestoreEmulator(db, EMULATOR_HOST, EMULATOR_PORTS.firestore);
+		connectFunctionsEmulator(functions, EMULATOR_HOST, EMULATOR_PORTS.functions);
 		window.testSignIn = async (uid) => {
 			const { signInForTest } = await import('./testinloggning');
 			return (await signInForTest(auth, uid)).user.uid;
 		};
 	}
-	return { app, auth, db };
+	return { app, auth, db, functions };
 }

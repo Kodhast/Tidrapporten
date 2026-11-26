@@ -1,6 +1,8 @@
 // Connects the settings views to Firestore: follows what each view shows and saves through the
 // data layer. The views themselves get plain values and can be tested without Firebase.
 import type { Firestore } from 'firebase/firestore';
+import type { Functions } from 'firebase/functions';
+import { restoreFile } from '../../data/aterstall.ts';
 import { useEffect, useState } from 'react';
 import {
 	absenceTypesPath,
@@ -22,7 +24,8 @@ import {
 	receiverCodec,
 	type Codec
 } from '../../data/dokument.ts';
-import { exportFile, exportFileName, readAll } from '../../data/export.ts';
+import { readAll } from '../../data/export.ts';
+import { exportFile, exportFileName } from '../../data/exportformat.ts';
 import { nextNumber } from '../../domain/installningar.ts';
 import { termsOn } from '../../domain/norm.ts';
 import { dateOf } from '../../domain/tid.ts';
@@ -40,6 +43,7 @@ type SettingsRoute = Extract<
 
 export interface InstallningarRuttProps {
 	db: Firestore;
+	functions: Functions;
 	uid: Id;
 	route: SettingsRoute;
 	online: boolean;
@@ -107,7 +111,7 @@ const download = (name: string, value: unknown) => {
 
 const Loading = () => <p className="kh-text-body innehall">Hämtar …</p>;
 
-export function InstallningarRutt({ db, uid, route, online }: InstallningarRuttProps) {
+export function InstallningarRutt({ db, functions, uid, route, online }: InstallningarRuttProps) {
 	// The day when the view opened; settings rarely stay open over midnight.
 	const [today] = useState(() => dateOf(Date.now()));
 	const assignmentId =
@@ -153,6 +157,7 @@ export function InstallningarRutt({ db, uid, route, online }: InstallningarRuttP
 						const now = Date.now();
 						download(exportFileName(now), exportFile(await readAll(db, uid), now));
 					}}
+					onRestore={(file) => restoreFile(functions, file)}
 				/>
 			);
 		case 'franvaro':

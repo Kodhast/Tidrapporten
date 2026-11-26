@@ -29,7 +29,7 @@ Allt i samma PR:
 
 Som ett fält, och dessutom:
 
-- **JSON-exporten** i `src/data/export.ts`: samlingen i `USER_COLLECTIONS` (eller
+- **JSON-exporten** i `src/data/exportformat.ts`: samlingen i `USER_COLLECTIONS` (eller
   `ASSIGNMENT_COLLECTIONS` under ett uppdrag), ett dokument under `state` i `STATE_DOCUMENTS`.
   Provet i `export.test.ts` jämför listorna med `firestore.rules` och fäller en samling som saknas.
 - **Playwright:** `test/e2e/export.e2e.ts` får ett dokument i den nya samlingen.
@@ -49,6 +49,9 @@ Som ett fält, och dessutom:
 - `toJson` vägrar värden appen inte lagrar (`Date`, `NaN`, `undefined`, referenser) hellre än att
   tappa dem. Lagras en ny sorts värde ska `toJson`, `fromJson` och `toValue` i
   `scripts/aterstall.mjs` lära sig den, med prov.
+- **Återställningen i appen** (funktionen `aterstall`, issue 57) vägrar sökvägar som
+  `isUserPath` i `src/data/exportformat.ts` inte känner igen. En ny samling ska in där, annars
+  går den inte att återställa.
 - Återställningen provas i varje PR: `test/e2e/export.e2e.ts` exporterar, återställer till en ny
   användare och jämför varje dokument.
 

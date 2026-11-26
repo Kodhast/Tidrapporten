@@ -48,8 +48,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # The restore function runs in the Functions emulator (issue 57) with its own packages.
+      - run: npm ci --prefix firebase-functions
       - run: npx playwright install --with-deps chromium
-      # The app runs against the Auth and Firestore emulators (issue 17), which need Java.
+      # The app runs against the Auth, Firestore and Functions emulators (issues 17 and 57), which
+      # need Java.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin

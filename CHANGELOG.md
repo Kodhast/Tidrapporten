@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.12.0
+
+- Inställningar: "Återställ från fil" läser en export och lägger tillbaka det som saknas, med
+  tider och ändringslogg som de var. Inget som finns skrivs över, och återställningen loggas
+  (#57).
+
 ## 0.11.0
 
 - Inställningar: "Exportera all data" laddar ner all din data som en JSON-fil, med uppdrag, tid,
