@@ -24,3 +24,4 @@ Code. 0002–0010 sammanfattar intervjun i issue 1–7.
 | [0017](0017-inloggningen.md)                          | Inloggningen: Access-JWT till Firebase custom token | Beslutat                                                                   |
 | [0018](0018-schemalagda-backuper.md)                  | Daglig backup med Firestores schemalagda backuper   | Beslutat                                                                   |
 | [0019](0019-arbetsgivare-och-kunder.md)               | Arbetsgivare och kunder över uppdragen              | Beslutat                                                                   |
+| [0020](0020-tomning-av-kontot.md)                     | Tömning av kontot raderar allt, också loggen        | Beslutat                                                                   |

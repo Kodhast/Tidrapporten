@@ -15,7 +15,7 @@ och låsning – och de syns inte i gränssnittet. Underlag från issue 6.
 - **Webbläsare:** bara Chrome på dator och Android, mest telefon. Ingen särskild hänsyn till
   skärmläsare, men vanlig användbarhet: tryckytor, kontrast och små skärmar.
 - **Ändringslogg i datan:** varje ändring av en låst vecka och varje rättning Claude gör loggas
-  med tid, vad, skäl och vem. Loggen sparas för alltid.
+  med tid, vad, skäl och vem. Loggen sparas för alltid, utom när ägaren tömmer hela kontot (0020).
 - **Driftloggar** i Pages Functions och Cloud Functions som strukturerad JSON: `info` för sällsynta
   viktiga händelser, `error` för allt som misslyckas (larmar i Google Cloud), `debug` bara i
   testmiljön. 30 dagars lagring. Bara id:n och händelser – aldrig kundnamn, anteckningar eller

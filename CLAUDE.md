@@ -29,7 +29,8 @@ Når en molnsession inte Playwrights nedladdning: `PLAYWRIGHT_CHROMIUM_PATH=/opt
   GitHub secrets. Se `docs/beslut/0007-sakerhet-och-integritet.md`.
 - **Riktig data:** läs bara med ägarens ok, och skriv aldrig i drift utan att ägaren bett om just
   den ändringen – med backup före och en post i ändringsloggen (beslut 0009).
-- **En låst vecka ändras bara via en loggad upplåsning.** Ändringsloggen raderas aldrig.
+- **En låst vecka ändras bara via en loggad upplåsning.** Ändringsloggen raderas aldrig,
+  utom när ägaren tömmer hela kontot (beslut 0020).
 - **Tid sparas i UTC och visas i Europe/Stockholm.** Beräkningar av tid, helgdagar och flex har
   räknade exempel i Vitest.
 - **Driftloggar** innehåller bara id:n och händelser, aldrig kundnamn, anteckningar eller tider.
