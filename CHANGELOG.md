@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.0.0
+
+- Första versionen i drift på tid.kodhast.com: timer, dagvy, startsida med flex, veckorapporter
+  per mottagare med avskrift och låsning, inställningar, export och återställning från fil, och
+  genvägar på appikonen (#8).
+
 ## 0.13.0
 
 - Genvägar på appikonen: en lång tryckning ger "Starta timern", "Stoppa timern" och "Idag".
