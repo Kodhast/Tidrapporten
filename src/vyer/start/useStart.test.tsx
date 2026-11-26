@@ -4,6 +4,7 @@
 // run against the emulators in test/e2e/timer.e2e.ts and test/e2e/oversikt.e2e.ts.
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -16,6 +17,7 @@ import {
 	work
 } from '../../domain/testdata.ts';
 import type { Assignment, Entry, Report, TimeCode, Timer } from '../../domain/types.ts';
+import { pendingShortcut, type PendingShortcut, type ShortcutAction } from '../genvagar';
 import { useStart } from './useStart';
 
 const listeners = vi.hoisted(() => ({
@@ -105,8 +107,14 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-function Harness({ online = true }: { online?: boolean }) {
-	const start = useStart({} as Firestore, 'testperson-1', online, null);
+function Harness({
+	online = true,
+	shortcut = null
+}: {
+	online?: boolean;
+	shortcut?: PendingShortcut | null;
+}) {
+	const start = useStart({} as Firestore, 'testperson-1', online, null, shortcut);
 	return (
 		<>
 			{start.view}
@@ -283,6 +291,70 @@ describe('useStart', () => {
 		await u.click(screen.getByRole('button', { name: /^Möten/ }));
 		expect(writes.switchTimer).not.toHaveBeenCalled();
 		expect(screen.getByRole('alertdialog')).toBeTruthy();
+	});
+
+	describe('the app icon’s shortcuts (issue 59)', () => {
+		const holder = (action: ShortcutAction) => pendingShortcut(action);
+
+		it('starts once with the main button’s code, after the data has come, also in StrictMode', () => {
+			const shortcut = holder('starta');
+			render(
+				<StrictMode>
+					<Harness shortcut={shortcut} />
+				</StrictMode>
+			);
+			expect(writes.startTimer).not.toHaveBeenCalled();
+			feed({ entries: [work('2026-11-24', '13:00', '16:00', 'c2')] });
+			expect(writes.startTimer).toHaveBeenCalledTimes(1);
+			expect(writes.startTimer.mock.calls[0]![2]).toMatchObject({
+				subject: { kind: 'code', codeId: 'c2' },
+				start: NOW
+			});
+			expect(shortcut.action).toBeNull();
+			// A new mount, as after signing out and in again, does not start again.
+			cleanup();
+			const { rerender } = render(<Harness shortcut={shortcut} />);
+			feed({ entries: [] });
+			rerender(<Harness shortcut={shortcut} />);
+			expect(writes.startTimer).toHaveBeenCalledTimes(1);
+		});
+
+		it('stops a running timer, and starts none when one runs', () => {
+			const timer = running(at('2026-11-25', '08:05'));
+			render(<Harness shortcut={holder('stoppa')} />);
+			feed({ timer });
+			expect(writes.stopTimer).toHaveBeenCalledWith({}, 'testperson-1', timer, NOW, []);
+			cleanup();
+			render(<Harness shortcut={holder('starta')} />);
+			feed({ timer });
+			expect(writes.startTimer).not.toHaveBeenCalled();
+		});
+
+		it('waits for the network before a stop into a sent week', () => {
+			const timer = running(at('2026-11-25', '08:05'));
+			const reports = [report('2026-W48', 'sent', [0, 0, 0, 0, 0, 0, 0])];
+			const shortcut = holder('stoppa');
+			const { rerender } = render(<Harness online={false} shortcut={shortcut} />);
+			feed({ timer, reports });
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+			expect(shortcut.action).toBe('stoppa');
+			rerender(<Harness online shortcut={shortcut} />);
+			expect(writes.stopTimer).toHaveBeenCalledTimes(1);
+		});
+
+		it('asks a forgotten timer when the work ended instead of stopping', () => {
+			render(<Harness shortcut={holder('stoppa')} />);
+			feed({ timer: running(at('2026-11-24', '22:05')) });
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+			expect(screen.getByRole('alertdialog')).toBeTruthy();
+		});
+
+		it('does nothing to stop when no timer runs', () => {
+			render(<Harness shortcut={holder('stoppa')} />);
+			feed({});
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+			expect(writes.startTimer).not.toHaveBeenCalled();
+		});
 	});
 
 	it('names a running timer whose code is archived', () => {

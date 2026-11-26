@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.13.0
+
+- Genvägar på appikonen: en lång tryckning ger "Starta timern", "Stoppa timern" och "Idag".
+  Starta och stoppa gör samma sak som huvudknappen, en gång (#59).
+
 ## 0.12.0
 
 - Inställningar: "Återställ från fil" läser en export och lägger tillbaka det som saknas, med
