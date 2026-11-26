@@ -113,7 +113,7 @@ body {
 }
 
 .start {
-	padding-block: var(--kh-space-xl);
+	padding-block: var(--kh-space-xl) calc(var(--kh-toolbar-clearance) + var(--kh-space-l));
 	display: grid;
 	gap: var(--kh-space-m);
 }
@@ -133,4 +133,53 @@ body {
 		--kh-tone-container: #5a3a00;
 		--kh-tone-content: #ffdcae;
 	}
+}
+
+/* ton-las: what cannot change right now, e.g. offline (mockup issue 16). ton-fel: a failed save. */
+.ton-las {
+	--kh-tone-container: var(--kh-surface-variant);
+	--kh-tone-content: var(--kh-on-surface-variant);
+}
+
+.ton-fel {
+	--kh-tone-container: var(--kh-error-container);
+	--kh-tone-content: var(--kh-on-error-container);
+}
+
+/*
+ * The layout of the settings views (issue 17), as in the mockup: sections with a small gap inside
+ * and a large one between, room below for the fixed tab row.
+ */
+.innehall {
+	display: flex;
+	flex-direction: column;
+	gap: var(--kh-space-xl);
+	padding: var(--kh-space-l) var(--kh-space-l) calc(var(--kh-toolbar-clearance) + var(--kh-space-l));
+}
+
+.sektion {
+	display: flex;
+	flex-direction: column;
+	gap: var(--kh-space-s);
+}
+
+.sektion > h2,
+.sektion > p {
+	margin: 0;
+	padding-inline: var(--kh-space-xs);
+}
+
+/* Rows in a card sit close to its edge, as in the mockup. */
+.radlista {
+	padding: var(--kh-space-xs);
+}
+
+.falt-par {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--kh-space-m);
+}
+
+.dampad {
+	color: var(--kh-on-surface-variant);
 }

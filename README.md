@@ -15,4 +15,4 @@ Kräver Node 22.18 eller senare (CI kör Node 24, se `.nvmrc`).
     npm ci
     npm run dev        # http://localhost:5173
     npm run verify     # typkontroll, lint och enhetstester med täckning
-    npm run test:e2e   # Playwright (första gången: npx playwright install chromium)
+    npm run test:e2e   # Playwright mot emulatorerna (Java 21; första gången: npx playwright install chromium)

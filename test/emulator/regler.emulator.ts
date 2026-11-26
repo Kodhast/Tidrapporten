@@ -34,6 +34,13 @@ import {
 	DEFAULT_SETTINGS
 } from '../../src/data/dokument.ts';
 import { createMeta, updateMeta } from '../../src/data/kodning.ts';
+import {
+	ensureDefaultAbsenceTypes,
+	saveAbsenceType,
+	saveAssignment,
+	saveFreeDay,
+	saveReceiver
+} from '../../src/data/installningar.ts';
 import { LockedChangeError, saveEntry, saveReport, stopTimer } from '../../src/data/skrivning.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
 import type { Report } from '../../src/domain/types.ts';
@@ -752,6 +759,70 @@ describe('the data layer’s writes pass the rules', () => {
 		expect(entry.time).toMatchObject({ end: timer.start + 24 * 3_600_000 });
 		const logs = await getDocs(collection(db, 'users', OWNER, 'changeLog'));
 		expect(logs.docs.map((d) => d.data().path)).toEqual([`entries/${entry.id}`]);
+	});
+});
+
+describe('the settings’ writes pass the rules (issue 17)', () => {
+	const logCount = async (db: Firestore) =>
+		(await getDocs(collection(db, 'users', OWNER, 'changeLog'))).size;
+
+	it('saveAssignment creates, changes the name freely and logs a changed balance', async () => {
+		const db = owner();
+		const a = assignment();
+		await allowed(saveAssignment(db, OWNER, null, a, [{ before: null, after: code('c1') }]));
+		await allowed(saveAssignment(db, OWNER, a, { ...a, name: 'Nytt namn', archived: true }));
+		expect(await logCount(db)).toBe(0);
+		const named = { ...a, name: 'Nytt namn', archived: true };
+		await allowed(
+			saveAssignment(db, OWNER, named, {
+				...named,
+				openingFlex: 270,
+				terms: [...a.terms, { from: '2026-11-26', scopePercent: 80, workdayMinutes: 480 }]
+			})
+		);
+		expect(await logCount(db)).toBe(1);
+		const saved = await getDoc(at(db, 'assignments/a1'));
+		expect(saved.data()).toMatchObject({ openingFlex: 270, name: 'Nytt namn' });
+		expect((await getDoc(at(db, 'assignments/a1/codes/c1'))).exists()).toBe(true);
+	});
+
+	it('saveReceiver logs a new receiver and a moved one, not a new mapping', async () => {
+		const db = owner();
+		const r = receiver();
+		await allowed(saveReceiver(db, OWNER, null, r));
+		await allowed(saveReceiver(db, OWNER, r, { ...r, mapping: {} }));
+		await allowed(saveReceiver(db, OWNER, r, { ...r, position: 2 }));
+		expect(await logCount(db)).toBe(2);
+	});
+
+	it('creates the default absence types once, and logs a changed counting', async () => {
+		const db = owner();
+		await expect(ensureDefaultAbsenceTypes(db, OWNER)).resolves.toBe(6);
+		await expect(ensureDefaultAbsenceTypes(db, OWNER)).resolves.toBe(0);
+		const semester = absenceTypeCodec.fromData(
+			'semester',
+			(await getDoc(at(db, 'absenceTypes/semester'))).data()!
+		);
+		await allowed(saveAbsenceType(db, OWNER, semester, { ...semester, name: 'Ledighet' }));
+		await allowed(saveAbsenceType(db, OWNER, semester, { ...semester, counting: 'worked' }));
+		expect(await logCount(db)).toBe(1);
+	});
+
+	it('saveFreeDay creates, renames, moves and removes a day, logging each', async () => {
+		const db = owner();
+		const day = { date: '2027-05-07', free: true, name: 'Klämdag' };
+		await allowed(saveFreeDay(db, OWNER, null, day));
+		await allowed(saveFreeDay(db, OWNER, day, { ...day, name: 'Ledig' }));
+		const moved = { ...day, name: 'Ledig', date: '2027-05-14' };
+		await allowed(saveFreeDay(db, OWNER, { ...day, name: 'Ledig' }, moved));
+		await allowed(saveFreeDay(db, OWNER, moved, null));
+		await allowed(
+			saveFreeDay(db, OWNER, null, { date: '2026-12-24', free: false, name: 'Julafton' })
+		);
+		expect(await logCount(db)).toBe(6);
+		expect(
+			(await getDocs(collection(db, 'users', OWNER, 'freeDays'))).docs.map((d) => d.id)
+		).toEqual(['2026-12-24']);
 	});
 });
 

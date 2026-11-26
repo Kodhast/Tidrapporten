@@ -47,3 +47,36 @@ describe('App and the cloud budget', () => {
 		expect(renderToStaticMarkup(<App />)).not.toContain('kh-notice');
 	});
 });
+
+describe('App and the views', () => {
+	it('has the tab row with Idag and Inställningar on the start page', () => {
+		const markup = renderToStaticMarkup(<App />);
+		expect(markup).toContain('kh-toolbar--fixed');
+		expect(markup).toMatch(/<a[^>]*href="#\/"[^>]*aria-current="page"/);
+		expect(markup).toContain('href="#/installningar"');
+	});
+
+	it('shows the settings it is given to a signed-in user', () => {
+		const markup = renderToStaticMarkup(
+			<App uid="testperson-1" route={{ view: 'installningar' }} settings={<p>Inställningarna</p>} />
+		);
+		expect(markup).toContain('<p>Inställningarna</p>');
+		expect(markup).toMatch(/<a[^>]*href="#\/installningar"[^>]*aria-current="page"/);
+		expect(markup).not.toContain('Starta timern');
+	});
+
+	it('asks for a sign-in before the settings', () => {
+		const markup = renderToStaticMarkup(
+			<App uid={null} route={{ view: 'franvaro' }} settings={<p>Inställningarna</p>} />
+		);
+		expect(markup).toContain('Logga in för att se inställningarna.');
+		expect(markup).not.toContain('Inställningarna</p>');
+	});
+
+	it('has no tab row in a view below a tab, which has its back arrow', () => {
+		const markup = renderToStaticMarkup(
+			<App uid="testperson-1" route={{ view: 'uppdrag', id: null }} />
+		);
+		expect(markup).not.toContain('kh-toolbar');
+	});
+});
