@@ -6,6 +6,7 @@ describe('the routes', () => {
 		['#/', { view: 'idag' }],
 		['#/installningar', { view: 'installningar' }],
 		['#/kom-igang', { view: 'kom-igang' }],
+		['#/om', { view: 'om' }],
 		['#/installningar/franvaro', { view: 'franvaro' }],
 		['#/dag/2026-11-24', { view: 'dag', date: '2026-11-24' }],
 		['#/installningar/uppdrag/ny', { view: 'uppdrag', id: null }],

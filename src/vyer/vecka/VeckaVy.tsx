@@ -1,12 +1,13 @@
 // The week (mockup "Vecka", issue 20): the week picker, the week's actual time, norm and flex, and
 // per assignment its receivers in the chain's order with each report's state. Gets plain values;
 // VeckaRutt connects it to Firestore.
-import { Header, Notice, PeriodPicker, Pill, Row } from '@kodhast/web-ui-react';
+import { Notice, PeriodPicker, Pill, Row } from '@kodhast/web-ui-react';
 import { plural } from '../../domain/installningar.ts';
 import { flexLabel } from '../../domain/oversikt.ts';
 import type { IsoWeek } from '../../domain/types.ts';
 import { hoursLabel, sentLabel, type ReceiverWeek, type WeekView } from '../../domain/vecka.ts';
-import { ClockIcon, WarningIcon } from '../ikoner';
+import { WarningIcon } from '../ikoner';
+import { Sidhuvud } from '../konto';
 import { href } from '../rutter.ts';
 
 export interface VeckaVyProps {
@@ -36,10 +37,9 @@ const subtitle = ({ report, minutes }: ReceiverWeek): string => {
 export function VeckaVy({ week, label, view, failed, onWeek }: VeckaVyProps) {
 	return (
 		<>
-			<Header
-				icon={<ClockIcon />}
-				name="Tidrapporten"
+			<Sidhuvud
 				title="Veckan"
+				bouncing={view === null && !failed}
 				subtitle={
 					view &&
 					(view.toSend === 0

@@ -398,3 +398,25 @@ body {
 .steg-nummer {
 	padding-inline-end: var(--kh-space-s);
 }
+
+/* The flex on the start page's first row (issue 66): the header's end is the account's. */
+.flexrad {
+	display: flex;
+}
+
+/* Om Tidrapporten (issue 66). */
+.om {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--kh-space-s);
+	padding: var(--kh-space-l);
+	text-align: center;
+}
+.om > * {
+	margin: 0;
+}
+.om-ikon {
+	inline-size: 72px;
+	block-size: 72px;
+}

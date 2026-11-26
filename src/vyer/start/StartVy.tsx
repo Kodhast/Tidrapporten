@@ -1,8 +1,8 @@
-// The start page (mockup "Idag – arbetsdagens hjul", issue 19): the flex in the header, the wheel
+// The start page (mockup "Idag – arbetsdagens hjul", issue 19): the flex on the first row, the wheel
 // round the timer's code chip and running time, today's time against the norm, today's intervals
 // and gaps, the reports not yet sent, the offline notice and the forgotten-timer question. Gets
 // plain values; useStart connects it to Firestore.
-import { buttonClass, Chip, EmptyState, Header, Notice, Pill } from '@kodhast/web-ui-react';
+import { buttonClass, Chip, EmptyState, Notice, Pill } from '@kodhast/web-ui-react';
 import { useState, type ReactNode } from 'react';
 import { dayName, minutesLabel, type DayRow } from '../../domain/dag.ts';
 import type { CodeColour } from '../../domain/hjul.ts';
@@ -17,8 +17,9 @@ import {
 	type CodeGroup
 } from '../../domain/timer.ts';
 import type { Entry, Id, IsoDate, Timer, UtcMillis } from '../../domain/types.ts';
-import { ClockIcon, ExpandIcon, OfflineIcon, WarningIcon, WorkIcon } from '../ikoner';
+import { ExpandIcon, OfflineIcon, WarningIcon, WorkIcon } from '../ikoner';
 import { DagRader } from '../dag/DagRader';
+import { Sidhuvud } from '../konto';
 import { href } from '../rutter.ts';
 import { FlexArk } from './FlexArk';
 import { GlomdTimer, type GlomdTimerProps } from './GlomdTimer';
@@ -99,24 +100,19 @@ export function StartVy({
 	const names = timer ? timerNames : current && choiceNames(groups, current);
 	return (
 		<>
-			<Header
-				icon={<ClockIcon />}
-				name="Tidrapporten"
-				title="Idag"
-				subtitle={daySubtitle(today)}
-				trailing={
-					overview &&
-					overview.perAssignment.length > 0 && (
+			<Sidhuvud title="Idag" subtitle={daySubtitle(today)} bouncing={loading} />
+			<div className="innehall">
+				{/* The header's end is the account's (issue 66), so the flex is the content's first row. */}
+				{overview && overview.perAssignment.length > 0 && (
+					<div className="flexrad">
 						<Pill
 							tone={isFlexNegative(overview.total) ? 'ton-varning' : 'ton-ok'}
 							onPress={() => setShowingFlex(true)}
 						>
 							{`Flex ${flexLabel(overview.total)}`}
 						</Pill>
-					)
-				}
-			/>
-			<div className="innehall">
+					</div>
+				)}
 				{!online && (
 					<Notice
 						tone="ton-las"

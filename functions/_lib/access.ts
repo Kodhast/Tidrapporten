@@ -138,3 +138,50 @@ export async function verifyAccessJwt(
 export function forgetKeys(): void {
 	cached = null;
 }
+
+/** The name and Google picture of the person behind an Access token, as far as Access knows them. */
+export interface AccessIdentity {
+	name?: string;
+	picture?: string;
+}
+
+const IDENTITY_TIMEOUT_MS = 3_000;
+
+/** Google's profile pictures only, over https: not any address an identity could carry. */
+export function googlePicture(address: unknown): string | undefined {
+	if (typeof address !== 'string') return undefined;
+	try {
+		const url = new URL(address);
+		return url.protocol === 'https:' && /(^|\.)googleusercontent\.com$/.test(url.hostname)
+			? url.href
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * The name and picture from the team's get-identity, asked with the JWT as the cookie (as Husjakt's
+ * bildUrAccess). They are not in the JWT; the picture is under oidc_fields when `picture` is added as
+ * an OIDC claim on the Google login in Zero Trust. Anything wrong gives an empty identity, so that
+ * signing in never depends on it.
+ */
+export async function fetchIdentity(
+	jwt: string,
+	fetchFn: typeof fetch = fetch
+): Promise<AccessIdentity> {
+	try {
+		const response = await fetchFn(`${teamUrl(ACCESS_TEAM)}/cdn-cgi/access/get-identity`, {
+			headers: { cookie: `CF_Authorization=${jwt}` },
+			signal: AbortSignal.timeout(IDENTITY_TIMEOUT_MS)
+		});
+		if (!response.ok) return {};
+		const identity = (await response.json()) as Record<string, unknown> | null;
+		const oidc = (identity?.oidc_fields ?? {}) as Record<string, unknown>;
+		const name = typeof identity?.name === 'string' ? identity.name.trim() : '';
+		const picture = googlePicture(oidc.picture ?? identity?.picture);
+		return { ...(name && { name }), ...(picture && { picture }) };
+	} catch {
+		return {};
+	}
+}

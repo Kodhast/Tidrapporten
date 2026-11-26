@@ -150,11 +150,13 @@ describe('the overview', () => {
 		accent: () => 'accent-kod-1'
 	});
 
-	it('shows the flex in the header and per assignment in a sheet', async () => {
+	it('shows the flex on the first row (not in the header) and per assignment in a sheet', async () => {
 		const user = userEvent.setup();
 		render(<StartVy {...props({ overview: overview(390, 0) })} />);
 		const pill = screen.getByRole('button', { name: 'Flex +6,5 h' });
 		expect(pill.className).toContain('ton-ok');
+		expect(pill.closest('kh-header')).toBeNull();
+		expect(pill.closest('.innehall > .flexrad')).not.toBeNull();
 		await user.click(pill);
 		const sheet = screen.getByRole('dialog', { name: 'Flex' });
 		expect(within(sheet).getByText('Veckan 18 h 42 min av 40 h, +1,0 h')).toBeTruthy();

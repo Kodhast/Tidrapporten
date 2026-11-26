@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { BudgetStatus } from './domain/budget';
 import { startSignIn } from './firebase/auth';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
-import { CalendarIcon, ClockIcon, SettingsIcon } from './vyer/ikoner';
+import { OmVy } from './vyer/om/OmVy';
+import { CalendarIcon, ClockIcon } from './vyer/ikoner';
 import { href, type Route } from './vyer/rutter';
 
 export interface AppProps {
@@ -31,14 +32,9 @@ const TABS = [
 		label: 'Veckan',
 		icon: <CalendarIcon />,
 		href: href({ view: 'vecka', week: null })
-	},
-	{
-		id: 'installningar',
-		label: 'Inställningar',
-		icon: <SettingsIcon />,
-		href: href({ view: 'installningar' })
 	}
 ];
+// Inställningar is no tab (issue 66): it opens from the account menu, as in every Kodhäst app.
 
 const SignIn = ({ uid }: { uid?: string | null }) =>
 	uid === null ? <Button onPress={() => startSignIn()}>Logga in</Button> : null;
@@ -55,7 +51,13 @@ export function App({
 	const onStart = route.view === 'idag';
 	const banner = <BudgetBanderoll status={budget ?? null} />;
 	let content: ReactNode;
-	if (onStart && uid && start) {
+	if (route.view === 'om') {
+		content = (
+			<main>
+				<OmVy />
+			</main>
+		);
+	} else if (onStart && uid && start) {
 		content = <main>{start}</main>;
 	} else if (onStart) {
 		// Before the sign-in, and while Firebase finds out who it is.
@@ -91,7 +93,7 @@ export function App({
 		<>
 			{content}
 			{/* The views below a tab have their own back arrow and no tab row, as in the mockup. */}
-			{(onStart || route.view === 'installningar' || route.view === 'vecka') && (
+			{(onStart || route.view === 'vecka') && (
 				<Toolbar
 					tabs={TABS}
 					selected={route.view}

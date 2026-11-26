@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+import pkg from './package.json' with { type: 'json' };
 
 // Brand colours live in src/tema.css; the manifest needs its own copy because it is read
 // before any CSS. The look is provisional until the mockup in issue 16 settles it.
@@ -8,6 +9,8 @@ const background = '#fbf4ef';
 const shortcutIcon = { src: '/icon-192.png', sizes: '192x192', type: 'image/png' };
 
 export default defineConfig({
+	// The version in the header and Om Tidrapporten (issue 66).
+	define: { __APP_VERSION__: JSON.stringify(pkg.version) },
 	plugins: [
 		react(),
 		VitePWA({

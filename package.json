@@ -1,7 +1,7 @@
 {
 	"name": "tidrapporten",
 	"private": true,
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"description": "Tidrapportering för en IT-konsult: faktisk tid, veckorapporter och flex",
 	"type": "module",
 	"engines": {
@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@kodhast/web-ui": "github:Kodhast/web-ui#v2.3.0",
-		"@kodhast/web-ui-react": "github:Kodhast/web-ui-react#v0.9.0",
+		"@kodhast/web-ui-react": "github:Kodhast/web-ui-react#v0.10.0",
 		"firebase": "^13.4.0",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1"
