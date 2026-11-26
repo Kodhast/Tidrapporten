@@ -1,9 +1,9 @@
-// Listeners the views share: the codes and the receivers of every assignment.
+// Listeners the views share: the codes and the receivers of every assignment, and the time.
 import type { Firestore } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { codeCodec, receiverCodec, type Codec } from '../data/dokument.ts';
 import { codesPath, receiversPath, watchCollection } from '../data/installningar.ts';
-import type { Id, Receiver, TimeCode } from '../domain/types.ts';
+import type { Id, Receiver, TimeCode, UtcMillis } from '../domain/types.ts';
 
 /** A collection under each assignment, by assignment id; an id is missing until its values come. */
 const usePerAssignment = <T>(
@@ -43,3 +43,27 @@ export const useCodes = (db: Firestore, uid: Id, assignmentIds: readonly Id[]) =
 /** The receivers of every assignment, by assignment id. */
 export const useReceivers = (db: Firestore, uid: Id, assignmentIds: readonly Id[]) =>
 	usePerAssignment<Receiver>(db, uid, assignmentIds, receiversPath, receiverCodec);
+
+const MINUTE = 60_000;
+
+/** The time, moved on at each whole minute and when the app is shown again. */
+export const useNow = (): UtcMillis => {
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		let timeout: ReturnType<typeof setTimeout>;
+		const tick = () => {
+			setNow(Date.now());
+			timeout = setTimeout(tick, MINUTE - (Date.now() % MINUTE));
+		};
+		timeout = setTimeout(tick, MINUTE - (Date.now() % MINUTE));
+		const shown = () => {
+			if (document.visibilityState === 'visible') setNow(Date.now());
+		};
+		document.addEventListener('visibilitychange', shown);
+		return () => {
+			clearTimeout(timeout);
+			document.removeEventListener('visibilitychange', shown);
+		};
+	}, []);
+	return now;
+};

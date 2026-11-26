@@ -324,3 +324,65 @@ body {
 .centrerad {
 	justify-content: center;
 }
+
+/* The week's actual time, norm and flex side by side (mockup "Vecka", issue 20). */
+.veckosiffror {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--kh-space-s);
+}
+
+/*
+ * The transcript's table (mockup "Avskrift", issue 20): the receiver's codes with hours per day,
+ * the sum last and the total at the foot, in tabular figures.
+ */
+.avskrift-kort {
+	padding-inline: 0;
+	overflow-x: auto;
+}
+
+.avskrift {
+	inline-size: 100%;
+	border-collapse: collapse;
+	font: var(--kh-type-body-medium);
+	font-variant-numeric: tabular-nums;
+}
+
+.avskrift th,
+.avskrift td {
+	padding: 10px var(--kh-space-xs);
+	text-align: end;
+	border-block-end: 1px solid var(--kh-outline-variant);
+}
+
+.avskrift th:first-child {
+	text-align: start;
+	padding-inline-start: var(--kh-space-m);
+	font-weight: 700;
+}
+
+.avskrift tr > :last-child {
+	padding-inline-end: var(--kh-space-m);
+	font-weight: 700;
+}
+
+.avskrift thead th {
+	font: var(--kh-type-caption);
+	letter-spacing: var(--kh-tracking-caption);
+	color: var(--kh-on-surface-variant);
+}
+
+.avskrift tfoot :is(th, td) {
+	font-weight: 700;
+	border-block-end: 0;
+}
+
+.avskrift tbody tr:last-child :is(th, td) {
+	border-block-end: 0;
+}
+
+/* The unlock button stands alone, centred (mockup "Avskrift"). */
+.centrerad-fot {
+	display: flex;
+	justify-content: center;
+}

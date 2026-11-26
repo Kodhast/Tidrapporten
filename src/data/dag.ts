@@ -20,21 +20,19 @@ import { userDoc, userPath } from './skrivning.ts';
 const DAY_BEFORE = 24 * 60 * 60_000;
 
 /**
- * Follows the entries around a local day: intervals that start from 24 hours before the day (an
- * interval is at most 24 hours, so one from the evening before is found) up to the end of the next
- * day, so that a new interval over midnight is warned of an overlap there, and the whole-day
- * absence that day. The view leaves out what is not on the day.
+ * Follows the entries from local day `from` up to, not including, `to`: intervals that start from
+ * 24 hours before `from` (an interval is at most 24 hours, so one from the evening before is found)
+ * and whole-day absence in the span. The caller leaves out what is not on its days.
  */
-export const watchDayEntries = (
+export const watchEntriesIn = (
 	db: Firestore,
 	uid: Id,
-	date: IsoDate,
+	from: IsoDate,
+	to: IsoDate,
 	onChange: (entries: Entry[]) => void,
 	onError?: () => void
 ) => {
 	const entries = collection(db, 'users', uid, 'entries');
-	const start = startOfDay(date);
-	const end = startOfDay(addDays(date, 2));
 	let intervals: Entry[] | null = null;
 	let allDay: Entry[] | null = null;
 	const emit = () => {
@@ -46,8 +44,8 @@ export const watchDayEntries = (
 		onSnapshot(
 			query(
 				entries,
-				where('time.start', '>', Timestamp.fromMillis(start - DAY_BEFORE)),
-				where('time.start', '<', Timestamp.fromMillis(end))
+				where('time.start', '>', Timestamp.fromMillis(startOfDay(from) - DAY_BEFORE)),
+				where('time.start', '<', Timestamp.fromMillis(startOfDay(to)))
 			),
 			(snapshot) => {
 				intervals = decode(snapshot.docs);
@@ -56,7 +54,7 @@ export const watchDayEntries = (
 			onError
 		),
 		onSnapshot(
-			query(entries, where('time.date', '==', date)),
+			query(entries, where('time.date', '>=', from), where('time.date', '<', to)),
 			(snapshot) => {
 				allDay = decode(snapshot.docs);
 				emit();
@@ -66,6 +64,18 @@ export const watchDayEntries = (
 	];
 	return () => stops.forEach((stop) => stop());
 };
+
+/**
+ * Follows the entries around a local day, up to the end of the next day, so that a new interval
+ * over midnight is warned of an overlap there. The view leaves out what is not on the day.
+ */
+export const watchDayEntries = (
+	db: Firestore,
+	uid: Id,
+	date: IsoDate,
+	onChange: (entries: Entry[]) => void,
+	onError?: () => void
+) => watchEntriesIn(db, uid, date, addDays(date, 2), onChange, onError);
 
 /** A new entry's id, made on the device so that it works offline. */
 export const newEntryId = (db: Firestore, uid: Id): Id =>

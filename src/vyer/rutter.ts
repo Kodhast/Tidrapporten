@@ -1,7 +1,8 @@
 // The app's views live in the address after `#`, so Pages serves index.html for every view
 // without a rewrite and the service worker needs no navigation rules.
 import { useEffect, useState } from 'react';
-import type { Id, IsoDate } from '../domain/types.ts';
+import { isoWeekOf, mondayOf } from '../domain/tid.ts';
+import type { Id, IsoDate, IsoWeek } from '../domain/types.ts';
 
 export type Route =
 	| { view: 'idag' }
@@ -9,7 +10,16 @@ export type Route =
 	| { view: 'uppdrag'; id: Id | null } // null: a new assignment
 	| { view: 'mottagare'; assignmentId: Id; id: Id | null } // null: a new receiver
 	| { view: 'franvaro' }
-	| { view: 'dag'; date: IsoDate };
+	| { view: 'dag'; date: IsoDate }
+	| { view: 'vecka'; week: IsoWeek | null } // null: the current week
+	| {
+			view: 'rapport';
+			week: IsoWeek;
+			assignmentId: Id;
+			receiverId: Id;
+			/** The transcript (mockup "Avskrift") rather than the report's suggestion. */
+			transcript: boolean;
+	  };
 
 const ID = '([A-Za-z0-9-]+)';
 
@@ -19,6 +29,11 @@ const isValidDate = (date: string): boolean => {
 	return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === date;
 };
 
+/** A real ISO week, not week 54. */
+const isValidWeek = (week: IsoWeek): boolean => isoWeekOf(mondayOf(week)) === week;
+
+const WEEK = '(\\d{4})-W(\\d{2})';
+
 /** The view for `location.hash`; anything unknown is the start page. */
 export const parseRoute = (hash: string): Route => {
 	const path = hash.replace(/^#/, '');
@@ -26,7 +41,20 @@ export const parseRoute = (hash: string): Route => {
 	if (path === '/installningar/franvaro') return { view: 'franvaro' };
 	const day = /^\/dag\/(\d{4}-\d{2}-\d{2})$/.exec(path);
 	if (day && isValidDate(day[1]!)) return { view: 'dag', date: day[1]! };
-	let m = new RegExp(`^/installningar/uppdrag/${ID}$`).exec(path);
+	if (path === '/vecka') return { view: 'vecka', week: null };
+	let m = new RegExp(`^/vecka/${WEEK}(?:/${ID}/${ID}(/avskrift)?)?$`).exec(path);
+	if (m && isValidWeek(`${m[1]}-W${m[2]}`)) {
+		const week = `${m[1]}-W${m[2]}`;
+		if (!m[3]) return { view: 'vecka', week };
+		return {
+			view: 'rapport',
+			week,
+			assignmentId: m[3],
+			receiverId: m[4]!,
+			transcript: m[5] !== undefined
+		};
+	}
+	m = new RegExp(`^/installningar/uppdrag/${ID}$`).exec(path);
 	if (m) return { view: 'uppdrag', id: m[1] === 'ny' ? null : m[1]! };
 	m = new RegExp(`^/installningar/uppdrag/${ID}/mottagare/${ID}$`).exec(path);
 	if (m) return { view: 'mottagare', assignmentId: m[1]!, id: m[2] === 'ny' ? null : m[2]! };
@@ -46,6 +74,10 @@ export const href = (route: Route): string => {
 			return `#/installningar/uppdrag/${route.id ?? 'ny'}`;
 		case 'dag':
 			return `#/dag/${route.date}`;
+		case 'vecka':
+			return route.week ? `#/vecka/${route.week}` : '#/vecka';
+		case 'rapport':
+			return `#/vecka/${route.week}/${route.assignmentId}/${route.receiverId}${route.transcript ? '/avskrift' : ''}`;
 		case 'mottagare':
 			return `#/installningar/uppdrag/${route.assignmentId}/mottagare/${route.id ?? 'ny'}`;
 	}
