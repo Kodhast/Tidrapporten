@@ -193,6 +193,27 @@ body {
 	padding-inline: var(--kh-space-xs);
 }
 
+/* The danger zone around what cannot be undone (emptying the account, issue 26). */
+.farozon {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--kh-space-s);
+	padding: var(--kh-space-m);
+	border: 2px solid var(--kh-error);
+	border-radius: var(--kh-radius-card);
+	background: color-mix(in srgb, var(--kh-error-container) 35%, transparent);
+}
+
+.farozon > h3,
+.farozon > p {
+	margin: 0;
+}
+
+.farozon > h3 {
+	color: var(--kh-error);
+}
+
 /* Buttons side by side, wrapping on a narrow screen (the data section, issue 57). */
 .knapprad {
 	display: flex;

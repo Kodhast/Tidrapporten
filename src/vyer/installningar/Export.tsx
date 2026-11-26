@@ -130,9 +130,15 @@ export function Export({ online, onExport, onRestore, onEmpty }: ExportProps) {
 					Återställ från fil
 				</Button>
 			</div>
-			<div>
+			<div className="farozon" role="group" aria-labelledby="farozon-rubrik">
+				<h3 id="farozon-rubrik" className="kh-text-item-title">
+					Farozon
+				</h3>
+				<p className="kh-text-body">
+					Raderar allt, skickade veckor och ändringsloggen också. Går inte att ångra utan kopian.
+				</p>
 				<Button
-					variant="destructiveText"
+					variant="destructive"
 					isDisabled={!online}
 					isPending={emptying.pending}
 					onPress={() => {
