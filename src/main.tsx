@@ -4,15 +4,18 @@ import { createRoot } from 'react-dom/client';
 import '@kodhast/web-ui/tokens.css';
 import '@kodhast/web-ui/kh.css';
 import './tema.css';
-import { App } from './App';
+import { App, type AppProps } from './App';
 import { watchBudget } from './data/budget';
 import { ensureDefaultAbsenceTypes } from './data/installningar';
 import { watchOnline } from './data/uppkoppling';
 import type { BudgetStatus } from './domain/budget';
+import type { Id } from './domain/types';
 import { startFirebase } from './firebase/app';
 import { finishSignIn } from './firebase/auth';
 import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
+import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
+import { useStart } from './vyer/start/useStart';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
@@ -56,19 +59,27 @@ function Root() {
 		});
 	}, []);
 	const shownUid = signingIn ? undefined : uid;
+	const props: AppProps = { uid: shownUid, error, budget, route };
+	if (!shownUid) return <App {...props} />;
 	return (
-		<App
+		<SignedIn
+			{...props}
 			uid={shownUid}
-			error={error}
-			budget={budget}
-			route={route}
+			online={online}
 			settings={
-				shownUid && route.view !== 'idag' ? (
+				route.view !== 'idag' ? (
 					<InstallningarRutt db={db} uid={shownUid} route={route} online={online} />
 				) : null
 			}
 		/>
 	);
+}
+
+/** The app for a signed-in user: the start page follows the timer in Firestore (issue 18). */
+function SignedIn(props: AppProps & { uid: Id; online: boolean }) {
+	const { uid, online, budget } = props;
+	const start = useStart(db, uid, online, <BudgetBanderoll status={budget ?? null} />);
+	return <App {...props} start={start.view} timerAction={start.action} />;
 }
 
 createRoot(root).render(

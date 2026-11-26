@@ -10,10 +10,19 @@ describe('App', () => {
 		);
 	});
 
-	it('shows the timer button from web-ui-react, not yet in use', () => {
-		const markup = renderToStaticMarkup(<App />);
-		expect(markup).toMatch(
-			/<button[^>]*class="kh-btn kh-btn--primary"[^>]*disabled=""[^>]*>Starta timern<\/button>/
+	it('shows the start page it is given to a signed-in user, with the timer’s button', () => {
+		const action = { label: 'Starta timern', icon: <svg />, onPress: () => {} };
+		const markup = renderToStaticMarkup(
+			<App uid="testperson-1" start={<p>Timern</p>} timerAction={action} />
+		);
+		expect(markup).toContain('<main><p>Timern</p></main>');
+		expect(markup).toMatch(/<button[^>]*class="kh-toolbar__action"[^>]*aria-label="Starta timern"/);
+	});
+
+	it('has no timer button before the sign-in', () => {
+		const action = { label: 'Starta timern', icon: <svg />, onPress: () => {} };
+		expect(renderToStaticMarkup(<App uid={null} timerAction={action} />)).not.toContain(
+			'Starta timern'
 		);
 	});
 });
@@ -29,10 +38,13 @@ describe('App and the sign-in', () => {
 		expect(markup).not.toContain('Inloggad');
 	});
 
-	it('shows the uid when signed in, and the error after a failed sign-in', () => {
-		const markup = renderToStaticMarkup(<App uid="testperson-1" error="Det gick inte." />);
-		expect(markup).toContain('Inloggad som testperson-1');
+	it('shows the error after a failed sign-in', () => {
+		const markup = renderToStaticMarkup(<App uid={null} error="Det gick inte." />);
 		expect(markup).toContain('Det gick inte.');
+	});
+
+	it('offers no sign-in to a signed-in user', () => {
+		const markup = renderToStaticMarkup(<App uid="testperson-1" />);
 		expect(markup).not.toContain('Logga in');
 	});
 });

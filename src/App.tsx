@@ -1,4 +1,4 @@
-import { Button, Toolbar } from '@kodhast/web-ui-react';
+import { Button, Toolbar, type ToolbarAction } from '@kodhast/web-ui-react';
 import type { ReactNode } from 'react';
 import type { BudgetStatus } from './domain/budget';
 import { startSignIn } from './firebase/auth';
@@ -17,9 +17,13 @@ export interface AppProps {
 	route?: Route;
 	/** The settings view for the route, made by the caller, which has Firestore (issue 17). */
 	settings?: ReactNode;
+	/** The start page with the timer for a signed-in user, made by the caller (issue 18). */
+	start?: ReactNode;
+	/** The tab row's main button: the timer's start or stop (issue 18). */
+	timerAction?: ToolbarAction;
 }
 
-// The week (issue 20) and the timer's button (issue 18) join the tab row when they exist.
+// The week (issue 20) joins the tab row when it exists.
 const TABS = [
 	{ id: 'idag', label: 'Idag', icon: <ClockIcon />, href: href({ view: 'idag' }) },
 	{
@@ -33,39 +37,56 @@ const TABS = [
 const SignIn = ({ uid }: { uid?: string | null }) =>
 	uid === null ? <Button onPress={() => startSignIn()}>Logga in</Button> : null;
 
-export function App({ uid, error, budget, route = { view: 'idag' }, settings }: AppProps) {
+export function App({
+	uid,
+	error,
+	budget,
+	route = { view: 'idag' },
+	settings,
+	start,
+	timerAction
+}: AppProps) {
 	const onStart = route.view === 'idag';
+	const banner = <BudgetBanderoll status={budget ?? null} />;
+	let content: ReactNode;
+	if (onStart && uid && start) {
+		content = <main>{start}</main>;
+	} else if (onStart) {
+		// Before the sign-in, and while Firebase finds out who it is.
+		content = (
+			<main className="kh-page start">
+				{banner}
+				<h1 className="kh-text-screen-title">Tidrapporten</h1>
+				<SignIn uid={uid} />
+				{error && <p className="kh-text-body">{error}</p>}
+			</main>
+		);
+	} else {
+		content = (
+			<main>
+				{uid ? (
+					settings
+				) : (
+					<div className="innehall">
+						<p className="kh-text-body">Logga in för att se inställningarna.</p>
+						<SignIn uid={uid} />
+					</div>
+				)}
+			</main>
+		);
+	}
 	return (
 		<>
-			{onStart ? (
-				<main className="kh-page start">
-					<BudgetBanderoll status={budget ?? null} />
-					<h1 className="kh-text-screen-title">Tidrapporten</h1>
-					<p className="kh-text-body">Här kommer timern, dagen och veckan.</p>
-					{/* Shows that web-ui-react is installed from its tag; the timer itself comes with issue 18. */}
-					<Button variant="primary" isDisabled>
-						Starta timern
-					</Button>
-					{/* Provisional until the views in issue 19. */}
-					<SignIn uid={uid} />
-					{uid && <p className="kh-text-body">Inloggad som {uid}</p>}
-					{error && <p className="kh-text-body">{error}</p>}
-				</main>
-			) : (
-				<main>
-					{uid ? (
-						settings
-					) : (
-						<div className="innehall">
-							<p className="kh-text-body">Logga in för att se inställningarna.</p>
-							<SignIn uid={uid} />
-						</div>
-					)}
-				</main>
-			)}
+			{content}
 			{/* The views below a tab have their own back arrow and no tab row, as in the mockup. */}
 			{(onStart || route.view === 'installningar') && (
-				<Toolbar tabs={TABS} selected={route.view} fixed aria-label="Vyer" />
+				<Toolbar
+					tabs={TABS}
+					selected={route.view}
+					action={uid ? timerAction : undefined}
+					fixed
+					aria-label="Vyer"
+				/>
 			)}
 		</>
 	);

@@ -7,8 +7,7 @@ test('the start page shows the app name', async ({ page }) => {
 
 test('the button from web-ui-react has web-ui’s look', async ({ page }) => {
 	await page.goto('/');
-	const button = page.getByRole('button', { name: 'Starta timern' });
-	await expect(button).toBeDisabled();
+	const button = page.getByRole('button', { name: 'Logga in' });
 	// kh.css makes a button a pill at least 56 high; unstyled it would be the browser's default.
 	await expect(button).toHaveCSS('min-height', '56px');
 	await expect(button).toHaveCSS('border-radius', /^\d{3,}px$/);

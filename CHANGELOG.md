@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.7.0
+
+- Timern finns på startsidan: huvudknappen i flikraden startar och stoppar den, och kodchipet
+  visar tidkoden och byter den medan timern går. Timern syns direkt på telefonen och datorn
+  samtidigt och går att starta och stoppa utan nät. Har den gått över 10 timmar frågar appen när
+  arbetet slutade. Utan nät går den inte att stoppa in i en skickad vecka (#18).
+
 ## 0.6.0
 
 - Inställningarna finns: lägg till uppdrag med omfattning, arbetsdag, startdatum och ingående
