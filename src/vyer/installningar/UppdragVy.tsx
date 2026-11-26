@@ -4,6 +4,8 @@ import {
 	BottomSheet,
 	Button,
 	buttonClass,
+	ConfirmDialog,
+	Notice,
 	Row,
 	SwitchRow,
 	TextField,
@@ -24,6 +26,7 @@ import {
 } from '../../domain/installningar.ts';
 import type {
 	Assignment,
+	Id,
 	Customer,
 	Employer,
 	IsoDate,
@@ -32,6 +35,7 @@ import type {
 } from '../../domain/types.ts';
 import type { CodeChange } from '../../data/installningar.ts';
 import { href } from '../rutter.ts';
+import { WarningIcon } from '../ikoner';
 import { ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
 
 export const SUGGESTION_LABELS = {
@@ -56,6 +60,8 @@ export interface UppdragVyProps {
 		codes: CodeChange[],
 		receivers: Receiver[]
 	) => Promise<void>;
+	/** Deletes the assignment and all of it; gives the reason when it may not be deleted. */
+	onDelete: (id: Id) => Promise<string | null>;
 }
 
 const sameForm = (a: AssignmentForm, b: AssignmentForm) =>
@@ -70,8 +76,12 @@ export function UppdragVy({
 	nextOrder,
 	today,
 	online,
-	onSave
+	onSave,
+	onDelete
 }: UppdragVyProps) {
+	const removing = useSave();
+	const [askDelete, setAskDelete] = useState(false);
+	const [refused, setRefused] = useState<string | null>(null);
 	// Archived ones are not offered, except the one already chosen.
 	const offered = <T extends { id: string; archived: boolean; order: number }>(
 		items: readonly T[],
@@ -346,6 +356,44 @@ export function UppdragVy({
 								{assignment.archived ? 'Återställ uppdraget' : 'Arkivera uppdraget'}
 							</Button>
 						</div>
+						{refused && (
+							<Notice
+								tone="ton-fel"
+								icon={<WarningIcon />}
+								title="Uppdraget kan inte raderas"
+								detail={refused}
+							/>
+						)}
+						{removing.failed && (
+							<Notice
+								tone="ton-fel"
+								icon={<WarningIcon />}
+								title="Det gick inte att radera"
+								detail="Kontrollera anslutningen och försök igen."
+							/>
+						)}
+						<div>
+							<Button
+								variant="destructiveText"
+								isDisabled={!online || save.pending}
+								isPending={removing.pending}
+								onPress={() => setAskDelete(true)}
+							>
+								Radera uppdraget
+							</Button>
+						</div>
+						<ConfirmDialog
+							isOpen={askDelete}
+							onOpenChange={setAskDelete}
+							destructive
+							title="Radera uppdraget?"
+							text="Uppdraget raderas med sina tidkoder, mottagare, tider och rapportutkast. Det går inte att ångra. Ett uppdrag med skickade veckor kan bara arkiveras."
+							confirmLabel="Radera"
+							onConfirm={() => {
+								setRefused(null);
+								void removing.run(async () => setRefused(await onDelete(assignment.id)));
+							}}
+						/>
 					</section>
 				)}
 			</div>

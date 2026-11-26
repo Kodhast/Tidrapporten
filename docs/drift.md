@@ -185,6 +185,34 @@ dagen. Cloud Scheduler-jobbet är ett av tre fria per betalkonto, och Cloud Mess
 `paminnelser: misslyckades` (error, uid), `provnotis: skickad` och `provnotis: misslyckades`.
 Aldrig vad påminnelserna säger.
 
+## Tömningen och raderingen
+
+Issue 26 och beslut 0020. **`tomKonto`** raderar allt under `users/{uid}`, ändringsloggen också;
+appen laddar först ner JSON-exporten och anropar funktionen först när nedladdningen startat.
+**`raderaUppdrag`** raderar ett uppdrag med tidkoder, mottagare, tider och rapporter och skriver en
+post i ändringsloggen före raderingen. Ett uppdrag med en skickad eller upplåst vecka raderas inte
+(funktionen svarar att det ska arkiveras), eftersom en låst vecka bara ändras via en loggad
+upplåsning. Båda körs som **`tidrapporten-radering`** med rollen Cloud Datastore User, och finns
+bara i drift som de andra funktionerna; i testmiljön svarar knapparna att det inte gick.
+
+**Före första releasen med tömningen** i Cloud Shell:
+
+    gcloud iam service-accounts create tidrapporten-radering --project=device-streaming-5b35f7b8
+    gcloud projects add-iam-policy-binding device-streaming-5b35f7b8 \
+      --member=serviceAccount:tidrapporten-radering@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --role=roles/datastore.user
+    gcloud iam service-accounts add-iam-policy-binding \
+      tidrapporten-radering@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --project=device-streaming-5b35f7b8 \
+      --member=serviceAccount:tidrapporten-deploy@device-streaming-5b35f7b8.iam.gserviceaccount.com \
+      --role=roles/iam.serviceAccountUser
+
+**Loggar:** `tomning` och `raderaUppdrag` (info, med uid, uppdragets id och antal dokument),
+`tomning: misslyckades` och `raderaUppdrag: misslyckades` (error). Aldrig vad som raderades.
+
+**Ångra:** tömningen ångras med filen som laddades ner (Inställningar → Återställ från fil), eller
+med Firestores backup och PITR (avsnittet Backup).
+
 ## Budgeten och stoppet i test
 
 Beslut 0010 och issue 28. Budgeten **Tidrapporten 100 kr** gäller hela betalkontot, alltså båda

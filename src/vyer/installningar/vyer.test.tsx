@@ -48,7 +48,8 @@ describe('InstallningarVy', () => {
 		scopeToday: { a1: 80, a2: 20 },
 		online: true,
 		onExport: noSave,
-		onRestore: () => Promise.resolve({ restored: 0, existed: 0 })
+		onRestore: () => Promise.resolve({ restored: 0, existed: 0 }),
+		onEmpty: () => Promise.resolve()
 	};
 
 	it('shows the assignments under one heading when there is no employer yet', () => {
@@ -105,7 +106,8 @@ describe('UppdragVy', () => {
 		nextOrder: 1,
 		today: '2026-11-26',
 		online: true,
-		onSave: noSave
+		onSave: noSave,
+		onDelete: () => Promise.resolve(null)
 	};
 
 	it('starts a new assignment with empty name and Spara off, and receivers after the save', () => {

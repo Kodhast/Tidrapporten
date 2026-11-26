@@ -10,7 +10,8 @@ import { assignmentCodec, receiverCodec } from '../../src/data/dokument.ts';
 import { assignment, at, receiver } from '../../src/domain/testdata.ts';
 import { EMULATOR_HOST, EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/firebase/config.ts';
 
-const UID = 'testperson-1';
+// An own user, since the emulator test files run side by side against one database.
+const UID = 'paminnelser-1';
 let app: App;
 
 beforeAll(() => {
@@ -24,7 +25,7 @@ afterAll(() => deleteApp(app));
 const db = () => getFirestore();
 
 beforeEach(async () => {
-	await db().recursiveDelete(db().collection('users'));
+	await db().recursiveDelete(db().doc(`users/${UID}`));
 });
 
 const put = (path: string, data: object) => db().doc(`users/${UID}/${path}`).set(data);

@@ -20,6 +20,7 @@ export interface InstallningarVyProps {
 	online: boolean;
 	onExport: () => Promise<void>;
 	onRestore: (file: ExportFile) => Promise<RestoreResult>;
+	onEmpty: () => Promise<void>;
 }
 
 /** Archived last, otherwise in the user's order. */
@@ -35,7 +36,8 @@ export function InstallningarVy({
 	scopeToday,
 	online,
 	onExport,
-	onRestore
+	onRestore,
+	onEmpty
 }: InstallningarVyProps) {
 	const { account } = useKonto();
 	const sorted = inOrder(assignments);
@@ -164,7 +166,7 @@ export function InstallningarVy({
 					</div>
 				</section>
 
-				<Export online={online} onExport={onExport} onRestore={onRestore} />
+				<Export online={online} onExport={onExport} onRestore={onRestore} onEmpty={onEmpty} />
 			</div>
 		</>
 	);

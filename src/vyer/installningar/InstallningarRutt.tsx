@@ -10,6 +10,7 @@ import {
 	codesPath,
 	customersPath,
 	employersPath,
+	ensureDefaultAbsenceTypes,
 	freeDaysPath,
 	receiversPath,
 	saveAbsenceType,
@@ -31,6 +32,7 @@ import {
 	type Codec
 } from '../../data/dokument.ts';
 import { readAll } from '../../data/export.ts';
+import { deleteAssignment, emptyAccount } from '../../data/radering.ts';
 import { exportFile, exportFileName } from '../../data/exportformat.ts';
 import { nextNumber } from '../../domain/installningar.ts';
 import { termsOn } from '../../domain/norm.ts';
@@ -117,6 +119,11 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 	const employers = useCollection(db, uid, employersPath, employerCodec);
 	const customers = useCollection(db, uid, customersPath, customerCodec);
 
+	const saveCopy = async () => {
+		const now = Date.now();
+		download(exportFileName(now), exportFile(await readAll(db, uid), now));
+	};
+
 	if (!assignments || !absenceTypes || !freeDays || !employers || !customers) return <Loading />;
 
 	switch (route.view) {
@@ -132,11 +139,16 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 						assignments.map((a) => [a.id, (termsOn(a, today) ?? a.terms[0])?.scopePercent ?? 100])
 					)}
 					online={online}
-					onExport={async () => {
-						const now = Date.now();
-						download(exportFileName(now), exportFile(await readAll(db, uid), now));
-					}}
+					onExport={saveCopy}
 					onRestore={(file) => restoreFile(functions, file)}
+					onEmpty={async () => {
+						// The copy first: without it nothing is deleted.
+						await saveCopy();
+						await emptyAccount(functions);
+						// The defaults as at the first sign-in; the start then offers "Kom igång".
+						await ensureDefaultAbsenceTypes(db, uid);
+						replaceRoute({ view: 'idag' });
+					}}
 				/>
 			);
 		case 'franvaro':
@@ -169,6 +181,11 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					onSave={async (before, after, codeChanges, firstReceivers) => {
 						await saveAssignment(db, uid, before, after, codeChanges, firstReceivers);
 						if (!before) replaceRoute({ view: 'uppdrag', id: after.id });
+					}}
+					onDelete={async (id) => {
+						const refused = await deleteAssignment(functions, id);
+						if (refused === null) replaceRoute({ view: 'installningar' });
+						return refused;
 					}}
 				/>
 			);

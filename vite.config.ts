@@ -67,6 +67,7 @@ export default defineConfig({
 				'src/main.tsx',
 				'firebase-functions/src/index.ts',
 				'firebase-functions/src/paminnelser-effekter.ts',
+				'firebase-functions/src/radering.ts',
 				'firebase-functions/src/firestore-shim.ts',
 				'src/sw.ts',
 				'src/**/*.test.{ts,tsx}',
