@@ -1,6 +1,7 @@
 // The settings' first view (mockup "Inställningar"): the assignments, and the way to absence
 // types and free days.
 import { buttonClass, Header, Row } from '@kodhast/web-ui-react';
+import { plural } from '../../domain/installningar.ts';
 import type { Assignment, Id } from '../../domain/types.ts';
 import { ClockIcon } from '../ikoner';
 import { href } from '../rutter.ts';
@@ -19,8 +20,6 @@ export interface InstallningarVyProps {
 	scopeToday: Readonly<Record<Id, number>>;
 	online: boolean;
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function InstallningarVy({
 	assignments,

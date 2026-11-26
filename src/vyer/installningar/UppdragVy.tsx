@@ -16,6 +16,7 @@ import {
 	nameError,
 	newId,
 	nextNumber,
+	plural,
 	readAssignmentForm,
 	unmappedCodes,
 	type AssignmentForm
@@ -217,8 +218,8 @@ export function UppdragVy({
 										const missing = unmappedCodes(codes, r).length;
 										const parts: string[] = [SUGGESTION_LABELS[r.suggestionMode]];
 										if (i === 0) parts.push('flexen räknas härifrån');
-										if (missing > 0) parts.push(`${missing} omappade`);
-										else parts.push(`${r.codes.length} koder`);
+										if (missing > 0) parts.push(plural(missing, 'omappad', 'omappade'));
+										else parts.push(plural(r.codes.length, 'kod', 'koder'));
 										return (
 											<Row
 												key={r.id}

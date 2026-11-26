@@ -287,6 +287,10 @@ export const longDate = (date: IsoDate): string => {
 };
 
 /** Swedish genitive: `Kund A` → `Kund A:s`, `Arbetsgivaren` → `Arbetsgivarens`, `Lars` → `Lars`. */
+/** A count with its noun: `1 tidkod`, `3 tidkoder`. */
+export const plural = (n: number, one: string, many: string): string =>
+	`${n} ${n === 1 ? one : many}`;
+
 export const genitive = (name: string): string => {
 	if (/[sxz]$/i.test(name)) return name;
 	if (/[A-ZÅÄÖ0-9]$/.test(name)) return `${name}:s`;

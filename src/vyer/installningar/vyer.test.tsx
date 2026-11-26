@@ -105,7 +105,7 @@ describe('UppdragVy', () => {
 		expect(markup).toContain('Inte debiterbar');
 		expect(markup.indexOf('1 · Arbetsgivaren')).toBeLessThan(markup.indexOf('2 · Kund A'));
 		expect(markup).toContain('Fyll mot normen · flexen räknas härifrån · 2 omappade');
-		expect(markup).toContain('Fyll mot normen · 1 omappade');
+		expect(markup).toContain('Fyll mot normen · 1 omappad');
 		expect(markup).toContain('href="#/installningar/uppdrag/a1/mottagare/ny"');
 		expect(markup).toContain('Arkivera uppdraget');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);

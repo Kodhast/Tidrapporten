@@ -10,6 +10,7 @@ import {
 	formatHours,
 	freeDayErrors,
 	genitive,
+	plural,
 	isEve,
 	isIsoDate,
 	longDate,
@@ -110,6 +111,12 @@ describe('names, ids and dates', () => {
 		expect(genitive('Arbetsgivaren')).toBe('Arbetsgivarens');
 		expect(genitive('Konsultbolaget AB')).toBe('Konsultbolaget AB:s');
 		expect(genitive('Mellanhands')).toBe('Mellanhands');
+	});
+
+	it('counts with the singular for one only', () => {
+		expect(plural(1, 'kod', 'koder')).toBe('1 kod');
+		expect(plural(0, 'kod', 'koder')).toBe('0 koder');
+		expect(plural(3, 'omappad', 'omappade')).toBe('3 omappade');
 	});
 
 	it('takes the next number after the largest', () => {
