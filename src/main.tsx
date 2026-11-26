@@ -16,6 +16,7 @@ import { DagRutt } from './vyer/dag/DagRutt';
 import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
+import { pendingShortcut, takeShortcut } from './vyer/genvagar';
 import { useStart } from './vyer/start/useStart';
 import { RapportRutt, VeckaRutt } from './vyer/vecka/VeckaRutt';
 
@@ -25,6 +26,9 @@ if (!root) throw new Error('index.html has no #root');
 const { auth, db, functions } = startFirebase();
 // Read once, before React, so that StrictMode's second effect run cannot sign in twice.
 const signInError = finishSignIn(auth);
+// The app icon's shortcut, read once for the same reason (issue 59); the start page empties it
+// when it is done.
+const shortcut = pendingShortcut(takeShortcut(window.location, window.history));
 
 function Root() {
 	const [uid, setUid] = useState<string | null | undefined>(undefined);
@@ -102,7 +106,7 @@ function Root() {
 /** The app for a signed-in user: the start page follows the timer in Firestore (issue 18). */
 function SignedIn(props: AppProps & { uid: Id; online: boolean }) {
 	const { uid, online, budget } = props;
-	const start = useStart(db, uid, online, <BudgetBanderoll status={budget ?? null} />);
+	const start = useStart(db, uid, online, <BudgetBanderoll status={budget ?? null} />, shortcut);
 	return <App {...props} start={start.view} timerAction={start.action} />;
 }
 

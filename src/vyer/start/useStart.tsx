@@ -45,6 +45,7 @@ import type {
 import { useCodes, useNow, useReceivers } from '../lyssnare.ts';
 import { IntervallArk } from '../dag/IntervallArk';
 import type { HjulArc } from './Hjul';
+import type { PendingShortcut } from '../genvagar';
 import { PlayIcon, StopIcon } from '../ikoner';
 import { StartVy, type StartDay, type TimerProblem } from './StartVy';
 
@@ -56,7 +57,17 @@ export interface Start {
 	action: ToolbarAction | undefined;
 }
 
-export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactNode): Start {
+export function useStart(
+	db: Firestore,
+	uid: Id,
+	online: boolean,
+	banner: ReactNode,
+	/**
+	 * The action from the app icon's shortcuts (issue 59), done once when the data has come and
+	 * then emptied.
+	 */
+	shortcut: PendingShortcut | null = null
+): Start {
 	const now = useNow();
 	const today = dateOf(now);
 	const [timer, setTimer] = useState<Timer | null | undefined>(undefined);
@@ -223,6 +234,28 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 		? colourOf(timer)
 		: next &&
 			colourOf({ assignmentId: next.assignmentId, subject: { kind: 'code', codeId: next.codeId } });
+
+	// The shortcut does what the main button would do, once: it is marked done, so that neither a
+	// rerender, StrictMode's second effect run nor a new sign-in in the same tab does it again. A forgotten timer is not stopped; its question shows as on any start. A
+	// stop the network blocks waits for the network (the app starts as offline until it knows).
+	useEffect(() => {
+		const action = shortcut?.action;
+		if (!shortcut || !action || loading) return;
+		const at = Date.now();
+		const known = reports ?? [];
+		if (action === 'stoppa' && timer && stopBlockedOffline(timer, at, known, online)) return;
+		shortcut.done();
+		let save: (() => Promise<unknown>) | null = null;
+		if (action === 'starta' && !timer && next) {
+			const { assignmentId, codeId } = next;
+			save = () =>
+				startTimer(db, uid, { assignmentId, subject: { kind: 'code', codeId }, start: at });
+		}
+		if (action === 'stoppa' && timer && !isTimerForgotten(timer, at)) {
+			save = () => stopTimer(db, uid, timer, at, known);
+		}
+		save?.().catch(() => setProblem('failed'));
+	}, [db, uid, shortcut, loading, timer, next, reports, online]);
 
 	let action: ToolbarAction | undefined;
 	if (loading) {

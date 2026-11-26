@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // Brand colours live in src/tema.css; the manifest needs its own copy because it is read
 // before any CSS. The look is provisional until the mockup in issue 16 settles it.
 const background = '#fbf4ef';
+const shortcutIcon = { src: '/icon-192.png', sizes: '192x192', type: 'image/png' };
 
 export default defineConfig({
 	plugins: [
@@ -26,6 +27,13 @@ export default defineConfig({
 				display: 'standalone',
 				theme_color: background,
 				background_color: background,
+				// A long press on the installed app's icon (issue 59). The notification buttons of
+				// issue 22 open the same addresses.
+				shortcuts: [
+					{ name: 'Starta timern', url: '/?gor=starta', icons: [shortcutIcon] },
+					{ name: 'Stoppa timern', url: '/?gor=stoppa', icons: [shortcutIcon] },
+					{ name: 'Idag', url: '/', icons: [shortcutIcon] }
+				],
 				icons: [
 					{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
 					{ src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

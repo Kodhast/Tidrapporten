@@ -44,6 +44,33 @@ test('start and stop give an interval named by the start', async ({ page, reques
 	expect(span(entry!).end - span(entry!).start).toBeGreaterThanOrEqual(60_000);
 });
 
+test('the app icon’s shortcuts start and stop the timer once (issue 59)', async ({
+	page,
+	request
+}) => {
+	const user = uid('genvag');
+	await seedAssignment(request, user, ['Utveckling']);
+	await signIn(page, user);
+	// The page has its data before it is left, so that the next one does not wait for the cache
+	// that this one still holds.
+	await expect(startButton(page)).toBeVisible();
+
+	await page.goto('/?gor=starta');
+	await expect(page.getByText('Pågår')).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+	await expect
+		.poll(async () => (await stored(request, user, 'state')).some((d) => d.id === 'timer'))
+		.toBe(true);
+	// A reload does not start again: the address has no action left.
+	await page.reload();
+	await expect(stopButton(page)).toBeVisible();
+
+	await page.goto('/?gor=stoppa');
+	await expect(startButton(page)).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+	await expect.poll(async () => (await entriesOnServer(request, user)).length).toBe(1);
+});
+
 test('a change of code ends the interval and goes on from its end', async ({ page, request }) => {
 	const user = uid('byte');
 	await seedAssignment(request, user, ['Utveckling', 'Möten']);
