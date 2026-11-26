@@ -97,17 +97,17 @@ describe('StartVy', () => {
 		expect(onChoose).not.toHaveBeenCalled();
 	});
 
-	it('offers to add an assignment when there is none', () => {
+	it('offers the start at first use when there is no assignment (issue 64)', () => {
 		render(<StartVy {...props({ groups: [], next: null })} />);
-		expect(screen.getByText('Inga uppdrag än')).toBeTruthy();
-		expect(screen.getByRole('link', { name: 'Lägg till uppdrag' }).getAttribute('href')).toBe(
-			'#/installningar/uppdrag/ny'
+		expect(screen.getByText(/Fyra steg/)).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'Kom igång' }).getAttribute('href')).toBe(
+			'#/kom-igang'
 		);
 	});
 
 	it('shows neither the timer nor the empty state while loading', () => {
 		render(<StartVy {...props({ groups: [], next: null, loading: true })} />);
-		expect(screen.queryByText('Inga uppdrag än')).toBeNull();
+		expect(screen.queryByText(/Fyra steg/)).toBeNull();
 		expect(screen.queryByRole('button', { name: /^Byt tidkod/ })).toBeNull();
 	});
 

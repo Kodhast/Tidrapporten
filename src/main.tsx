@@ -14,6 +14,7 @@ import { startFirebase } from './firebase/app';
 import { finishSignIn } from './firebase/auth';
 import { DagRutt } from './vyer/dag/DagRutt';
 import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
+import { KomIgangRutt } from './vyer/kom-igang/KomIgangRutt';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
 import { pendingShortcut, takeShortcut } from './vyer/genvagar';
@@ -89,6 +90,8 @@ function Root() {
 						transcript={route.transcript}
 						online={online}
 					/>
+				) : route.view === 'kom-igang' ? (
+					<KomIgangRutt db={db} uid={shownUid} online={online} />
 				) : route.view !== 'idag' ? (
 					<InstallningarRutt
 						db={db}

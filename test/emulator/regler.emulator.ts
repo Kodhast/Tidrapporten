@@ -42,6 +42,7 @@ import {
 	saveAssignment,
 	saveCustomer,
 	saveEmployer,
+	saveFirstAssignment,
 	saveFreeDay,
 	saveReceiver
 } from '../../src/data/installningar.ts';
@@ -53,6 +54,7 @@ import {
 	stopTimer,
 	switchTimer
 } from '../../src/data/skrivning.ts';
+import { startDocuments } from '../../src/domain/komigang.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
 import type { Report } from '../../src/domain/types.ts';
 import { EMULATOR_HOST, EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/firebase/config.ts';
@@ -995,6 +997,38 @@ describe('the settings’ writes pass the rules (issue 17)', () => {
 		expect((await getDoc(at(db, 'assignments/a1/receivers/r2'))).data()).toMatchObject({
 			party: { kind: 'customer', id: 'k1' }
 		});
+	});
+
+	it('saves the start at first use in one go, with a log entry per receiver (issue 64)', async () => {
+		const db = owner();
+		const docs = startDocuments(
+			{
+				employerName: 'Exempelkonsult AB',
+				suggestionMode: 'fillNorm',
+				customerName: 'Kund A',
+				customerReceives: true,
+				assignment: {
+					name: 'Uppdrag A',
+					scope: '100',
+					workday: '8',
+					openingFlex: '0',
+					startDate: '2026-11-23'
+				},
+				codes: [{ name: 'Utveckling', billable: true }]
+			},
+			'2026-11-26'
+		)!;
+		await allowed(saveFirstAssignment(db, OWNER, docs));
+		expect(await logCount(db)).toBe(2);
+		for (const path of [
+			`employers/${docs.employer.id}`,
+			`customers/${docs.customer!.id}`,
+			`assignments/${docs.assignment.id}`,
+			`assignments/${docs.assignment.id}/codes/${docs.codes[0]!.id}`,
+			`assignments/${docs.assignment.id}/receivers/${docs.receivers[1]!.id}`
+		]) {
+			expect((await getDoc(at(db, path))).exists()).toBe(true);
+		}
 	});
 
 	it('creates the default absence types once, and logs a changed counting', async () => {

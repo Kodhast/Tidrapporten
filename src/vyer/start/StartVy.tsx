@@ -145,17 +145,14 @@ export function StartVy({
 				{loading ? null : groups.length === 0 && !timer ? (
 					<EmptyState
 						icon={<WorkIcon />}
-						title="Inga uppdrag än"
-						text="Lägg till ett uppdrag med omfattning och tidkoder. Sedan kan du starta timern."
+						title="Kom igång"
+						text="Fyra steg: arbetsgivaren, kunden, uppdraget och dess tidkoder. Sedan kan du starta timern."
 						actions={
-							<a
-								className={buttonClass({ variant: 'primary' })}
-								href={href({ view: 'uppdrag', id: null })}
-							>
-								Lägg till uppdrag
+							<a className={buttonClass({ variant: 'primary' })} href={href({ view: 'kom-igang' })}>
+								Kom igång
 							</a>
 						}
-						note="Har du flex sedan tidigare anger du den som ingående saldo i uppdraget."
+						note="Allt går att ändra sedan under Inställningar."
 					/>
 				) : (
 					<>
