@@ -1,8 +1,9 @@
 // /inloggning (decision 0017): Cloudflare Access stands in front of this path and signs the user
 // in with Google. The function checks Access's JWT, looks the e-mail address up in ANVANDARE and
-// redirects to /#token=<Firebase custom token>. The fragment never reaches a server; the app reads
+// redirects to /#token=<Firebase custom token>&namn=…&bild=… (the name and Google picture from
+// Access's get-identity, when it gives them). The fragment never reaches a server; the app reads
 // it and signs in with signInWithCustomToken.
-import { KeysUnavailable, verifyAccessJwt } from './_lib/access.ts';
+import { fetchIdentity, KeysUnavailable, verifyAccessJwt } from './_lib/access.ts';
 import { parseSigner, signCustomToken } from './_lib/custom-token.ts';
 
 export interface Env {
@@ -25,7 +26,7 @@ export interface Deps {
 }
 
 type Event =
-	| { level: 'info'; event: 'inloggning'; uid: string }
+	| { level: 'info'; event: 'inloggning'; uid: string; bild: boolean }
 	| { level: 'info'; event: 'inloggning-nekad'; reason: 'jwt' | 'okand-adress' }
 	| { level: 'error'; event: 'inloggning-fel'; reason: 'nycklar' | 'konfiguration' | 'okant' };
 
@@ -58,9 +59,10 @@ export async function handleSignIn(request: Request, env: Env, deps: Deps = {}):
 		.filter(Boolean);
 	if (audiences.length === 0) return misconfigured();
 
+	const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
 	let payload;
 	try {
-		payload = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
+		payload = await verifyAccessJwt(jwt, {
 			aud: audiences,
 			now,
 			fetchFn
@@ -93,9 +95,13 @@ export async function handleSignIn(request: Request, env: Env, deps: Deps = {}):
 		return misconfigured();
 	}
 
-	write({ level: 'info', event: 'inloggning', uid });
+	const identity = await fetchIdentity(jwt!, fetchFn);
+	write({ level: 'info', event: 'inloggning', uid, bild: Boolean(identity.picture) });
+	const fragment = new URLSearchParams({ token });
+	if (identity.name) fragment.set('namn', identity.name);
+	if (identity.picture) fragment.set('bild', identity.picture);
 	const target = new URL('/', request.url);
-	target.hash = `token=${token}`;
+	target.hash = fragment.toString();
 	return new Response(null, {
 		status: 302,
 		headers: { location: target.href, 'cache-control': 'no-store' }

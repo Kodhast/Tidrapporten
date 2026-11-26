@@ -6,7 +6,14 @@ import {
 	RS256,
 	signJwt
 } from '../functions/_lib/jwt.ts';
-import { ACCESS_TEAM, forgetKeys, teamUrl, verifyAccessJwt } from '../functions/_lib/access.ts';
+import {
+	ACCESS_TEAM,
+	fetchIdentity,
+	forgetKeys,
+	googlePicture,
+	teamUrl,
+	verifyAccessJwt
+} from '../functions/_lib/access.ts';
 import { parseSigner, signCustomToken } from '../functions/_lib/custom-token.ts';
 import { handleSignIn, type Env } from '../functions/inloggning.ts';
 
@@ -174,6 +181,34 @@ describe('verifyAccessJwt', () => {
 	});
 });
 
+describe('fetchIdentity', () => {
+	const answer = (body: unknown, status = 200) =>
+		(async () => Response.json(body, { status })) as unknown as typeof fetch;
+
+	it('reads the name and the picture, under oidc_fields or at the top', async () => {
+		expect(
+			await fetchIdentity(
+				'j',
+				answer({ name: ' Testa ', picture: 'https://lh3.googleusercontent.com/a/1' })
+			)
+		).toEqual({ name: 'Testa', picture: 'https://lh3.googleusercontent.com/a/1' });
+		expect(await fetchIdentity('j', answer({ email: 'person@example.com' }))).toEqual({});
+	});
+
+	it('gives nothing for an error, a refusal or a picture that is not Google’s', async () => {
+		expect(await fetchIdentity('j', answer({ name: 'Testa' }, 401))).toEqual({});
+		expect(
+			await fetchIdentity('j', (async () => new Response('inte json')) as unknown as typeof fetch)
+		).toEqual({});
+		expect(
+			await fetchIdentity('j', answer({ oidc_fields: { picture: 'https://exempel.se/bild.png' } }))
+		).toEqual({});
+		expect(googlePicture('http://lh3.googleusercontent.com/a/1')).toBeUndefined();
+		expect(googlePicture('inte en adress')).toBeUndefined();
+		expect(googlePicture(42)).toBeUndefined();
+	});
+});
+
 describe('/inloggning', () => {
 	const logged: string[] = [];
 	const env = (): Env => ({
@@ -208,8 +243,50 @@ describe('/inloggning', () => {
 		const [, payload = ''] = token.split('.');
 		expect(decodeJson(payload)).toMatchObject({ uid: 'testperson-1' });
 		expect(logged.map((line) => JSON.parse(line))).toEqual([
-			{ level: 'info', event: 'inloggning', uid: 'testperson-1' }
+			{ level: 'info', event: 'inloggning', uid: 'testperson-1', bild: false }
 		]);
+	});
+
+	it('adds the name and Google picture from get-identity to the fragment, never to the log', async () => {
+		const keys = certs();
+		const identityCalls: RequestInit[] = [];
+		const fetchFn = (async (url: string, init?: RequestInit) => {
+			if (url.endsWith('/get-identity')) {
+				identityCalls.push(init!);
+				return Response.json({
+					name: 'Testa Testsson',
+					email: 'person@example.com',
+					oidc_fields: { picture: 'https://lh3.googleusercontent.com/a/prov=s96-c' }
+				});
+			}
+			return keys.fetchFn(url);
+		}) as unknown as typeof fetch;
+		const jwt = await accessJwt();
+		const response = await signIn(request(jwt), env(), fetchFn);
+		const fragment = new URLSearchParams(new URL(response.headers.get('location')!).hash.slice(1));
+		expect(fragment.get('token')).toMatch(/^eyJ/);
+		expect(fragment.get('namn')).toBe('Testa Testsson');
+		expect(fragment.get('bild')).toBe('https://lh3.googleusercontent.com/a/prov=s96-c');
+		expect(new Headers(identityCalls[0]!.headers).get('cookie')).toBe(`CF_Authorization=${jwt}`);
+		expect(JSON.parse(logged[0]!)).toEqual({
+			level: 'info',
+			event: 'inloggning',
+			uid: 'testperson-1',
+			bild: true
+		});
+		expect(logged.join()).not.toMatch(/Testa|googleusercontent/);
+	});
+
+	it('signs in without name and picture when get-identity fails', async () => {
+		const keys = certs();
+		const fetchFn = (async (url: string) => {
+			if (url.endsWith('/get-identity')) throw new TypeError('nätet');
+			return keys.fetchFn(url);
+		}) as unknown as typeof fetch;
+		const response = await signIn(request(await accessJwt()), env(), fetchFn);
+		expect(response.status).toBe(302);
+		const fragment = new URLSearchParams(new URL(response.headers.get('location')!).hash.slice(1));
+		expect([...fragment.keys()]).toEqual(['token']);
 	});
 
 	it('matches the address regardless of case and blanks', async () => {

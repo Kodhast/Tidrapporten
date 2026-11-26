@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.3.0
+
+- Kontot uppe till höger, som i Kodhästs andra appar: din Google-bild i sidhuvudet och en meny med
+  Inställningar, Om Tidrapporten och Logga ut. Fliken Inställningar är borta; inställningarna öppnas
+  från menyn med en tillbakapil. Flex står på första raden på Idag, och sidhuvudet visar versionen.
+  Kodhäst-klockan med de två prickarna är appens ikon överallt (#66).
+
 ## 1.2.0
 
 - Kom igång: utan uppdrag leder startsidan genom fyra steg – arbetsgivaren, kunden, uppdraget och

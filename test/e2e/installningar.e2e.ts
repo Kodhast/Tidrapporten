@@ -46,7 +46,8 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 	page
 }) => {
 	await signIn(page, uid('installningar'));
-	await page.getByRole('link', { name: 'Inställningar' }).click();
+	await page.getByRole('button', { name: /^Konto och inställningar/ }).click();
+	await page.getByRole('menuitem', { name: 'Inställningar' }).click();
 	await addParty(page, 'Lägg till arbetsgivare', 'Arbetsgivare', 'Exempelkonsult AB');
 	await addParty(page, 'Lägg till kund', 'Kund', 'Kund A');
 	await expect(page.getByRole('link', { name: /Kund A/ })).toContainText('Inga uppdrag än');

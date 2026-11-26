@@ -1,9 +1,10 @@
-// The settings' first view (mockup "Inställningar – arbetsgivare och kunder"): the assignments
+// The settings' first view (mockup "Inställningar – arbetsgivare och kunder"), opened from the
+// account menu with a back arrow (issue 66): the assignments
 // under their employer, the customers, and the way to absence types and free days.
-import { buttonClass, Header, Row } from '@kodhast/web-ui-react';
+import { AccountRow, buttonClass, Row, TopBar } from '@kodhast/web-ui-react';
 import { plural } from '../../domain/installningar.ts';
 import type { Assignment, Customer, Employer, Id } from '../../domain/types.ts';
-import { ClockIcon } from '../ikoner';
+import { useKonto } from '../konto';
 import { href } from '../rutter.ts';
 import { OfflineNotice } from './delar';
 import { Export, type RestoreResult } from './Export';
@@ -36,6 +37,7 @@ export function InstallningarVy({
 	onExport,
 	onRestore
 }: InstallningarVyProps) {
+	const { account } = useKonto();
 	const sorted = inOrder(assignments);
 	const customerName = new Map(customers.map((c) => [c.id, c.name]));
 	const employerIds = new Set(employers.map((e) => e.id));
@@ -72,9 +74,14 @@ export function InstallningarVy({
 
 	return (
 		<>
-			<Header icon={<ClockIcon />} name="Tidrapporten" title="Inställningar" />
+			<TopBar title="Inställningar" backHref={href({ view: 'idag' })} />
 			<div className="innehall">
 				<OfflineNotice online={online} />
+				{account && (
+					<div className="kh-card radlista">
+						<AccountRow {...account} />
+					</div>
+				)}
 				{inOrder(employers).map((e) => (
 					<section key={e.id} className="sektion">
 						<h2 className="kh-text-section-title">{e.name}</h2>
