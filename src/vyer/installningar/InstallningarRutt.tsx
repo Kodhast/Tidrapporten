@@ -22,6 +22,7 @@ import {
 	receiverCodec,
 	type Codec
 } from '../../data/dokument.ts';
+import { exportFile, exportFileName, readAll } from '../../data/export.ts';
 import { nextNumber } from '../../domain/installningar.ts';
 import { termsOn } from '../../domain/norm.ts';
 import { dateOf } from '../../domain/tid.ts';
@@ -92,6 +93,18 @@ function useCounts(db: Firestore, uid: Id, ids: readonly Id[]): Record<Id, Assig
 	return counts;
 }
 
+/** Saves the value as a JSON file through the browser's download. */
+const download = (name: string, value: unknown) => {
+	const url = URL.createObjectURL(
+		new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
+	);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = name;
+	link.click();
+	URL.revokeObjectURL(url);
+};
+
 const Loading = () => <p className="kh-text-body innehall">Hämtar …</p>;
 
 export function InstallningarRutt({ db, uid, route, online }: InstallningarRuttProps) {
@@ -136,6 +149,10 @@ export function InstallningarRutt({ db, uid, route, online }: InstallningarRuttP
 						assignments.map((a) => [a.id, (termsOn(a, today) ?? a.terms[0])?.scopePercent ?? 100])
 					)}
 					online={online}
+					onExport={async () => {
+						const now = Date.now();
+						download(exportFileName(now), exportFile(await readAll(db, uid), now));
+					}}
 				/>
 			);
 		case 'franvaro':

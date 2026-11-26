@@ -25,6 +25,9 @@ Du granskar ändringar i Tidrapporten. Du ändrar aldrig filer och kör bara lä
   test? Test som beror på klocka, tidszon, nätverk eller ordning? Sänkt täckningsgräns?
 - **Tid och data:** tider sparas i UTC och visas i Europe/Stockholm; sommartid och helgdagar.
   En låst vecka ändras bara via loggad upplåsning. Driftloggar innehåller bara id:n och händelser.
+- **Datasäkerhet:** rör diffen ett fält, en samling eller ett dokument i Firestore, gå igenom
+  skill `datasakerhet`: kodaren, fixturen och rundturen, reglerna, JSON-exporten och
+  ändringsloggen. Något som saknas är ❌.
 - **Beslut:** bygger diffen förbi en ADR utan en ny?
 - **Språk:** svenska identifierare eller kommentarer i koden; engelska i gränssnittet.
 - **React:** krokarnas regler, onödiga effekter och omrenderingar (`vercel-react-best-practices`,

@@ -1,7 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { describe, expect, it } from 'vitest';
-import { absentAllDay, assignment, code, receiver, report, work } from '../domain/testdata.ts';
-import type { ChangeLogEntry, Settings, Timer } from '../domain/types.ts';
+import { assignment, code, receiver, work } from '../domain/testdata.ts';
 import {
 	absenceTypeCodec,
 	assignmentCodec,
@@ -12,104 +11,14 @@ import {
 	deviceCodec,
 	entryCodec,
 	freeDayCodec,
-	pauseCodec,
 	receiverCodec,
 	reportCodec,
 	reportId,
 	settingsCodec,
 	timerCodec
 } from './dokument.ts';
+import { logEntry, roundTrips, sent, stored } from './fixturer.ts';
 import { createMeta, updateMeta, without } from './kodning.ts';
-
-const sent = {
-	...report('2026-W48', 'sent', [480, 480, 480, 480, 480, 0, 0]),
-	snapshot: {
-		sentAt: Date.UTC(2026, 10, 27, 14, 0),
-		assignmentName: 'Exempeluppdraget',
-		receiverName: 'Mottagare ett',
-		codeNames: { 'R-arbete': 'Arbete' },
-		actualMinutes: 2490
-	},
-	lastChangeId: 'logg-1'
-};
-
-const logEntry: ChangeLogEntry = {
-	id: 'logg-1',
-	at: 0,
-	path: 'reports/a1_r1_2026-W48',
-	action: 'unlock',
-	week: '2026-W48',
-	before: { status: 'sent' },
-	after: { status: 'unlocked' },
-	reason: 'Fel kod på fredag',
-	by: 'app'
-};
-
-const timer: Timer = {
-	assignmentId: 'a1',
-	subject: { kind: 'code', codeId: 'c1' },
-	start: Date.UTC(2026, 10, 25, 7, 0)
-};
-
-const settings: Settings = { ...DEFAULT_SETTINGS, noTimerBy: null, flexWarning: 600 };
-
-// [name, codec, value, id, parent id]
-const roundTrips: [string, Codec<never>, unknown, string, string?][] = [
-	[
-		'assignment',
-		assignmentCodec as Codec<never>,
-		assignment({
-			endDate: '2026-12-31',
-			standardDay: [{ start: '08:00', end: '17:00', codeId: 'c1' }]
-		}),
-		'a1'
-	],
-	['time code', codeCodec as Codec<never>, code('c1', { billable: false, order: 2 }), 'c1', 'a1'],
-	['receiver', receiverCodec as Codec<never>, receiver(), 'r1', 'a1'],
-	[
-		'absence type',
-		absenceTypeCodec as Codec<never>,
-		{ id: 'komptid', name: 'Komptid', counting: 'flexWithdrawal', archived: false, order: 1 },
-		'komptid'
-	],
-	[
-		'free day',
-		freeDayCodec as Codec<never>,
-		{ date: '2026-12-24', free: false, name: 'Julafton' },
-		'2026-12-24'
-	],
-	[
-		'interval entry',
-		entryCodec as Codec<never>,
-		{ ...work('2026-11-25', '08:00', '17:00'), id: 'e1', note: 'Möte' },
-		'e1'
-	],
-	[
-		'whole-day entry',
-		entryCodec as Codec<never>,
-		{ ...absentAllDay('2026-11-25', 'semester'), id: 'e2' },
-		'e2'
-	],
-	['timer', timerCodec as Codec<never>, timer, 'timer'],
-	['pause', pauseCodec as Codec<never>, { date: '2026-11-25' }, '2026-11-25'],
-	[
-		'draft report',
-		reportCodec as Codec<never>,
-		report('2026-W48', 'draft', [60, 0, 0, 0, 0, 0, 0]),
-		'a1_r1_2026-W48'
-	],
-	['sent report', reportCodec as Codec<never>, sent, 'a1_r1_2026-W48'],
-	['settings', settingsCodec as Codec<never>, settings, 'settings'],
-	['device', deviceCodec as Codec<never>, { id: 'd1', fcmToken: 'token-1', label: 'Telefon' }, 'd1']
-];
-
-/** What Firestore gives back: the stored fields plus the common ones. */
-const stored = (data: object) => ({
-	...data,
-	schemaVersion: 1,
-	createdAt: Timestamp.fromMillis(0),
-	updatedAt: Timestamp.fromMillis(0)
-});
 
 describe('round trip domain → document → domain', () => {
 	it.each(roundTrips)('%s', (_, codec, value, id, parent) => {

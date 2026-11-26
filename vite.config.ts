@@ -53,7 +53,8 @@ export default defineConfig({
 				'src/main.tsx',
 				'firebase-functions/src/index.ts',
 				'src/**/*.test.{ts,tsx}',
-				'src/domain/testdata.ts'
+				'src/domain/testdata.ts',
+				'src/data/fixturer.ts'
 			],
 			thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 }
 		}

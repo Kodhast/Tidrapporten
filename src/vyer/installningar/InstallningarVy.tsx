@@ -6,6 +6,7 @@ import type { Assignment, Id } from '../../domain/types.ts';
 import { ClockIcon } from '../ikoner';
 import { href } from '../rutter.ts';
 import { OfflineNotice } from './delar';
+import { Export } from './Export';
 
 export interface AssignmentCounts {
 	codes: number;
@@ -19,6 +20,7 @@ export interface InstallningarVyProps {
 	freeDays: number;
 	scopeToday: Readonly<Record<Id, number>>;
 	online: boolean;
+	onExport: () => Promise<void>;
 }
 
 export function InstallningarVy({
@@ -27,7 +29,8 @@ export function InstallningarVy({
 	absenceTypes,
 	freeDays,
 	scopeToday,
-	online
+	online,
+	onExport
 }: InstallningarVyProps) {
 	const sorted = [...assignments].sort(
 		(a, b) => Number(a.archived) - Number(b.archived) || a.order - b.order
@@ -80,6 +83,8 @@ export function InstallningarVy({
 						/>
 					</div>
 				</section>
+
+				<Export online={online} onExport={onExport} />
 			</div>
 		</>
 	);

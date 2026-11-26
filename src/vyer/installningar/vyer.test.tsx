@@ -41,7 +41,8 @@ describe('InstallningarVy', () => {
 		absenceTypes: 6,
 		freeDays: 1,
 		scopeToday: { a1: 80, a2: 20 },
-		online: true
+		online: true,
+		onExport: noSave
 	};
 
 	it('lists the assignments in order, archived last, with scope and counts', () => {
