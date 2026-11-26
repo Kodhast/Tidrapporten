@@ -193,6 +193,13 @@ body {
 	padding-inline: var(--kh-space-xs);
 }
 
+/* Buttons side by side, wrapping on a narrow screen (the data section, issue 57). */
+.knapprad {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--kh-space-s);
+}
+
 /* Rows in a card sit close to its edge, as in the mockup. */
 .radlista {
 	padding: var(--kh-space-xs);

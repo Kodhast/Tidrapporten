@@ -126,7 +126,7 @@ export interface Report {
 	lastChangeId: Id | null; // the changeLog entry written with the latest locked change
 }
 
-export type ChangeAction = 'create' | 'update' | 'delete' | 'send' | 'unlock';
+export type ChangeAction = 'create' | 'update' | 'delete' | 'send' | 'unlock' | 'restore';
 
 export interface ChangeLogEntry {
 	id: Id;

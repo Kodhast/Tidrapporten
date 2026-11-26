@@ -4,9 +4,11 @@
 // the behaviour is in the files it imports, which run in Vitest.
 import { CloudBillingClient } from '@google-cloud/billing';
 import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
+import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onMessagePublished } from 'firebase-functions/v2/pubsub';
+import { RefusedFile, restoreMissing, type RestoreEffects } from './aterstall.ts';
 import { handleBudget, type BudgetEffects } from './budget.ts';
 
 initializeApp();
@@ -59,5 +61,50 @@ export const budget = onMessagePublished(
 			// Not JSON: handleBudget logs it as an unknown message.
 		}
 		await handleBudget(json, budgetEffects);
+	}
+);
+
+const userDoc = (uid: string, path: string) => getFirestore().doc(`users/${uid}/${path}`);
+
+const restoreEffects: RestoreEffects = {
+	makeTime: (seconds, nanoseconds) => new Timestamp(Math.floor(seconds), nanoseconds),
+	existing: async (uid, paths) => {
+		const snapshots = await getFirestore().getAll(...paths.map((p) => userDoc(uid, p)));
+		return new Set(paths.filter((_, i) => snapshots[i]!.exists));
+	},
+	create: async (uid, documents, logEntry) => {
+		const db = getFirestore();
+		const batch = db.batch();
+		for (const { path, data } of documents) batch.create(userDoc(uid, path), data);
+		const now = FieldValue.serverTimestamp();
+		batch.create(db.collection(`users/${uid}/changeLog`).doc(), {
+			...logEntry,
+			at: now,
+			schemaVersion: 1,
+			createdAt: now,
+			updatedAt: now
+		});
+		await batch.commit();
+	},
+	info: (message, fields) => logger.info(message, fields)
+};
+
+/**
+ * Restores a JSON export for the signed-in user (issue 57): writes the documents that are
+ * missing, never over one that exists. Runs in drift (release.yml) and in the emulators, as
+ * tidrapporten-aterstall: Cloud Datastore User in drift, nothing more (docs/drift.md).
+ */
+export const aterstall = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-aterstall@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		try {
+			return await restoreMissing(uid, request.data, restoreEffects);
+		} catch (error) {
+			if (error instanceof RefusedFile) throw new HttpsError('invalid-argument', error.message);
+			logger.error('aterstall: misslyckades', { uid });
+			throw new HttpsError('internal', 'Återställningen misslyckades.');
+		}
 	}
 );

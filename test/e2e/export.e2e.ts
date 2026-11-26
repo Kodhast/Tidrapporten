@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { restore } from '../../scripts/aterstall.mjs';
-import type { ExportFile } from '../../src/data/export.ts';
+import type { ExportFile } from '../../src/data/exportformat.ts';
 import { DOCUMENTS, seed, seedAssignment, signIn, stored, uid, type StoredDoc } from './hjalp.ts';
 
 // The JSON export against the emulators (issue 21): the downloaded file holds every document the
@@ -144,4 +144,36 @@ test('a restored export is the same data, and the app shows it', async ({ page, 
 	await restoredPage.goto('/#/installningar');
 	await expect(restoredPage.getByRole('link', { name: /Exempeluppdraget/ })).toBeVisible();
 	await other.close();
+});
+
+test('the app puts back what is missing from a file and leaves the rest', async ({
+	page,
+	request
+}) => {
+	const user = uid('aterstall-appen');
+	await seedEverything(request, user);
+	const file = await exportAll(page, user);
+	const before = await onServer(request, user);
+
+	// An interval is deleted and a device renamed after the export.
+	const deleted = await request.delete(`${DOCUMENTS}/users/${user}/entries/e1`, {
+		headers: { Authorization: 'Bearer owner' }
+	});
+	expect(deleted.ok()).toBe(true);
+	await seed(request, user, 'devices/d1', { fcmToken: 'token-1', label: 'Ny telefon' });
+
+	const path = test.info().outputPath('export.json');
+	await writeFile(path, JSON.stringify(file));
+	await page.getByLabel('Fil att återställa').setInputFiles(path);
+	const dialog = page.getByRole('alertdialog', { name: 'Återställa från filen?' });
+	await expect(dialog).toContainText(`${Object.keys(file.documents).length} dokument`);
+	await dialog.getByRole('button', { name: 'Återställ' }).click();
+	await expect(page.getByText('1 dokument återställt')).toBeVisible({ timeout: 15_000 });
+
+	const after = await onServer(request, user);
+	expect(after['entries/e1']).toEqual(before['entries/e1']);
+	expect(after['devices/d1']!.label).toEqual({ stringValue: 'Ny telefon' });
+	const logs = Object.entries(after).filter(([p]) => p.startsWith('changeLog/'));
+	expect(logs).toHaveLength(2);
+	expect(logs.map(([, f]) => f.action)).toContainEqual({ stringValue: 'restore' });
 });

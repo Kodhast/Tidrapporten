@@ -1,24 +1,66 @@
-// The settings' section for the JSON export (issue 21): one button that downloads all the user's
-// data. It reads from the server, so it waits for the network like the rest of the settings.
-import { Button, Notice } from '@kodhast/web-ui-react';
-import { WarningIcon } from '../ikoner';
+// The settings' section for the data (issues 21 and 57): one button that downloads all the user's
+// data as a JSON file, and one that puts back from such a file what is missing. Both need the
+// server, so they wait for the network like the rest of the settings.
+import { Button, ConfirmDialog, Notice } from '@kodhast/web-ui-react';
+import { useRef, useState } from 'react';
+import { parseExportFile, type ExportFile } from '../../data/exportformat.ts';
+import { plural } from '../../domain/installningar.ts';
+import { CheckIcon, WarningIcon } from '../ikoner';
 import { useSave } from './delar';
+
+export interface RestoreResult {
+	restored: number;
+	existed: number;
+}
 
 export interface ExportProps {
 	online: boolean;
 	/** Reads everything and starts the download. */
 	onExport: () => Promise<void>;
+	/** Writes the documents of the file that are missing. */
+	onRestore: (file: ExportFile) => Promise<RestoreResult>;
 }
 
-export function Export({ online, onExport }: ExportProps) {
-	const { pending, failed, run } = useSave();
+/** The file's export day in Swedish time, e.g. "26 nov 2026". */
+const dayOf = (iso: string) =>
+	new Date(iso).toLocaleDateString('sv-SE', {
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric',
+		timeZone: 'Europe/Stockholm'
+	});
+
+export function Export({ online, onExport, onRestore }: ExportProps) {
+	const exporting = useSave();
+	const restoring = useSave();
+	const input = useRef<HTMLInputElement>(null);
+	const [chosen, setChosen] = useState<ExportFile | null>(null);
+	const [refused, setRefused] = useState<string | null>(null);
+	const [result, setResult] = useState<RestoreResult | null>(null);
+
+	const read = async (picked: File | undefined) => {
+		setRefused(null);
+		setResult(null);
+		if (!picked) return;
+		let parsed: ExportFile | string;
+		try {
+			parsed = parseExportFile(JSON.parse(await picked.text()));
+		} catch {
+			parsed = 'Filen är ingen export från Tidrapporten.';
+		}
+		if (typeof parsed === 'string') setRefused(parsed);
+		else setChosen(parsed);
+	};
+
+	const count = chosen ? Object.keys(chosen.documents).length : 0;
 	return (
 		<section className="sektion">
 			<h2 className="kh-text-section-title">Data</h2>
 			<p className="kh-text-body">
-				All din data som en JSON-fil: uppdrag, tid, rapporter och ändringsloggen.
+				All din data som en JSON-fil: uppdrag, tid, rapporter och ändringsloggen. En sådan fil kan
+				läggas tillbaka; det som saknas återställs, och inget skrivs över.
 			</p>
-			{failed && (
+			{exporting.failed && (
 				<Notice
 					tone="ton-fel"
 					icon={<WarningIcon />}
@@ -26,11 +68,76 @@ export function Export({ online, onExport }: ExportProps) {
 					detail="Kontrollera anslutningen och försök igen."
 				/>
 			)}
-			<div>
-				<Button isDisabled={!online} isPending={pending} onPress={() => run(onExport)}>
+			{refused && (
+				<Notice
+					tone="ton-fel"
+					icon={<WarningIcon />}
+					title="Filen kan inte återställas"
+					detail={refused}
+				/>
+			)}
+			{restoring.failed && (
+				<Notice
+					tone="ton-fel"
+					icon={<WarningIcon />}
+					title="Det gick inte att återställa"
+					detail="Det som hann läggas tillbaka står i ändringsloggen. Försök igen; det som redan finns hoppas över."
+				/>
+			)}
+			{result && (
+				<Notice
+					tone="ton-ok"
+					icon={<CheckIcon />}
+					title={
+						result.restored > 0
+							? `${result.restored} dokument ${result.restored === 1 ? 'återställt' : 'återställda'}`
+							: 'Inget saknades'
+					}
+					detail={`${result.existed} dokument fanns redan och lämnades ${result.existed === 1 ? 'orört' : 'orörda'}.`}
+				/>
+			)}
+			<div className="knapprad">
+				<Button
+					isDisabled={!online}
+					isPending={exporting.pending}
+					onPress={() => exporting.run(onExport)}
+				>
 					Exportera all data
 				</Button>
+				<Button
+					variant="outlined"
+					isDisabled={!online}
+					isPending={restoring.pending}
+					onPress={() => input.current?.click()}
+				>
+					Återställ från fil
+				</Button>
 			</div>
+			<input
+				ref={input}
+				type="file"
+				accept=".json,application/json"
+				hidden
+				aria-label="Fil att återställa"
+				onChange={(event) => {
+					void read(event.target.files?.[0]);
+					event.target.value = '';
+				}}
+			/>
+			<ConfirmDialog
+				isOpen={chosen !== null}
+				onOpenChange={(open) => !open && setChosen(null)}
+				title="Återställa från filen?"
+				text={
+					chosen &&
+					`Filen är exporterad ${dayOf(chosen.exportedAt)} och har ${plural(count, 'dokument', 'dokument')}. Det som saknas läggs tillbaka; inget som finns skrivs över. Återställningen loggas.`
+				}
+				confirmLabel="Återställ"
+				onConfirm={() => {
+					const file = chosen!;
+					void restoring.run(async () => setResult(await onRestore(file)));
+				}}
+			/>
 		</section>
 	);
 }

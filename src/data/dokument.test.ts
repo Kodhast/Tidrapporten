@@ -155,4 +155,14 @@ describe('tolerant reading', () => {
 			after: null
 		});
 	});
+
+	it('reads a restore from a file in the change log (issue 57)', () => {
+		expect(
+			changeLogCodec.fromData('l', {
+				path: '*',
+				action: 'restore',
+				after: { paths: ['entries/e1'], exportedAt: '2026-11-26T09:00:00.000Z' }
+			})
+		).toMatchObject({ action: 'restore', after: { paths: ['entries/e1'] } });
+	});
 });

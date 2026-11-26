@@ -8,6 +8,7 @@ import { DEFAULT_ABSENCE_TYPES } from '../../domain/installningar.ts';
 import { assignment, code } from '../../domain/testdata.ts';
 import type { Receiver } from '../../domain/types.ts';
 import { useRoute } from '../rutter.ts';
+import { exportFile } from '../../data/exportformat.ts';
 import { Export } from './Export';
 import { FranvaroVy } from './FranvaroVy';
 import { MottagareVy } from './MottagareVy';
@@ -263,6 +264,20 @@ describe('useRoute', () => {
 
 describe('Export', () => {
 	const button = () => screen.getByRole('button', { name: 'Exportera all data' });
+	const restoreButton = () => screen.getByRole('button', { name: 'Återställ från fil' });
+	const noRestore = () => Promise.resolve({ restored: 0, existed: 0 });
+	const exported = exportFile(
+		[
+			{ path: 'entries/e1', data: { note: 'Påhittad' } },
+			{ path: 'entries/e2', data: { note: 'Påhittad' } }
+		],
+		Date.UTC(2026, 10, 26, 9)
+	);
+	const pick = (user: ReturnType<typeof userEvent.setup>, content: string) =>
+		user.upload(
+			screen.getByLabelText('Fil att återställa'),
+			new File([content], 'tidrapporten-2026-11-26.json', { type: 'application/json' })
+		);
 
 	it('exports on a press and says when it fails', async () => {
 		const user = userEvent.setup();
@@ -270,7 +285,7 @@ describe('Export', () => {
 			.fn()
 			.mockRejectedValueOnce(new Error('unavailable'))
 			.mockResolvedValue(undefined);
-		render(<Export online onExport={onExport} />);
+		render(<Export online onExport={onExport} onRestore={noRestore} />);
 		await user.click(button());
 		expect(await screen.findByText('Det gick inte att exportera')).toBeTruthy();
 		await user.click(button());
@@ -278,8 +293,59 @@ describe('Export', () => {
 		expect(onExport).toHaveBeenCalledTimes(2);
 	});
 
-	it('waits for the network, since it reads from the server', () => {
-		render(<Export online={false} onExport={vi.fn()} />);
+	it('waits for the network, since both read from and write to the server', () => {
+		render(<Export online={false} onExport={vi.fn()} onRestore={noRestore} />);
 		expect(button().hasAttribute('disabled')).toBe(true);
+		expect(restoreButton().hasAttribute('disabled')).toBe(true);
+	});
+
+	it('restores a chosen file after the confirmation and says what came back', async () => {
+		const user = userEvent.setup({ applyAccept: false });
+		const onRestore = vi.fn().mockResolvedValue({ restored: 1, existed: 1 });
+		render(<Export online onExport={vi.fn()} onRestore={onRestore} />);
+		const click = vi.spyOn(HTMLInputElement.prototype, 'click');
+		await user.click(restoreButton());
+		expect(click).toHaveBeenCalled();
+		await pick(user, JSON.stringify(exported));
+		const dialog = await screen.findByRole('alertdialog', { name: 'Återställa från filen?' });
+		expect(dialog.textContent).toContain('exporterad 26 nov. 2026 och har 2 dokument');
+		await user.click(within(dialog).getByRole('button', { name: 'Återställ' }));
+		expect(onRestore).toHaveBeenCalledWith(exported);
+		expect(await screen.findByText('1 dokument återställt')).toBeTruthy();
+		expect(screen.getByText('1 dokument fanns redan och lämnades orört.')).toBeTruthy();
+	});
+
+	it('refuses a file that is no export, and says when the restore fails', async () => {
+		const user = userEvent.setup({ applyAccept: false });
+		const onRestore = vi.fn().mockRejectedValue(new Error('internal'));
+		render(<Export online onExport={vi.fn()} onRestore={onRestore} />);
+		await pick(user, 'inte json');
+		expect(await screen.findByText('Filen är ingen export från Tidrapporten.')).toBeTruthy();
+		await pick(user, JSON.stringify({ ...exported, schemaVersion: 9 }));
+		expect(await screen.findByText('Filen har formatet 9, och appen läser 1.')).toBeTruthy();
+		expect(onRestore).not.toHaveBeenCalled();
+
+		await pick(user, JSON.stringify(exported));
+		await user.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Återställ' })
+		);
+		expect(await screen.findByText('Det gick inte att återställa')).toBeTruthy();
+	});
+
+	it('says when nothing was missing', async () => {
+		const user = userEvent.setup({ applyAccept: false });
+		render(
+			<Export
+				online
+				onExport={vi.fn()}
+				onRestore={() => Promise.resolve({ restored: 0, existed: 2 })}
+			/>
+		);
+		await pick(user, JSON.stringify(exported));
+		await user.click(
+			within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Återställ' })
+		);
+		expect(await screen.findByText('Inget saknades')).toBeTruthy();
+		expect(screen.getByText('2 dokument fanns redan och lämnades orörda.')).toBeTruthy();
 	});
 });

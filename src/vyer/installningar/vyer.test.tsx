@@ -42,7 +42,8 @@ describe('InstallningarVy', () => {
 		freeDays: 1,
 		scopeToday: { a1: 80, a2: 20 },
 		online: true,
-		onExport: noSave
+		onExport: noSave,
+		onRestore: () => Promise.resolve({ restored: 0, existed: 0 })
 	};
 
 	it('lists the assignments in order, archived last, with scope and counts', () => {

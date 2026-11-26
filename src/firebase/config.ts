@@ -10,7 +10,10 @@ export const EMULATOR_PROJECT_ID = 'demo-tidrapporten';
 
 /** Must match "emulators" in firebase.json; a test checks it. */
 export const EMULATOR_HOST = '127.0.0.1';
-export const EMULATOR_PORTS = { auth: 9099, firestore: 8080 } as const;
+export const EMULATOR_PORTS = { auth: 9099, firestore: 8080, functions: 5001 } as const;
+
+/** Where the Cloud Functions run (decision 0015). */
+export const FUNCTIONS_REGION = 'europe-west1';
 
 const options: Record<Environment, FirebaseOptions> = {
 	test: {

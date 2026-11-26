@@ -22,7 +22,7 @@ import { RapportRutt, VeckaRutt } from './vyer/vecka/VeckaRutt';
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
 
-const { auth, db } = startFirebase();
+const { auth, db, functions } = startFirebase();
 // Read once, before React, so that StrictMode's second effect run cannot sign in twice.
 const signInError = finishSignIn(auth);
 
@@ -86,7 +86,13 @@ function Root() {
 						online={online}
 					/>
 				) : route.view !== 'idag' ? (
-					<InstallningarRutt db={db} uid={shownUid} route={route} online={online} />
+					<InstallningarRutt
+						db={db}
+						functions={functions}
+						uid={shownUid}
+						route={route}
+						online={online}
+					/>
 				) : null
 			}
 		/>

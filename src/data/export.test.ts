@@ -4,19 +4,24 @@ import { Timestamp, type DocumentData } from 'firebase/firestore';
 import { describe, expect, it, vi } from 'vitest';
 import { at } from '../domain/testdata.ts';
 import { changeLogCodec } from './dokument.ts';
+import { readAll } from './export.ts';
 import {
 	ASSIGNMENT_COLLECTIONS,
 	exportFile,
 	exportFileName,
-	fromJson,
-	readAll,
+	fromJson as fromJsonWith,
+	isUserPath,
+	parseExportFile,
 	STATE_DOCUMENTS,
 	toJson,
 	USER_COLLECTIONS,
-	type ExportFile
-} from './export.ts';
+	type ExportFile,
+	type JsonValue
+} from './exportformat.ts';
 import rules from '../../firestore.rules?raw';
 import { logEntry, roundTrips, stored } from './fixturer.ts';
+
+const fromJson = (value: JsonValue) => fromJsonWith(value, (s, n) => new Timestamp(s, n));
 
 const server = vi.hoisted(() => ({ docs: {} as Record<string, Record<string, DocumentData>> }));
 
@@ -103,6 +108,7 @@ describe('export', () => {
 		expect(toJson({ at: time })).toEqual({ at: { $timestamp: '2026-11-18T11:06:40.123456789Z' } });
 		expect(fromJson(toJson([time]))).toEqual([time]);
 		expect(() => fromJson({ $timestamp: '2026-11-19' })).toThrow();
+		expect(() => fromJson({ $timestamp: '2026-13-45T99:00:00.000000000Z' })).toThrow();
 	});
 
 	it('refuses a value the app never stores instead of losing it', () => {
@@ -146,5 +152,52 @@ describe('export', () => {
 			'changeLog/l1',
 			'state/timer'
 		]);
+	});
+
+	it('knows the paths the app stores, and nothing else', () => {
+		for (const path of [
+			'entries/e1',
+			'changeLog/l1',
+			'state/timer',
+			'state/settings',
+			'assignments/a1/codes/c1',
+			'assignments/a1/receivers/r1'
+		]) {
+			expect(isUserPath(path), path).toBe(true);
+		}
+		for (const path of [
+			'entries',
+			'state/other',
+			'system/budget',
+			'other/x',
+			'assignments/a1/other/x',
+			'entries/e1/sub/x',
+			'entries/..',
+			'entries/__x__',
+			'entries//e1'
+		]) {
+			expect(isUserPath(path), path).toBe(false);
+		}
+	});
+
+	it('reads a file of this format and says why another is refused', () => {
+		const file = exportFile([{ path: 'entries/e1', data: { n: 1 } }], 0);
+		expect(parseExportFile(JSON.parse(JSON.stringify(file)))).toEqual(file);
+		expect(parseExportFile(null)).toBe('Filen är ingen export från Tidrapporten.');
+		expect(parseExportFile({ ...file, app: 'Annan' })).toBe(
+			'Filen är ingen export från Tidrapporten.'
+		);
+		expect(parseExportFile({ ...file, schemaVersion: 2 })).toBe(
+			'Filen har formatet 2, och appen läser 1.'
+		);
+		expect(parseExportFile({ ...file, exportedAt: 'igår' })).toBe('Filen saknar exportens tid.');
+		expect(parseExportFile({ ...file, exportedAt: undefined })).toBe('Filen saknar exportens tid.');
+		expect(parseExportFile({ ...file, documents: [] })).toBe('Filen saknar dokument.');
+		expect(parseExportFile({ ...file, documents: { 'system/budget': {} } })).toBe(
+			'Filen har ett dokument appen inte känner igen: system/budget.'
+		);
+		expect(parseExportFile({ ...file, documents: { 'entries/e1': 5 } })).toBe(
+			'Filen har ett dokument appen inte känner igen: entries/e1.'
+		);
 	});
 });
