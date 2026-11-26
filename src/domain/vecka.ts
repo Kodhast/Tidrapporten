@@ -173,10 +173,14 @@ export const storedLines = (lines: readonly ReportLine[]): ReportLine[] =>
 const fullestDay = (days: DayMinutes): number =>
 	days.reduce((best, m, i) => (m > days[best]! ? i : best), 0);
 
+/** A day holds at most 24 hours. */
+const DAY_MINUTES = 24 * 60;
+
 /**
  * A line changed to `minutes` for the week (the mockup's stepper per code and week). More time
- * goes to the code's fullest day, or the first workday when it has none; less time comes off the
- * fullest day first, then the next. `workdays` are the weekday indexes (0 = Monday) with a norm.
+ * goes to the code's fullest day, or the first workday when it has none, and to the next days
+ * when a day is full; less time comes off the fullest day first, then the next. `workdays` are
+ * the weekday indexes (0 = Monday) with a norm.
  */
 export const changeWeek = (
 	line: ReportLine,
@@ -184,10 +188,18 @@ export const changeWeek = (
 	workdays: readonly number[]
 ): ReportLine => {
 	const days = [...line.minutesPerDay] as DayMinutes;
-	let diff = Math.max(0, minutes) - lineMinutes(line);
+	const target = Math.min(Math.max(0, minutes), 7 * DAY_MINUTES);
+	let diff = target - lineMinutes(line);
 	if (diff > 0) {
-		const day = lineMinutes(line) > 0 ? fullestDay(days) : (workdays[0] ?? 0);
-		days[day]! += diff;
+		const all = [0, 1, 2, 3, 4, 5, 6];
+		const order =
+			lineMinutes(line) > 0 ? [fullestDay(days), ...workdays, ...all] : [...workdays, ...all];
+		for (const day of order) {
+			const added = Math.min(diff, DAY_MINUTES - days[day]!);
+			days[day]! += added;
+			diff -= added;
+			if (diff === 0) break;
+		}
 	}
 	while (diff < 0) {
 		const day = fullestDay(days);

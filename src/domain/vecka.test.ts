@@ -156,6 +156,11 @@ describe('changeWeek', () => {
 		expect(partly.minutesPerDay).toEqual([20, 0, 0, 0, 0, 0, 0]);
 	});
 
+	it('fills a day to 24 hours and goes on to the next workday', () => {
+		const changed = changeWeek(line('x', [0, 1380, 0, 0, 0, 0, 0]), 1380 + 120, workdays);
+		expect(changed.minutesPerDay).toEqual([60, 1440, 0, 0, 0, 0, 0]);
+	});
+
 	it('never goes below zero', () => {
 		expect(changeWeek(line('x', [30, 0, 0, 0, 0, 0, 0]), -30, workdays).minutesPerDay).toEqual([
 			0, 0, 0, 0, 0, 0, 0

@@ -43,7 +43,7 @@ export function VeckaRutt({ db, uid, week }: VeckaRuttProps) {
 	const now = useNow();
 	const today = dateOf(now);
 	const shown = week ?? isoWeekOf(today);
-	const data = useVecka(db, uid, shown);
+	const data = useVecka(db, uid, shown, now);
 	return (
 		<VeckaVy
 			week={shown}
@@ -67,7 +67,8 @@ export interface RapportRuttProps {
 
 export function RapportRutt(props: RapportRuttProps) {
 	const { db, uid, week, assignmentId, receiverId, online } = props;
-	const data = useVecka(db, uid, week);
+	const now = useNow();
+	const data = useVecka(db, uid, week, now);
 	// The mode chosen here, and the lines once changed; null follows the suggestion or the
 	// unlocked report.
 	const [mode, setMode] = useState<SuggestionMode | null>(null);
@@ -172,7 +173,7 @@ export function RapportRutt(props: RapportRuttProps) {
 								assignment,
 								receiver,
 								a.actual,
-								data.now
+								now
 							),
 							report
 						)

@@ -22,10 +22,11 @@ import type {
 	Id,
 	IsoWeek,
 	Report,
-	TimeCode
+	TimeCode,
+	UtcMillis
 } from '../../domain/types.ts';
 import { weekView, type WeekView } from '../../domain/vecka.ts';
-import { useCodes, useNow, useReceivers } from '../lyssnare.ts';
+import { useCodes, useReceivers } from '../lyssnare.ts';
 
 export interface Week {
 	/** Null until everything has come. */
@@ -36,7 +37,6 @@ export interface Week {
 	freeDays: ReturnType<typeof freeDaysByDate>;
 	/** A listener failed: what is shown is the latest known. */
 	failed: boolean;
-	now: number;
 }
 
 /** A value that belongs to one week, so that the last week's does not show for the next. */
@@ -45,8 +45,7 @@ interface Of<T> {
 	value: T;
 }
 
-export function useVecka(db: Firestore, uid: Id, week: IsoWeek): Week {
-	const now = useNow();
+export function useVecka(db: Firestore, uid: Id, week: IsoWeek, now: UtcMillis): Week {
 	const [assignments, setAssignments] = useState<Assignment[] | null>(null);
 	const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
 	const [freeDays, setFreeDays] = useState<FreeDay[] | null>(null);
@@ -109,7 +108,6 @@ export function useVecka(db: Firestore, uid: Id, week: IsoWeek): Week {
 		codes,
 		absenceTypes: absenceTypes ?? [],
 		freeDays: days,
-		failed,
-		now
+		failed
 	};
 }
