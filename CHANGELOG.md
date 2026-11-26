@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.11.0
+
+- Inställningar: "Exportera all data" laddar ner all din data som en JSON-fil, med uppdrag, tid,
+  rapporter och ändringsloggen. Exporten läser från servern och kräver nätet (#21).
+
 ## 0.10.0
 
 - Veckan: en ny flik med veckans faktiska tid, norm och flex och en rapport per mottagare i

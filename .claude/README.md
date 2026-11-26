@@ -14,6 +14,7 @@ skill, agent och koppling kommer in står i issue 8 under "Skills, agenter och k
 | `adr`                         | Nytt beslut i `docs/beslut/`                   | Egen, efter VeckansMat                           |
 | `mockup`                      | Före ny eller ändrad GUI                       | Egen, efter VeckansMat                           |
 | `tidsregler`                  | Beräkningar i `src/domain/`: tid, norm, flex   | Egen, som `fondmatematik` i Fonder               |
+| `datasakerhet`                | Fält eller samling i Firestore, exporten       | Egen, som `data-safety-backup` i Android-repona  |
 | `vercel-react-best-practices` | Skriva och granska React-kod                   | Vercel, oförändrad                               |
 | `firebase-basics`             | Firebase CLI, projekt och `firebase use`       | Google, oförändrad                               |
 | `firebase-auth-basics`        | Firebase Authentication och inloggning         | Google, oförändrad                               |

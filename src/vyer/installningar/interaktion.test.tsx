@@ -8,6 +8,7 @@ import { DEFAULT_ABSENCE_TYPES } from '../../domain/installningar.ts';
 import { assignment, code } from '../../domain/testdata.ts';
 import type { Receiver } from '../../domain/types.ts';
 import { useRoute } from '../rutter.ts';
+import { Export } from './Export';
 import { FranvaroVy } from './FranvaroVy';
 import { MottagareVy } from './MottagareVy';
 import { UppdragVy } from './UppdragVy';
@@ -257,5 +258,28 @@ describe('useRoute', () => {
 			window.dispatchEvent(new HashChangeEvent('hashchange'));
 		});
 		expect(screen.getByText('franvaro')).toBeTruthy();
+	});
+});
+
+describe('Export', () => {
+	const button = () => screen.getByRole('button', { name: 'Exportera all data' });
+
+	it('exports on a press and says when it fails', async () => {
+		const user = userEvent.setup();
+		const onExport = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('unavailable'))
+			.mockResolvedValue(undefined);
+		render(<Export online onExport={onExport} />);
+		await user.click(button());
+		expect(await screen.findByText('Det gick inte att exportera')).toBeTruthy();
+		await user.click(button());
+		await waitFor(() => expect(screen.queryByText('Det gick inte att exportera')).toBeNull());
+		expect(onExport).toHaveBeenCalledTimes(2);
+	});
+
+	it('waits for the network, since it reads from the server', () => {
+		render(<Export online={false} onExport={vi.fn()} />);
+		expect(button().hasAttribute('disabled')).toBe(true);
 	});
 });

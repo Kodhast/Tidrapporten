@@ -140,3 +140,25 @@ under 90 % och upprepade meddelanden efter stoppet loggas inte.
 Cloud Run, Eventarc och Cloud Billing. Att `tidrapporten-deploy` har alla roller som en
 2nd gen-funktion kräver vid första driftsättningen är inte provat; provkör `release.yml` med
 _dry_run_ och läs felet om den skarpa körningen fallerar.
+
+## Backup
+
+Den dagliga exporten till Cloud Storage kommer i en egen PR (issue 21).
+
+**JSON-exporten i appen** (Inställningar → Exportera all data) läser varje dokument under
+`users/{uid}` från servern, ändringsloggen inräknad, och laddar ner `tidrapporten-<datum>.json`:
+
+```json
+{
+	"app": "Tidrapporten",
+	"schemaVersion": 1,
+	"exportedAt": "2026-11-26T09:00:00.000Z",
+	"documents": {
+		"entries/e1": { "time": { "start": { "$timestamp": "2026-11-16T07:00:00.000000000Z" } } }
+	}
+}
+```
+
+Nycklarna i `documents` är dokumentens sökvägar under användaren. Tider skrivs med nio decimaler
+och läses tillbaka exakt med `fromJson` i `src/data/export.ts`. Vad som ska med när datan ändras:
+skill `datasakerhet`.
