@@ -31,3 +31,28 @@ export const WarningIcon = () => (
 		<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
 	</svg>
 );
+
+/** The arrow after the code chip's text, which says the chip opens a choice. */
+export const ExpandIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+	</svg>
+);
+
+export const PlayIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M8 5v14l11-7z" />
+	</svg>
+);
+
+export const StopIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M6 6h12v12H6z" />
+	</svg>
+);
+
+export const WorkIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z" />
+	</svg>
+);

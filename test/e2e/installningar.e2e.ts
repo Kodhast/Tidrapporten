@@ -1,21 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import { signIn, uid } from './hjalp.ts';
 
 // The settings against the emulators (issue 17). Made-up names only; every test signs in as a
 // user of its own so that the tests do not see each other's data.
-
-const signIn = async (page: Page, uid: string) => {
-	await page.goto('/');
-	// Only emulator builds have it (src/firebase/app.ts); the test project has no DOM types.
-	await page.waitForFunction('typeof window.testSignIn === "function"');
-	await page.evaluate(
-		(id) =>
-			(globalThis as unknown as { testSignIn: (uid: string) => Promise<string> }).testSignIn(id),
-		uid
-	);
-	await expect(page.getByText(`Inloggad som ${uid}`)).toBeVisible();
-};
-
-const uid = (name: string) => `${name}-${test.info().project.name}-${Date.now()}`;
 
 const save = (page: Page) => page.getByRole('button', { name: 'Spara', exact: true });
 

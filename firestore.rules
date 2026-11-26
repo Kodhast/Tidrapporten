@@ -37,7 +37,8 @@ rules_version = '2';
 //   reason string ≤ 500, by 'app'. Create only; never updated or deleted.
 // devices/{id}: fcmToken string 1–4096, label string ≤ 100
 // state/timer: assignmentId, subject, start timestamp between 2020-01-01 and a day from now.
-//   Deleted when the timer stops.
+//   Deleted when the timer stops, and its start moved on a change of code, only together with
+//   the entry `timer-<start>` it becomes.
 // system/budget (outside users/): percent, cost, budget, currency, month 'YYYY-MM',
 //   schemaVersion, updatedAt; written only by the budget function, read by the signed-in user.
 // state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
@@ -279,6 +280,11 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId)).data;
     }
 
+    // The entry the stored timer becomes when it stops: `timer-<start in milliseconds>`.
+    function hasTimerEntryAfter(uid) {
+      return existsAfter(/databases/$(database)/documents/users/$(uid)/entries/$('timer-' + string(resource.data.start.toMillis())));
+    }
+
     function isLogged(uid, path, action, week) {
       let logPath = /databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId);
       return isId(data().lastChangeId)
@@ -421,9 +427,16 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && isValidMeta() && isValidDevice();
       }
 
+      // A running timer ends only with its own entry in the same batch (issue 18): a stop
+      // deletes it and a change of code moves its start. So a stop or change queued offline on
+      // one device cannot delete or overwrite a timer another device started meanwhile. A change
+      // of code within the first minute keeps the start and needs no entry.
       match /state/timer {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && isValidMeta() && isValidTimer();
+        allow read: if isOwner(uid);
+        allow delete: if isOwner(uid) && hasTimerEntryAfter(uid);
+        allow create: if isOwner(uid) && isValidMeta() && isValidTimer();
+        allow update: if isOwner(uid) && isValidMeta() && isValidTimer()
+          && (data().start == resource.data.start || hasTimerEntryAfter(uid));
       }
 
       match /state/settings {

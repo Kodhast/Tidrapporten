@@ -41,7 +41,14 @@ import {
 	saveFreeDay,
 	saveReceiver
 } from '../../src/data/installningar.ts';
-import { LockedChangeError, saveEntry, saveReport, stopTimer } from '../../src/data/skrivning.ts';
+import {
+	LockedChangeError,
+	saveEntry,
+	saveReport,
+	startTimer,
+	stopTimer,
+	switchTimer
+} from '../../src/data/skrivning.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
 import type { Report } from '../../src/domain/types.ts';
 import { EMULATOR_HOST, EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/firebase/config.ts';
@@ -725,6 +732,100 @@ describe('the data layer’s writes pass the rules', () => {
 		await denied(stopTimer(db, OWNER, timer, Date.UTC(2026, 10, 25, 16)));
 		const entries = await getDocs(collection(db, 'users', OWNER, 'entries'));
 		expect(entries.size).toBe(1);
+	});
+
+	it('startTimer starts a timer, and never replaces one that runs', async () => {
+		const db = owner();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await startTimer(db, OWNER, timer);
+		expect((await getDoc(at(db, 'state/timer'))).data()).toMatchObject({ assignmentId: 'a1' });
+		await denied(startTimer(db, OWNER, { ...timer, start: timer.start + 3_600_000 }));
+	});
+
+	it('switchTimer writes the entry so far and goes on with the new code from its end', async () => {
+		const db = owner();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await startTimer(db, OWNER, timer);
+		const switchAt = Date.UTC(2026, 10, 25, 9);
+		const next = await switchTimer(
+			db,
+			OWNER,
+			timer,
+			{ assignmentId: 'a1', subject: { kind: 'code', codeId: 'c2' } },
+			switchAt
+		);
+		expect(next).toEqual({
+			assignmentId: 'a1',
+			subject: { kind: 'code', codeId: 'c2' },
+			start: switchAt
+		});
+		const stored = await getDoc(at(db, 'state/timer'));
+		expect(timerCodec.fromData('timer', stored.data()!)).toEqual(next);
+		const entry = await getDoc(at(db, `entries/timer-${timer.start}`));
+		expect(entry.data()?.subject).toEqual({ kind: 'code', codeId: 'c1' });
+		// A device that had not seen the change cannot switch the same timer again.
+		await denied(
+			switchTimer(
+				db,
+				OWNER,
+				timer,
+				{ assignmentId: 'a1', subject: { kind: 'code', codeId: 'c3' } },
+				switchAt + 60_000
+			)
+		);
+	});
+
+	it('a stop or change of an older timer cannot remove the one another device started', async () => {
+		const db = owner();
+		const code = (codeId: string) => ({ kind: 'code' as const, codeId });
+		const queued = { assignmentId: 'a1', subject: code('c1'), start: Date.UTC(2026, 10, 25, 7) };
+		const other = { assignmentId: 'a1', subject: code('c2'), start: Date.UTC(2026, 10, 25, 8) };
+		await startTimer(db, OWNER, other);
+		await denied(stopTimer(db, OWNER, queued, Date.UTC(2026, 10, 25, 9)));
+		await denied(
+			switchTimer(
+				db,
+				OWNER,
+				queued,
+				{ assignmentId: 'a1', subject: code('c3') },
+				Date.UTC(2026, 10, 25, 9)
+			)
+		);
+		await denied(deleteDoc(at(db, 'state/timer')));
+		expect(timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!)).toEqual(
+			other
+		);
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
+	});
+
+	it('switchTimer within the first minute changes the code and keeps the start', async () => {
+		const db = owner();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await startTimer(db, OWNER, timer);
+		const next = await switchTimer(
+			db,
+			OWNER,
+			timer,
+			{ assignmentId: 'a1', subject: { kind: 'code', codeId: 'c2' } },
+			timer.start + 20_000
+		);
+		expect(next.start).toBe(timer.start);
+		expect(timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!)).toEqual(
+			next
+		);
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
 	});
 
 	it('saveEntry refuses to change an entry’s id', async () => {

@@ -1,0 +1,229 @@
+import { describe, expect, it } from 'vitest';
+import { isTimerForgotten } from './intervall.ts';
+import { assignment, at, code, report, work } from './testdata.ts';
+import {
+	choiceNames,
+	durationLabel,
+	elapsedLabel,
+	parseEnd,
+	startChoice,
+	stopBlockedOffline,
+	timerCodeGroups,
+	timerEntry
+} from './timer.ts';
+import type { Timer } from './types.ts';
+
+const MINUTE = 60_000;
+
+const a1 = assignment({ id: 'a1', name: 'Uppdrag A', order: 0 });
+const a2 = assignment({ id: 'a2', name: 'Uppdrag B', order: 1 });
+const codes = {
+	a1: [
+		code('c2', { name: 'Möten', order: 1 }),
+		code('c1', { name: 'Utveckling', order: 0 }),
+		code('c3', { name: 'Gammal', order: 2, archived: true })
+	],
+	a2: [code('c9', { assignmentId: 'a2', name: 'Förvaltning' })]
+};
+
+const timer = (start: number, codeId = 'c1'): Timer => ({
+	assignmentId: 'a1',
+	subject: { kind: 'code', codeId },
+	start
+});
+
+describe('timerCodeGroups', () => {
+	it('lists the codes per assignment in their order, without archived codes', () => {
+		const groups = timerCodeGroups([a2, a1], codes, '2026-11-25');
+		expect(groups.map((g) => [g.assignment.id, g.codes.map((c) => c.id)])).toEqual([
+			['a1', ['c1', 'c2']],
+			['a2', ['c9']]
+		]);
+	});
+
+	it('leaves out archived and ended assignments and those without codes', () => {
+		const groups = timerCodeGroups(
+			[
+				a1,
+				{ ...a2, archived: true },
+				assignment({ id: 'a3', endDate: '2026-11-24' }),
+				assignment({ id: 'a4', endDate: '2026-11-25' }),
+				assignment({ id: 'a5' })
+			],
+			{ ...codes, a3: [code('x')], a4: [code('y')] },
+			'2026-11-25'
+		);
+		// a4 ends today and can still be worked on.
+		expect(groups.map((g) => g.assignment.id)).toEqual(['a1', 'a4']);
+	});
+});
+
+describe('startChoice', () => {
+	const groups = timerCodeGroups([a1, a2], codes, '2026-11-25');
+
+	it('takes the code of the latest interval', () => {
+		const older = work('2026-11-24', '08:00', '12:00', 'c1');
+		const newer = work('2026-11-24', '13:00', '16:00', 'c2');
+		expect(startChoice(groups, [older, newer])).toEqual({ assignmentId: 'a1', codeId: 'c2' });
+	});
+
+	it('skips an interval whose code is archived', () => {
+		const archived = work('2026-11-24', '13:00', '16:00', 'c3');
+		const earlier = work('2026-11-24', '08:00', '12:00', 'c2');
+		expect(startChoice(groups, [archived, earlier])).toEqual({ assignmentId: 'a1', codeId: 'c2' });
+	});
+
+	it('takes the first code of the first assignment without intervals', () => {
+		expect(startChoice(groups, [])).toEqual({ assignmentId: 'a1', codeId: 'c1' });
+	});
+
+	it('is null without assignments', () => {
+		expect(startChoice([], [])).toBeNull();
+	});
+
+	it('names the choice', () => {
+		expect(choiceNames(groups, { assignmentId: 'a2', codeId: 'c9' })).toEqual({
+			code: 'Förvaltning',
+			assignment: 'Uppdrag B'
+		});
+		expect(choiceNames(groups, { assignmentId: 'a2', codeId: 'c1' })).toBeNull();
+	});
+});
+
+describe('timerEntry', () => {
+	const start = at('2026-11-25', '08:00');
+
+	it('is named by the start and ends at the stop', () => {
+		expect(timerEntry(timer(start), start + 90 * MINUTE)).toEqual({
+			id: `timer-${start}`,
+			assignmentId: 'a1',
+			subject: { kind: 'code', codeId: 'c1' },
+			time: { kind: 'interval', start, end: start + 90 * MINUTE },
+			note: ''
+		});
+	});
+
+	it('is at least a minute and at most 24 hours', () => {
+		expect(timerEntry(timer(start), start - MINUTE).time).toMatchObject({ end: start + MINUTE });
+		expect(timerEntry(timer(start), start + 30 * 60 * MINUTE).time).toMatchObject({
+			end: start + 24 * 60 * MINUTE
+		});
+	});
+});
+
+describe('the ten-hour limit', () => {
+	const start = at('2026-11-25', '08:00');
+
+	it('asks after more than ten hours, not before', () => {
+		expect(isTimerForgotten(timer(start), at('2026-11-25', '17:59'))).toBe(false);
+		expect(isTimerForgotten(timer(start), at('2026-11-25', '18:00'))).toBe(false);
+		expect(isTimerForgotten(timer(start), at('2026-11-25', '18:01'))).toBe(true);
+	});
+});
+
+describe('stopBlockedOffline', () => {
+	// Week 48 of 2026 is 23–29 November.
+	const start = at('2026-11-25', '08:00');
+	const end = at('2026-11-25', '16:00');
+
+	it('blocks a stop into a sent week offline', () => {
+		const reports = [report('2026-W48', 'sent', [480, 480, 480, 480, 480, 0, 0])];
+		expect(stopBlockedOffline(timer(start), end, reports, false)).toBe(true);
+	});
+
+	it('blocks a stop into an unlocked week offline', () => {
+		const reports = [report('2026-W48', 'unlocked', [0, 0, 0, 0, 0, 0, 0])];
+		expect(stopBlockedOffline(timer(start), end, reports, false)).toBe(true);
+	});
+
+	it('allows the same stop online, where it is logged', () => {
+		const reports = [report('2026-W48', 'sent', [0, 0, 0, 0, 0, 0, 0])];
+		expect(stopBlockedOffline(timer(start), end, reports, true)).toBe(false);
+	});
+
+	it('allows a stop into an open week offline', () => {
+		const reports = [
+			report('2026-W48', 'draft', [0, 0, 0, 0, 0, 0, 0]),
+			report('2026-W47', 'sent', [0, 0, 0, 0, 0, 0, 0])
+		];
+		expect(stopBlockedOffline(timer(start), end, reports, false)).toBe(false);
+	});
+
+	it('blocks a timer from Sunday night into a sent Monday week', () => {
+		const sunday = at('2026-11-29', '22:00');
+		const reports = [report('2026-W49', 'sent', [0, 0, 0, 0, 0, 0, 0])];
+		expect(stopBlockedOffline(timer(sunday), at('2026-11-30', '01:00'), reports, false)).toBe(true);
+		expect(stopBlockedOffline(timer(sunday), at('2026-11-29', '23:30'), reports, false)).toBe(
+			false
+		);
+	});
+
+	it('ignores another assignment’s sent week', () => {
+		const other = { ...report('2026-W48', 'sent', [0, 0, 0, 0, 0, 0, 0]), assignmentId: 'a2' };
+		expect(stopBlockedOffline(timer(start), end, [other], false)).toBe(false);
+	});
+});
+
+describe('labels', () => {
+	const start = at('2026-11-25', '08:05');
+
+	it('shows running time without seconds', () => {
+		expect(elapsedLabel(start, start + 59_999)).toBe('0 min');
+		expect(elapsedLabel(start, start + 42 * MINUTE + 59_000)).toBe('42 min');
+		expect(elapsedLabel(start, start + 102 * MINUTE)).toBe('1 h 42');
+		expect(elapsedLabel(start, start + 665 * MINUTE)).toBe('11 h 05');
+		expect(elapsedLabel(start, start - MINUTE)).toBe('0 min');
+	});
+
+	it('says a length in words', () => {
+		expect(durationLabel(start, start + 680 * MINUTE)).toBe('11 h 20 min');
+		expect(durationLabel(start, start + 600 * MINUTE)).toBe('10 h');
+		expect(durationLabel(start, start + 45 * MINUTE)).toBe('45 min');
+	});
+});
+
+describe('parseEnd', () => {
+	const start = at('2026-11-25', '08:05');
+	const now = at('2026-11-25', '19:25');
+
+	it('reads a clock time on the start day', () => {
+		for (const text of ['16:05', '16.05', '1605', ' 16:05 ']) {
+			expect(parseEnd(text, timer(start), now)).toEqual({ end: at('2026-11-25', '16:05') });
+		}
+		expect(parseEnd('9:30', timer(start), now)).toEqual({ end: at('2026-11-25', '09:30') });
+	});
+
+	it('refuses what is not a time', () => {
+		for (const text of ['', '25:00', '16:60', 'fyra', '16']) {
+			expect(parseEnd(text, timer(start), now)).toEqual({ error: 'Skriv en tid som 16:05' });
+		}
+	});
+
+	it('refuses an end at or before the start, and after now', () => {
+		expect(parseEnd('08:05', timer(start), now)).toEqual({
+			error: 'Sluttiden måste vara efter 08:05'
+		});
+		expect(parseEnd('19:30', timer(start), now)).toEqual({
+			error: 'Sluttiden kan inte vara senare än nu'
+		});
+	});
+
+	it('reads a time not after the start as the next day, for a timer over midnight', () => {
+		const late = timer(at('2026-11-24', '22:05'));
+		const morning = at('2026-11-25', '09:47');
+		expect(parseEnd('01:30', late, morning)).toEqual({ end: at('2026-11-25', '01:30') });
+		expect(parseEnd('00:00', late, morning)).toEqual({ end: at('2026-11-25', '00:00') });
+		expect(parseEnd('23:30', late, morning)).toEqual({ end: at('2026-11-24', '23:30') });
+		expect(parseEnd('10:00', late, morning)).toEqual({
+			error: 'Sluttiden måste vara efter 22:05'
+		});
+	});
+
+	it('counts the real hours on the day summer time ends', () => {
+		// 25 October 2026: 03:00 summer time becomes 02:00 winter time, so the day has 25 hours.
+		const autumn = at('2026-10-25', '01:00');
+		const result = parseEnd('10:00', timer(autumn), at('2026-10-25', '20:00'));
+		expect(result).toEqual({ end: at('2026-10-25', '10:00') });
+		expect(((result as { end: number }).end - autumn) / MINUTE).toBe(10 * 60);
+	});
+});

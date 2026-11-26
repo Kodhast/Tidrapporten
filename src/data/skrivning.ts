@@ -1,15 +1,18 @@
 // Writes that must follow the locking rules (ADR 0012): reports with a log entry in the same
-// transaction, entries with a log entry when their week is sent, and stopping the timer.
+// transaction, entries with a log entry when their week is sent, and the timer.
 import {
 	collection,
 	doc,
 	runTransaction,
 	serverTimestamp,
+	setDoc,
 	writeBatch,
 	type DocumentData,
+	type WriteBatch,
 	type Firestore
 } from 'firebase/firestore';
 import { entryChange, reportChange } from '../domain/lasning.ts';
+import { timerEnd, timerEntry } from '../domain/timer.ts';
 import type {
 	ChangeAction,
 	Entry,
@@ -19,7 +22,7 @@ import type {
 	Timer,
 	UtcMillis
 } from '../domain/types.ts';
-import { entryCodec, reportCodec } from './dokument.ts';
+import { entryCodec, reportCodec, timerCodec } from './dokument.ts';
 import { createMeta, updateMeta } from './kodning.ts';
 
 /** The document path below the user, as the log stores it: `reports/a1_r1_2026-W48`. */
@@ -154,41 +157,24 @@ export const saveEntry = async (
 	await batch.commit();
 };
 
-const MINUTE = 60_000;
-const MAX_ENTRY = 24 * 60 * MINUTE;
-
 /**
  * The id of the entry a stopped timer becomes. Two devices stopping the same timer give the same
  * id; the second write is refused by the rules (it would change createdAt), so one entry remains
  * and the second device gets permission-denied.
  */
-export const timerEntryId = (timer: Timer): Id => `timer-${timer.start}`;
+export const timerEntryId = (timer: Timer): Id => timerEntry(timer, timer.start).id;
 
-/**
- * Writes the timer's entry and empties `state/timer` in one batch, with a log entry when the
- * week is sent. The end is kept between one minute and 24 hours after the start, the limits of
- * an entry, so that a forgotten timer or a device clock behind the start can always be stopped.
- */
-export const stopTimer = async (
+/** Adds the stopped timer's entry to the batch, with a log entry when its week is sent. */
+const addTimerEntry = (
 	db: Firestore,
 	uid: Id,
+	batch: WriteBatch,
 	timer: Timer,
 	end: UtcMillis,
-	reports: readonly Report[] = [],
+	reports: readonly Report[],
 	note = ''
-): Promise<Entry> => {
-	const entry: Entry = {
-		id: timerEntryId(timer),
-		assignmentId: timer.assignmentId,
-		subject: timer.subject,
-		time: {
-			kind: 'interval',
-			start: timer.start,
-			end: Math.min(Math.max(end, timer.start + MINUTE), timer.start + MAX_ENTRY)
-		},
-		note
-	};
-	const batch = writeBatch(db);
+): Entry => {
+	const entry = timerEntry(timer, end, note);
 	batch.set(userDoc(db, uid, userPath('entries', entry.id)), {
 		...entryCodec.toData(entry),
 		...createMeta()
@@ -207,7 +193,65 @@ export const stopTimer = async (
 			})
 		);
 	}
-	batch.delete(userDoc(db, uid, userPath('state', 'timer')));
+	return entry;
+};
+
+const timerPath = userPath('state', 'timer');
+
+const MINUTE = 60_000;
+
+/**
+ * Starts the timer. A plain write, so it works offline and syncs later. When another device has
+ * already started one, the rules refuse it (it would change createdAt), so a running timer is
+ * never replaced.
+ */
+export const startTimer = (db: Firestore, uid: Id, timer: Timer): Promise<void> =>
+	setDoc(userDoc(db, uid, timerPath), { ...timerCodec.toData(timer), ...createMeta() });
+
+/**
+ * Writes the timer's entry and empties `state/timer` in one batch, with a log entry when the
+ * week is sent. The end is clamped as `timerEntry` says.
+ */
+export const stopTimer = async (
+	db: Firestore,
+	uid: Id,
+	timer: Timer,
+	end: UtcMillis,
+	reports: readonly Report[] = [],
+	note = ''
+): Promise<Entry> => {
+	const batch = writeBatch(db);
+	const entry = addTimerEntry(db, uid, batch, timer, end, reports, note);
+	batch.delete(userDoc(db, uid, timerPath));
 	await batch.commit();
 	return entry;
+};
+
+/**
+ * Changes the running timer's code: the entry so far is written and the timer goes on with the
+ * new code from the entry's end, in one batch, so that the two intervals meet. Within the first
+ * minute there is nothing to write yet (an entry is at least a minute), so the code changes in
+ * place and the start stays. If another device stopped or changed the timer first, the rules
+ * refuse the whole batch.
+ */
+export const switchTimer = async (
+	db: Firestore,
+	uid: Id,
+	timer: Timer,
+	next: Pick<Timer, 'assignmentId' | 'subject'>,
+	at: UtcMillis,
+	reports: readonly Report[] = []
+): Promise<Timer> => {
+	const batch = writeBatch(db);
+	let nextTimer: Timer = { ...next, start: timer.start };
+	if (at >= timer.start + MINUTE) {
+		addTimerEntry(db, uid, batch, timer, at, reports);
+		nextTimer = { ...next, start: timerEnd(timer, at) };
+	}
+	batch.update(userDoc(db, uid, timerPath), {
+		...timerCodec.toData(nextTimer),
+		...updateMeta()
+	});
+	await batch.commit();
+	return nextTimer;
 };

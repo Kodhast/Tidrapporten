@@ -183,3 +183,14 @@ body {
 .dampad {
 	color: var(--kh-on-surface-variant);
 }
+
+/*
+ * The timer on the start page (issue 18): the code chip, the running time and a line under it,
+ * centred where the wheel from issue 19 will go round them.
+ */
+.timer {
+	display: grid;
+	justify-items: center;
+	gap: var(--kh-space-s);
+	padding-block: var(--kh-space-xl);
+}

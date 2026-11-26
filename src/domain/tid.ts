@@ -58,6 +58,12 @@ export const dateOf = (at: UtcMillis): IsoDate => {
 	return formatDate(p.year, p.month, p.day);
 };
 
+/** The local clock time at the instant, `HH:MM`. */
+export const clockOf = (at: UtcMillis): ClockTime => {
+	const p = localParts(at);
+	return `${pad(p.hour)}:${pad(p.minute)}`;
+};
+
 /** Days after `date`; negative goes back. */
 export const addDays = (date: IsoDate, days: number): IsoDate => {
 	const { year, month, day } = parseDate(date);
