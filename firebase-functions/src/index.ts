@@ -13,6 +13,7 @@ import { RefusedFile, restoreMissing, type RestoreEffects } from './aterstall.ts
 import { handleBudget, type BudgetEffects } from './budget.ts';
 import { reminderEffects } from './paminnelser-effekter.ts';
 import { runReminders, sendTest } from './paminnelser.ts';
+import { deleteAssignment, emptyAccount, RefusedDelete } from './radering.ts';
 
 initializeApp();
 
@@ -142,6 +143,52 @@ export const provnotis = onCall(
 		} catch {
 			logger.error('provnotis: misslyckades', { uid });
 			throw new HttpsError('internal', 'Provnotisen gick inte att skicka.');
+		}
+	}
+);
+
+/**
+ * Empties the signed-in user's account (issue 26, decision 0020): everything below the user, the
+ * changeLog included. The app downloads the export first. Runs in drift (release.yml) as
+ * tidrapporten-radering: Cloud Datastore User in drift, nothing more (docs/drift.md).
+ */
+export const tomKonto = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-radering@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		try {
+			const dokument = await emptyAccount(uid);
+			logger.info('tomning', { uid, dokument });
+			return { deleted: dokument };
+		} catch {
+			logger.error('tomning: misslyckades', { uid });
+			throw new HttpsError(
+				'internal',
+				'Tömningen gick inte. Försök igen; det som finns kvar töms då.'
+			);
+		}
+	}
+);
+
+/** Deletes one of the signed-in user's assignments (issue 26); the changeLog keeps it. */
+export const raderaUppdrag = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-radering@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		const id: unknown = (request.data as { assignmentId?: unknown } | null)?.assignmentId;
+		if (typeof id !== 'string' || id === '' || id.includes('/'))
+			throw new HttpsError('invalid-argument', 'Uppdraget finns inte.');
+		try {
+			const dokument = await deleteAssignment(uid, id);
+			logger.info('raderaUppdrag', { uid, assignmentId: id, dokument });
+			return { deleted: dokument };
+		} catch (error) {
+			if (error instanceof RefusedDelete)
+				throw new HttpsError('failed-precondition', error.message);
+			logger.error('raderaUppdrag: misslyckades', { uid, assignmentId: id });
+			throw new HttpsError('internal', 'Uppdraget gick inte att radera.');
 		}
 	}
 );

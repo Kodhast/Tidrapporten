@@ -1,7 +1,8 @@
-// The settings' section for the data (issues 21 and 57): one button that downloads all the user's
-// data as a JSON file, and one that puts back from such a file what is missing. Both need the
-// server, so they wait for the network like the rest of the settings.
-import { Button, ConfirmDialog, Notice } from '@kodhast/web-ui-react';
+// The settings' section for the data (issues 21, 57 and 26): one button that downloads all the
+// user's data as a JSON file, one that puts back from such a file what is missing, and one that
+// empties the account after a download. All need the server, so they wait for the network like
+// the rest of the settings.
+import { Button, ConfirmDialog, Notice, TextField } from '@kodhast/web-ui-react';
 import { useRef, useState } from 'react';
 import { parseExportFile, type ExportFile } from '../../data/exportformat.ts';
 import { plural } from '../../domain/installningar.ts';
@@ -19,7 +20,12 @@ export interface ExportProps {
 	onExport: () => Promise<void>;
 	/** Writes the documents of the file that are missing. */
 	onRestore: (file: ExportFile) => Promise<RestoreResult>;
+	/** Downloads everything, then deletes all of the user's data. */
+	onEmpty: () => Promise<void>;
 }
+
+/** What the owner types to empty the account. */
+export const EMPTY_WORD = 'TÖM';
 
 /** The file's export day in Swedish time, e.g. "26 nov 2026". */
 const dayOf = (iso: string) =>
@@ -30,9 +36,12 @@ const dayOf = (iso: string) =>
 		timeZone: 'Europe/Stockholm'
 	});
 
-export function Export({ online, onExport, onRestore }: ExportProps) {
+export function Export({ online, onExport, onRestore, onEmpty }: ExportProps) {
 	const exporting = useSave();
 	const restoring = useSave();
+	const emptying = useSave();
+	const [asking, setAsking] = useState(false);
+	const [word, setWord] = useState('');
 	const input = useRef<HTMLInputElement>(null);
 	const [chosen, setChosen] = useState<ExportFile | null>(null);
 	const [refused, setRefused] = useState<string | null>(null);
@@ -84,6 +93,14 @@ export function Export({ online, onExport, onRestore }: ExportProps) {
 					detail="Det som hann läggas tillbaka står i ändringsloggen. Försök igen; det som redan finns hoppas över."
 				/>
 			)}
+			{emptying.failed && (
+				<Notice
+					tone="ton-fel"
+					icon={<WarningIcon />}
+					title="Det gick inte att tömma kontot"
+					detail="Försök igen; det som finns kvar töms då."
+				/>
+			)}
 			{result && (
 				<Notice
 					tone="ton-ok"
@@ -113,6 +130,19 @@ export function Export({ online, onExport, onRestore }: ExportProps) {
 					Återställ från fil
 				</Button>
 			</div>
+			<div>
+				<Button
+					variant="destructiveText"
+					isDisabled={!online}
+					isPending={emptying.pending}
+					onPress={() => {
+						setWord('');
+						setAsking(true);
+					}}
+				>
+					Töm kontot
+				</Button>
+			</div>
 			<input
 				ref={input}
 				type="file"
@@ -138,6 +168,18 @@ export function Export({ online, onExport, onRestore }: ExportProps) {
 					void restoring.run(async () => setResult(await onRestore(file)));
 				}}
 			/>
+			<ConfirmDialog
+				isOpen={asking}
+				onOpenChange={setAsking}
+				destructive
+				title="Töm kontot?"
+				text={`Allt du sparat raderas: uppdrag, tider, rapporter, inställningar och ändringsloggen. Först laddas en kopia ner som du kan återställa från. Skriv ${EMPTY_WORD} för att fortsätta.`}
+				confirmLabel="Ladda ner och töm"
+				isConfirmDisabled={word.trim().toLocaleUpperCase('sv-SE') !== EMPTY_WORD}
+				onConfirm={() => void emptying.run(onEmpty)}
+			>
+				<TextField label={`Skriv ${EMPTY_WORD}`} value={word} onChange={setWord} />
+			</ConfirmDialog>
 		</section>
 	);
 }

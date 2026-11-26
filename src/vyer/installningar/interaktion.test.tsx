@@ -48,7 +48,8 @@ describe('UppdragVy', () => {
 		customers: [customer(), customer({ id: 'k2', name: 'Kund B', order: 1 })],
 		nextOrder: 2,
 		today: '2026-11-26',
-		online: true
+		online: true,
+		onDelete: vi.fn()
 	};
 
 	it('saves a new assignment with its codes, under the only employer, with both receivers', async () => {
@@ -150,6 +151,34 @@ describe('UppdragVy', () => {
 		await user.click(screen.getByRole('button', { name: 'Arkivera uppdraget' }));
 		await waitFor(() => expect(screen.queryByText('Det gick inte att spara')).toBeNull());
 		expect(onSave.mock.calls[1]).toEqual([a, { ...a, archived: true }, [], []]);
+	});
+
+	it('deletes after the confirmation, and shows why when it may not', async () => {
+		const user = userEvent.setup();
+		const onDelete = vi
+			.fn()
+			.mockResolvedValueOnce('Uppdraget har skickade veckor. Arkivera det i stället.')
+			.mockResolvedValue(null);
+		render(<UppdragVy {...base} assignment={assignment()} onSave={vi.fn()} onDelete={onDelete} />);
+		expect(screen.queryByRole('button', { name: 'Radera uppdraget' })).toBeTruthy();
+		const remove = async () => {
+			await user.click(screen.getByRole('button', { name: 'Radera uppdraget' }));
+			const dialog = await screen.findByRole('alertdialog', { name: 'Radera uppdraget?' });
+			await user.click(within(dialog).getByRole('button', { name: 'Radera' }));
+		};
+		await remove();
+		expect(
+			await screen.findByText('Uppdraget har skickade veckor. Arkivera det i stället.')
+		).toBeTruthy();
+		await remove();
+		await waitFor(() => expect(screen.queryByText(/skickade veckor\. Arkivera/)).toBeNull());
+		expect(onDelete).toHaveBeenCalledWith('a1');
+		expect(onDelete).toHaveBeenCalledTimes(2);
+	});
+
+	it('offers no delete for a new assignment', () => {
+		render(<UppdragVy {...base} assignment={null} onSave={vi.fn()} />);
+		expect(screen.queryByRole('button', { name: 'Radera uppdraget' })).toBeNull();
 	});
 });
 
@@ -359,7 +388,7 @@ describe('Export', () => {
 			.fn()
 			.mockRejectedValueOnce(new Error('unavailable'))
 			.mockResolvedValue(undefined);
-		render(<Export online onExport={onExport} onRestore={noRestore} />);
+		render(<Export online onExport={onExport} onRestore={noRestore} onEmpty={vi.fn()} />);
 		await user.click(button());
 		expect(await screen.findByText('Det gick inte att exportera')).toBeTruthy();
 		await user.click(button());
@@ -368,7 +397,7 @@ describe('Export', () => {
 	});
 
 	it('waits for the network, since both read from and write to the server', () => {
-		render(<Export online={false} onExport={vi.fn()} onRestore={noRestore} />);
+		render(<Export online={false} onExport={vi.fn()} onRestore={noRestore} onEmpty={vi.fn()} />);
 		expect(button().hasAttribute('disabled')).toBe(true);
 		expect(restoreButton().hasAttribute('disabled')).toBe(true);
 	});
@@ -376,7 +405,7 @@ describe('Export', () => {
 	it('restores a chosen file after the confirmation and says what came back', async () => {
 		const user = userEvent.setup({ applyAccept: false });
 		const onRestore = vi.fn().mockResolvedValue({ restored: 1, existed: 1 });
-		render(<Export online onExport={vi.fn()} onRestore={onRestore} />);
+		render(<Export online onExport={vi.fn()} onRestore={onRestore} onEmpty={vi.fn()} />);
 		const click = vi.spyOn(HTMLInputElement.prototype, 'click');
 		await user.click(restoreButton());
 		expect(click).toHaveBeenCalled();
@@ -392,7 +421,7 @@ describe('Export', () => {
 	it('refuses a file that is no export, and says when the restore fails', async () => {
 		const user = userEvent.setup({ applyAccept: false });
 		const onRestore = vi.fn().mockRejectedValue(new Error('internal'));
-		render(<Export online onExport={vi.fn()} onRestore={onRestore} />);
+		render(<Export online onExport={vi.fn()} onRestore={onRestore} onEmpty={vi.fn()} />);
 		await pick(user, 'inte json');
 		expect(await screen.findByText('Filen är ingen export från Tidrapporten.')).toBeTruthy();
 		await pick(user, JSON.stringify({ ...exported, schemaVersion: 9 }));
@@ -413,6 +442,7 @@ describe('Export', () => {
 				online
 				onExport={vi.fn()}
 				onRestore={() => Promise.resolve({ restored: 0, existed: 2 })}
+				onEmpty={vi.fn()}
 			/>
 		);
 		await pick(user, JSON.stringify(exported));
@@ -421,6 +451,40 @@ describe('Export', () => {
 		);
 		expect(await screen.findByText('Inget saknades')).toBeTruthy();
 		expect(screen.getByText('2 dokument fanns redan och lämnades orörda.')).toBeTruthy();
+	});
+
+	it('empties the account only after TÖM is typed, and says when it fails', async () => {
+		const user = userEvent.setup();
+		const onEmpty = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('internal'))
+			.mockResolvedValue(undefined);
+		render(<Export online onExport={vi.fn()} onRestore={noRestore} onEmpty={onEmpty} />);
+		const ask = async () => {
+			await user.click(screen.getByRole('button', { name: 'Töm kontot' }));
+			return screen.findByRole('alertdialog', { name: 'Töm kontot?' });
+		};
+		let dialog = await ask();
+		const confirm = () => within(dialog).getByRole('button', { name: 'Ladda ner och töm' });
+		expect(confirm().hasAttribute('disabled')).toBe(true);
+		await user.type(within(dialog).getByLabelText('Skriv TÖM'), 'TÖ');
+		expect(confirm().hasAttribute('disabled')).toBe(true);
+		await user.type(within(dialog).getByLabelText('Skriv TÖM'), 'M');
+		await user.click(confirm());
+		expect(await screen.findByText('Det gick inte att tömma kontot')).toBeTruthy();
+
+		// The word is asked for again each time.
+		dialog = await ask();
+		expect(confirm().hasAttribute('disabled')).toBe(true);
+		await user.type(within(dialog).getByLabelText('Skriv TÖM'), 'töm');
+		await user.click(confirm());
+		await waitFor(() => expect(screen.queryByText('Det gick inte att tömma kontot')).toBeNull());
+		expect(onEmpty).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not empty offline', () => {
+		render(<Export online={false} onExport={vi.fn()} onRestore={noRestore} onEmpty={vi.fn()} />);
+		expect(screen.getByRole('button', { name: 'Töm kontot' }).hasAttribute('disabled')).toBe(true);
 	});
 });
 

@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.5.0
+
+- Töm kontot i Inställningar → Data: först laddas en kopia av all data ner, sedan raderas allt,
+  ändringsloggen också, och appen börjar om med Kom igång. Du skriver TÖM för att bekräfta. Ett
+  uppdrag kan raderas med sina tider och rapportutkast; har det skickade veckor går det bara att
+  arkivera. Kommer efter nästa release (#26).
+
 ## 1.4.0
 
 - Påminnelser som notiser i telefonen: ingen timer igång på morgonen, timern igång på kvällen, en
