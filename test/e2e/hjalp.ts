@@ -19,7 +19,7 @@ export const signIn = async (page: Page, uid: string) => {
 /** A user of the test's own, so that the tests do not see each other's data. */
 export const uid = (name: string) => `${name}-${test.info().project.name}-${Date.now()}`;
 
-const DOCUMENTS = `http://${EMULATOR_HOST}:${EMULATOR_PORTS.firestore}/v1/projects/${EMULATOR_PROJECT_ID}/databases/(default)/documents`;
+export const DOCUMENTS = `http://${EMULATOR_HOST}:${EMULATOR_PORTS.firestore}/v1/projects/${EMULATOR_PROJECT_ID}/databases/(default)/documents`;
 
 /** The emulator lets this token past the rules, as an admin. */
 const ADMIN = { Authorization: 'Bearer owner' };

@@ -1,6 +1,6 @@
 ---
 name: datasakerhet
-description: 'Datasäkerheten i Tidrapporten – ingen data får tappas. Vad som ska med när ett fält, en samling eller ett dokument läggs till eller ändras i Firestore: kodaren i src/data/dokument.ts, fixturen och rundturen, reglerna och deras prov, JSON-exporten, ändringsloggen och den dagliga exporten. Ladda när data under users/{uid} läggs till, ändras eller tas bort, och när granskaren ser en sådan diff. Trigger-ord: fält, samling, dokument, datamodell, schemaVersion, codec, kodare, firestore.rules, export, JSON-export, backup, säkerhetskopia, återställ, rundtur, ändringslogg, changeLog, dataförlust.'
+description: 'Datasäkerheten i Tidrapporten – ingen data får tappas. Vad som ska med när ett fält, en samling eller ett dokument läggs till eller ändras i Firestore: kodaren i src/data/dokument.ts, fixturen och rundturen, reglerna och deras prov, JSON-exporten, ändringsloggen och den dagliga backupen. Ladda när data under users/{uid} läggs till, ändras eller tas bort, och när granskaren ser en sådan diff. Trigger-ord: fält, samling, dokument, datamodell, schemaVersion, codec, kodare, firestore.rules, export, JSON-export, backup, säkerhetskopia, återställ, rundtur, ändringslogg, changeLog, dataförlust.'
 ---
 
 # Datasäkerhet
@@ -33,7 +33,8 @@ Som ett fält, och dessutom:
   `ASSIGNMENT_COLLECTIONS` under ett uppdrag), ett dokument under `state` i `STATE_DOCUMENTS`.
   Provet i `export.test.ts` jämför listorna med `firestore.rules` och fäller en samling som saknas.
 - **Playwright:** `test/e2e/export.e2e.ts` får ett dokument i den nya samlingen.
-- **Den dagliga exporten** tar hela databasen och behöver ingen ändring.
+- **Den dagliga backupen** (beslut 0018) tar hela databasen och behöver ingen ändring. Lägg
+  samlingen i `collections` i `scripts/backup.sh`, som räknar dokumenten i återställningsprovet.
 
 ## Exportfilen
 
@@ -46,7 +47,10 @@ Som ett fält, och dessutom:
 - JSON skiljer inte på heltal och decimaltal. Appen lagrar bara heltal, så en återställning
   skriver tillbaka samma typ.
 - `toJson` vägrar värden appen inte lagrar (`Date`, `NaN`, `undefined`, referenser) hellre än att
-  tappa dem. Lagras en ny sorts värde ska `toJson` och `fromJson` lära sig den, med prov.
+  tappa dem. Lagras en ny sorts värde ska `toJson`, `fromJson` och `toValue` i
+  `scripts/aterstall.mjs` lära sig den, med prov.
+- Återställningen provas i varje PR: `test/e2e/export.e2e.ts` exporterar, återställer till en ny
+  användare och jämför varje dokument.
 
 ## Aldrig
 

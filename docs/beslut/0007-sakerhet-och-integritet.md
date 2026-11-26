@@ -1,6 +1,6 @@
 # 0007. Säkerhet och integritet
 
-- **Status:** Beslutat
+- **Status:** Beslutat, backupen ersatt av 0018
 - **Datum:** 2026-11-25
 
 ## Sammanhang
