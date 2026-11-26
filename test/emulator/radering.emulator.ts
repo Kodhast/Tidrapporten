@@ -96,9 +96,11 @@ describe('deleteAssignment', () => {
 		expect(left.filter((p) => p.startsWith('changeLog/'))).toHaveLength(2);
 	});
 
-	it('refuses an assignment with a sent week, and one that does not exist', async () => {
+	it('refuses an assignment with a sent or unlocked week, and one that does not exist', async () => {
 		await seed(ME);
 		await put(ME, 'reports/a1_r1_2026-W47', { assignmentId: 'a1', status: 'sent' });
+		await expect(deleteAssignment(ME, 'a1')).rejects.toThrow(RefusedDelete);
+		await put(ME, 'reports/a1_r1_2026-W47', { assignmentId: 'a1', status: 'unlocked' });
 		await expect(deleteAssignment(ME, 'a1')).rejects.toThrow(RefusedDelete);
 		await expect(deleteAssignment(ME, 'saknas')).rejects.toThrow(RefusedDelete);
 		expect(await paths(ME)).toContain('assignments/a1/codes/c1');

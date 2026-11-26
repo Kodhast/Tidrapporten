@@ -158,9 +158,9 @@ export const tomKonto = onCall(
 		const uid = request.auth?.uid;
 		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
 		try {
-			const dokument = await emptyAccount(uid);
-			logger.info('tomning', { uid, dokument });
-			return { deleted: dokument };
+			const count = await emptyAccount(uid);
+			logger.info('tomning', { uid, dokument: count });
+			return { deleted: count };
 		} catch {
 			logger.error('tomning: misslyckades', { uid });
 			throw new HttpsError(
@@ -181,9 +181,9 @@ export const raderaUppdrag = onCall(
 		if (typeof id !== 'string' || id === '' || id.includes('/'))
 			throw new HttpsError('invalid-argument', 'Uppdraget finns inte.');
 		try {
-			const dokument = await deleteAssignment(uid, id);
-			logger.info('raderaUppdrag', { uid, assignmentId: id, dokument });
-			return { deleted: dokument };
+			const count = await deleteAssignment(uid, id);
+			logger.info('raderaUppdrag', { uid, assignmentId: id, dokument: count });
+			return { deleted: count };
 		} catch (error) {
 			if (error instanceof RefusedDelete)
 				throw new HttpsError('failed-precondition', error.message);

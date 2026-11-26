@@ -42,6 +42,8 @@ export async function deleteAssignment(uid: string, assignmentId: string): Promi
 		user.collection('reports').where('assignmentId', '==', assignmentId).get(),
 		user.collection('state').doc('timer').get()
 	]);
+	// Not in one transaction with the deletion: a week sent from another device in the moment
+	// between is deleted too. Accepted for one owner; a transaction would cap the size.
 	if (reports.docs.some((r) => r.get('status') !== 'draft'))
 		throw new RefusedDelete('Uppdraget har skickade veckor. Arkivera det i stället.');
 	const before = { ...snapshot.data() };
