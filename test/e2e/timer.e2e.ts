@@ -46,9 +46,17 @@ test('start and stop give an interval named by the start', async ({ page, reques
 test('a change of code ends the interval and goes on from its end', async ({ page, request }) => {
 	const user = uid('byte');
 	await seedAssignment(request, user, ['Utveckling', 'Möten']);
+	// Started ten minutes ago: within the first minute a change only renames the timer.
+	await seed(request, user, 'state/timer', {
+		assignmentId: 'a1',
+		subject: { kind: 'code', codeId: 'c1' },
+		start: new Date(Date.now() - 10 * 60_000),
+		schemaVersion: 1,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	});
 	await signIn(page, user);
 
-	await startButton(page).click();
 	await expect(stopButton(page)).toBeVisible();
 	await chip(page).click();
 	const sheet = page.getByRole('dialog', { name: 'Välj tidkod' });
@@ -108,17 +116,20 @@ test('start and stop offline reach Firestore once online', async ({ page, contex
 test('offline the timer cannot be stopped into a sent week', async ({ page, context, request }) => {
 	const user = uid('last');
 	await seedAssignment(request, user, ['Utveckling']);
-	const week = isoWeekOf(dateOf(Date.now()));
-	await seed(request, user, `reports/a1_r1_${week}`, {
-		assignmentId: 'a1',
-		receiverId: 'r1',
-		week,
-		status: 'sent',
-		mode: 'fillNorm',
-		lines: [],
-		snapshot: null,
-		lastChangeId: null
-	});
+	// This week and the week a few minutes on, so that a run just before Monday midnight holds.
+	const weeks = new Set([Date.now(), Date.now() + 5 * 60_000].map((t) => isoWeekOf(dateOf(t))));
+	for (const week of weeks) {
+		await seed(request, user, `reports/a1_r1_${week}`, {
+			assignmentId: 'a1',
+			receiverId: 'r1',
+			week,
+			status: 'sent',
+			mode: 'fillNorm',
+			lines: [],
+			snapshot: null,
+			lastChangeId: null
+		});
+	}
 	await signIn(page, user);
 	await waitOnline(page);
 	await startButton(page).click();

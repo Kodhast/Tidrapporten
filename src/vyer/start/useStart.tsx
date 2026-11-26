@@ -22,6 +22,7 @@ import type {
 	Assignment,
 	Entry,
 	Id,
+	IsoWeek,
 	Report,
 	TimeCode,
 	Timer,
@@ -90,23 +91,38 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const [loadedAssignments, setAssignments] = useState<Assignment[] | null>(null);
 	const assignments = loadedAssignments ?? [];
 	const [latest, setLatest] = useState<Entry[]>([]);
-	const [reports, setReports] = useState<Report[]>([]);
+	const [loadedReports, setReports] = useState<{ week: IsoWeek; values: Report[] } | null>(null);
 	const [picked, setPicked] = useState<CodeChoice | null>(null);
 	const [problem, setProblem] = useState<TimerProblem>(null);
 	// The timer whose ten-hour question was answered "Jag jobbar fortfarande", until the app is
 	// opened again.
 	const [dismissed, setDismissed] = useState<UtcMillis | null>(null);
 
-	useEffect(() => watchTimer(db, uid, setTimer), [db, uid]);
+	// A listener that fails (a refused read, an ended session) leaves the page loading; the notice
+	// says why.
+	const failed = () => setProblem('failed');
+	useEffect(() => watchTimer(db, uid, setTimer, failed), [db, uid]);
 	useEffect(
 		() => watchCollection(db, uid, assignmentsPath, assignmentCodec, setAssignments),
 		[db, uid]
 	);
-	useEffect(() => watchLatestEntries(db, uid, setLatest), [db, uid]);
+	useEffect(() => watchLatestEntries(db, uid, setLatest, failed), [db, uid]);
 	// From the week the timer started, or this week: listening from the start, the reports are
 	// known before the app goes offline.
 	const fromWeek = isoWeekOf(dateOf(timer ? Math.min(timer.start, now) : now));
-	useEffect(() => watchReportsFrom(db, uid, fromWeek, setReports), [db, uid, fromWeek]);
+	useEffect(
+		() =>
+			watchReportsFrom(
+				db,
+				uid,
+				fromWeek,
+				(values) => setReports({ week: fromWeek, values }),
+				failed
+			),
+		[db, uid, fromWeek]
+	);
+	// Until the reports of the timer's weeks have come, a stop could not know whether to log.
+	const reports = loadedReports?.week === fromWeek ? loadedReports.values : null;
 	useEffect(() => {
 		const shown = () => {
 			if (document.visibilityState === 'visible') setDismissed(null);
@@ -126,6 +142,7 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const loading =
 		timer === undefined ||
 		loadedAssignments === null ||
+		reports === null ||
 		assignments.some((a) => codes[a.id] === undefined);
 	const next = picked && choiceNames(groups, picked) ? picked : startChoice(groups, latest);
 
@@ -136,7 +153,7 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	};
 
 	const blocked = (running: Timer, end: UtcMillis) => {
-		if (!stopBlockedOffline(running, end, reports, online)) return false;
+		if (!stopBlockedOffline(running, end, reports ?? [], online)) return false;
 		setProblem('blocked');
 		return true;
 	};
@@ -144,10 +161,12 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const stopAt = (running: Timer, end: UtcMillis) => {
 		if (blocked(running, end)) return;
 		setDismissed(null);
-		write(() => stopTimer(db, uid, running, end, reports));
+		setPicked(null);
+		write(() => stopTimer(db, uid, running, end, reports ?? []));
 	};
 
-	const start = (choice: CodeChoice) =>
+	const start = (choice: CodeChoice) => {
+		setPicked(null);
 		write(() =>
 			startTimer(db, uid, {
 				assignmentId: choice.assignmentId,
@@ -155,10 +174,12 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 				start: Date.now()
 			})
 		);
+	};
 
 	const choose = (choice: CodeChoice) => {
-		setPicked(choice);
-		if (!timer) return;
+		if (!timer) return setPicked(choice);
+		// A forgotten timer asks when the work ended first, as the stop does.
+		if (isTimerForgotten(timer, Date.now())) return setDismissed(null);
 		const at = Date.now();
 		if (blocked(timer, at)) return;
 		write(() =>
@@ -168,7 +189,7 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 				timer,
 				{ assignmentId: choice.assignmentId, subject: { kind: 'code', codeId: choice.codeId } },
 				at,
-				reports
+				reports ?? []
 			)
 		);
 	};
@@ -178,17 +199,19 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const asking = timer && forgotten && dismissed !== timer.start;
 	const terms = timerAssignment && termsOn(timerAssignment, dateOf(timer.start));
 	const workday = terms ? fullDayNorm(terms) : 8 * 60;
-	const label = timer && timerLabel(assignments, codes, timer);
+	const names = timer && timerNames(assignments, codes, timer);
 
 	let action: ToolbarAction | undefined;
-	if (timer) {
+	if (loading) {
+		action = undefined;
+	} else if (timer) {
 		action = {
 			label: 'Stoppa timern',
 			icon: <StopIcon />,
 			// A forgotten timer asks when the work ended instead of stopping now.
 			onPress: () => (forgotten ? setDismissed(null) : stopAt(timer, Date.now()))
 		};
-	} else if (!loading && timer === null && next) {
+	} else if (next) {
 		action = { label: 'Starta timern', icon: <PlayIcon />, onPress: () => start(next) };
 	}
 
@@ -199,17 +222,19 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 				today={today}
 				now={now}
 				timer={timer ?? null}
+				timerNames={names ?? null}
 				groups={groups}
 				loading={loading}
 				next={next}
 				online={online}
-				problem={problem}
+				// The block is about the network; once it is back the stop can be pressed again.
+				problem={problem === 'blocked' && online ? null : problem}
 				onChoose={choose}
 				banner={banner}
 				forgotten={
 					timer && asking
 						? {
-								name: label ?? '',
+								name: names ? [names.assignment, names.code].filter(Boolean).join(' · ') : '',
 								suggestion: timerAssignment
 									? suggestTimerEnd(timer, timerAssignment, now)
 									: Math.min(timer.start + workday * MINUTE, now),
@@ -224,14 +249,15 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	};
 }
 
-/** "Uppdrag A · Utveckling", also for an archived code that the list no longer shows. */
-const timerLabel = (
+/** The running timer's code and assignment, also when the code is archived or the assignment ended. */
+const timerNames = (
 	assignments: readonly Assignment[],
 	codes: Readonly<Record<Id, readonly TimeCode[]>>,
 	timer: Timer
-): string => {
-	const assignment = assignments.find((a) => a.id === timer.assignmentId);
+): { code: string; assignment: string } => {
 	const codeId = timer.subject.kind === 'code' ? timer.subject.codeId : '';
-	const code = (codes[timer.assignmentId] ?? []).find((c) => c.id === codeId);
-	return [assignment?.name, code?.name].filter(Boolean).join(' · ');
+	return {
+		assignment: assignments.find((a) => a.id === timer.assignmentId)?.name ?? '',
+		code: (codes[timer.assignmentId] ?? []).find((c) => c.id === codeId)?.name ?? ''
+	};
 };

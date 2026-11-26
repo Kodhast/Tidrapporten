@@ -783,6 +783,51 @@ describe('the data layer’s writes pass the rules', () => {
 		);
 	});
 
+	it('a stop or change of an older timer cannot remove the one another device started', async () => {
+		const db = owner();
+		const code = (codeId: string) => ({ kind: 'code' as const, codeId });
+		const queued = { assignmentId: 'a1', subject: code('c1'), start: Date.UTC(2026, 10, 25, 7) };
+		const other = { assignmentId: 'a1', subject: code('c2'), start: Date.UTC(2026, 10, 25, 8) };
+		await startTimer(db, OWNER, other);
+		await denied(stopTimer(db, OWNER, queued, Date.UTC(2026, 10, 25, 9)));
+		await denied(
+			switchTimer(
+				db,
+				OWNER,
+				queued,
+				{ assignmentId: 'a1', subject: code('c3') },
+				Date.UTC(2026, 10, 25, 9)
+			)
+		);
+		await denied(deleteDoc(at(db, 'state/timer')));
+		expect(timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!)).toEqual(
+			other
+		);
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
+	});
+
+	it('switchTimer within the first minute changes the code and keeps the start', async () => {
+		const db = owner();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await startTimer(db, OWNER, timer);
+		const next = await switchTimer(
+			db,
+			OWNER,
+			timer,
+			{ assignmentId: 'a1', subject: { kind: 'code', codeId: 'c2' } },
+			timer.start + 20_000
+		);
+		expect(next.start).toBe(timer.start);
+		expect(timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!)).toEqual(
+			next
+		);
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
+	});
+
 	it('saveEntry refuses to change an entry’s id', async () => {
 		const e = work('2026-11-25', '08:00', '12:00');
 		await expect(saveEntry(owner(), OWNER, e, { ...e, id: 'annan' }, [])).rejects.toThrow(

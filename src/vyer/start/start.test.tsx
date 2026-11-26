@@ -42,6 +42,7 @@ const props = (overrides: Partial<StartVyProps> = {}): StartVyProps => ({
 	today: '2026-11-25',
 	now: at('2026-11-25', '09:47'),
 	timer: null,
+	timerNames: { code: 'Utveckling', assignment: 'Uppdrag A' },
 	groups,
 	next: { assignmentId: 'a1', codeId: 'c2' },
 	online: true,

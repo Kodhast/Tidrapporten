@@ -198,6 +198,8 @@ const addTimerEntry = (
 
 const timerPath = userPath('state', 'timer');
 
+const MINUTE = 60_000;
+
 /**
  * Starts the timer. A plain write, so it works offline and syncs later. When another device has
  * already started one, the rules refuse it (it would change createdAt), so a running timer is
@@ -227,8 +229,10 @@ export const stopTimer = async (
 
 /**
  * Changes the running timer's code: the entry so far is written and the timer goes on with the
- * new code from the entry's end, in one batch, so that the two intervals meet. If another device
- * stopped the timer first, the entry exists and the rules refuse the whole batch.
+ * new code from the entry's end, in one batch, so that the two intervals meet. Within the first
+ * minute there is nothing to write yet (an entry is at least a minute), so the code changes in
+ * place and the start stays. If another device stopped or changed the timer first, the rules
+ * refuse the whole batch.
  */
 export const switchTimer = async (
 	db: Firestore,
@@ -239,8 +243,11 @@ export const switchTimer = async (
 	reports: readonly Report[] = []
 ): Promise<Timer> => {
 	const batch = writeBatch(db);
-	addTimerEntry(db, uid, batch, timer, at, reports);
-	const nextTimer: Timer = { ...next, start: timerEnd(timer, at) };
+	let nextTimer: Timer = { ...next, start: timer.start };
+	if (at >= timer.start + MINUTE) {
+		addTimerEntry(db, uid, batch, timer, at, reports);
+		nextTimer = { ...next, start: timerEnd(timer, at) };
+	}
 	batch.update(userDoc(db, uid, timerPath), {
 		...timerCodec.toData(nextTimer),
 		...updateMeta()

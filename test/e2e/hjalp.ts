@@ -31,6 +31,7 @@ const toValue = (value: unknown): Value => {
 	if (typeof value === 'string') return { stringValue: value };
 	if (typeof value === 'boolean') return { booleanValue: value };
 	if (typeof value === 'number') return { integerValue: String(value) };
+	if (value instanceof Date) return { timestampValue: value.toISOString() };
 	if (Array.isArray(value)) return { arrayValue: { values: value.map(toValue) } };
 	return { mapValue: { fields: toFields(value as Record<string, unknown>) } };
 };

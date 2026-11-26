@@ -115,7 +115,10 @@ const feed = (values: {
 		listeners.latest(values.latest ?? []);
 	});
 	// The codes are followed once the assignments have come.
-	act(() => listeners.collections.get('assignments/a1/codes')?.(values.codes ?? codes));
+	act(() => {
+		listeners.collections.get('assignments/a1/codes')?.(values.codes ?? codes);
+		listeners.reports([]);
+	});
 };
 
 const running = (start: number, codeId = 'c1'): Timer => ({
@@ -134,6 +137,8 @@ describe('useStart', () => {
 		act(() => listeners.collections.get('assignments')!([a1]));
 		expect(screen.queryByRole('button', { name: 'Starta timern' })).toBeNull();
 		act(() => listeners.collections.get('assignments/a1/codes')!(codes));
+		expect(screen.queryByRole('button', { name: 'Starta timern' })).toBeNull();
+		act(() => listeners.reports([]));
 		expect(screen.getByRole('button', { name: 'Starta timern' })).toBeTruthy();
 	});
 
@@ -239,6 +244,38 @@ describe('useStart', () => {
 		await u.click(screen.getByRole('button', { name: 'Stoppa timern' }));
 		expect(writes.stopTimer).not.toHaveBeenCalled();
 		expect(screen.getByRole('alertdialog')).toBeTruthy();
+	});
+
+	it('asks a forgotten timer when the work ended before a change of code', async () => {
+		const u = user();
+		render(<Harness />);
+		feed({ timer: running(at('2026-11-24', '22:05')) });
+		await u.click(screen.getByRole('button', { name: 'Jag jobbar fortfarande' }));
+		await u.click(screen.getByRole('button', { name: /^Byt tidkod/ }));
+		await u.click(screen.getByRole('button', { name: /^Möten/ }));
+		expect(writes.switchTimer).not.toHaveBeenCalled();
+		expect(screen.getByRole('alertdialog')).toBeTruthy();
+	});
+
+	it('names a running timer whose code is archived', () => {
+		render(<Harness />);
+		feed({
+			timer: running(at('2026-11-25', '09:00'), 'c3'),
+			codes: [...codes, code('c3', { name: 'Gammal kod', archived: true })]
+		});
+		expect(
+			screen.getByRole('button', { name: 'Byt tidkod, nu Gammal kod i Uppdrag A' })
+		).toBeTruthy();
+	});
+
+	it('takes the block away when the network is back', async () => {
+		const { rerender } = render(<Harness online={false} />);
+		feed({ timer: running(at('2026-11-25', '08:05')) });
+		act(() => listeners.reports([report('2026-W48', 'sent', [0, 0, 0, 0, 0, 0, 0])]));
+		await user().click(screen.getByRole('button', { name: 'Stoppa timern' }));
+		expect(screen.getByText('Veckan är skickad')).toBeTruthy();
+		rerender(<Harness online />);
+		expect(screen.queryByText('Veckan är skickad')).toBeNull();
 	});
 
 	it('moves the time on at each whole minute', () => {

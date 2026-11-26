@@ -1,6 +1,6 @@
-// The start page (mockup "Idag – timern går", theme Kanel): the timer's code chip and running time
-// where the wheel goes in issue 19, the offline notice and the forgotten-timer question. Gets plain
-// values; StartRutt connects it to Firestore.
+// The start page (mockup "Idag – timern går"): the timer's code chip and running time where the
+// wheel goes in issue 19, the offline notice and the forgotten-timer question. Gets plain values;
+// useStart connects it to Firestore.
 import { buttonClass, Chip, EmptyState, Header, Notice } from '@kodhast/web-ui-react';
 import { useState, type ReactNode } from 'react';
 import { longDate } from '../../domain/installningar.ts';
@@ -26,6 +26,8 @@ export interface StartVyProps {
 	now: UtcMillis;
 	/** The running timer; null when none runs. */
 	timer: Timer | null;
+	/** The running timer's code and assignment, also when the code is no longer in `groups`. */
+	timerNames?: { code: string; assignment: string } | null;
 	groups: readonly CodeGroup[];
 	/** The timer, assignments and codes have not come yet: neither the timer nor the empty state. */
 	loading?: boolean;
@@ -48,6 +50,7 @@ export function StartVy({
 	today,
 	now,
 	timer,
+	timerNames = null,
 	groups,
 	loading = false,
 	next,
@@ -59,7 +62,7 @@ export function StartVy({
 }: StartVyProps) {
 	const [choosing, setChoosing] = useState(false);
 	const current = timer ? timerChoice(timer) : next;
-	const names = current && choiceNames(groups, current);
+	const names = timer ? timerNames : current && choiceNames(groups, current);
 	return (
 		<>
 			<Header icon={<ClockIcon />} name="Tidrapporten" title="Idag" subtitle={daySubtitle(today)} />
@@ -111,14 +114,14 @@ export function StartVy({
 							onPress={() => setChoosing(true)}
 							aria-label={`Byt tidkod, nu ${names ? `${names.code} i ${names.assignment}` : 'ingen'}`}
 						>
-							{names?.code ?? 'Välj tidkod'}
+							{names?.code || 'Välj tidkod'}
 						</Chip>
 						<span className="kh-text-big-number">
 							{timer ? elapsedLabel(timer.start, now) : '0 min'}
 						</span>
 						<span className="kh-text-item-subtitle dampad">
 							{timer
-								? `Startad ${clockOf(timer.start)}${names ? ` · ${names.assignment}` : ''}`
+								? `Startad ${clockOf(timer.start)}${names?.assignment ? ` · ${names.assignment}` : ''}`
 								: 'Timern står still'}
 						</span>
 					</div>

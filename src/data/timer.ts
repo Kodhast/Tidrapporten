@@ -14,24 +14,38 @@ import type { Entry, Id, IsoWeek, Report, Timer } from '../domain/types.ts';
 import { entryCodec, reportCodec, timerCodec } from './dokument.ts';
 import { userDoc, userPath } from './skrivning.ts';
 
-/** Follows `state/timer`: the running timer, or null when none runs. */
-export const watchTimer = (db: Firestore, uid: Id, onChange: (timer: Timer | null) => void) =>
-	onSnapshot(userDoc(db, uid, userPath('state', 'timer')), (snapshot) =>
-		onChange(snapshot.exists() ? timerCodec.fromData(snapshot.id, snapshot.data()) : null)
+/** Follows `state/timer`: the running timer, or null when none runs. `onError` on a failed read. */
+export const watchTimer = (
+	db: Firestore,
+	uid: Id,
+	onChange: (timer: Timer | null) => void,
+	onError?: () => void
+) =>
+	onSnapshot(
+		userDoc(db, uid, userPath('state', 'timer')),
+		(snapshot) =>
+			onChange(snapshot.exists() ? timerCodec.fromData(snapshot.id, snapshot.data()) : null),
+		onError
 	);
 
 /** How many of the latest intervals are read to find the code a start uses. */
 export const LATEST_ENTRIES = 10;
 
 /** Follows the latest intervals by start; whole-day absence has no start and is left out. */
-export const watchLatestEntries = (db: Firestore, uid: Id, onChange: (entries: Entry[]) => void) =>
+export const watchLatestEntries = (
+	db: Firestore,
+	uid: Id,
+	onChange: (entries: Entry[]) => void,
+	onError?: () => void
+) =>
 	onSnapshot(
 		query(
 			collection(db, 'users', uid, 'entries'),
 			orderBy('time.start', 'desc'),
 			limit(LATEST_ENTRIES)
 		),
-		(snapshot) => onChange(snapshot.docs.map((d) => entryCodec.fromData(d.id, d.data())))
+		(snapshot) => onChange(snapshot.docs.map((d) => entryCodec.fromData(d.id, d.data()))),
+		onError
 	);
 
 /** Follows the reports from `week` on, which decide whether the timer's week is sent. */
@@ -39,9 +53,11 @@ export const watchReportsFrom = (
 	db: Firestore,
 	uid: Id,
 	week: IsoWeek,
-	onChange: (reports: Report[]) => void
+	onChange: (reports: Report[]) => void,
+	onError?: () => void
 ) =>
 	onSnapshot(
 		query(collection(db, 'users', uid, 'reports'), where('week', '>=', week)),
-		(snapshot) => onChange(snapshot.docs.map((d) => reportCodec.fromData(d.id, d.data())))
+		(snapshot) => onChange(snapshot.docs.map((d) => reportCodec.fromData(d.id, d.data()))),
+		onError
 	);
