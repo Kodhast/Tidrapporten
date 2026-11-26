@@ -282,7 +282,7 @@ inloggningen och går att ändra:
   `request.time`.
 - Klienten får bara skriva `by: 'app'`. Claude rättar med ett eget tjänstekonto (0009), som går
   förbi reglerna; där skriver rättningsverktyget `by: 'claude'` (issue 27).
-- Loggen sparas för alltid. Den följer med i backupen och i JSON-exporten.
+- Loggen sparas för alltid, utom när ägaren tömmer hela kontot (0020). Den följer med i backupen och i JSON-exporten.
 
 ### Flex
 
