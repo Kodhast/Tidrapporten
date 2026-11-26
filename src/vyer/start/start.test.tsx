@@ -4,10 +4,12 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { assignment, at, code } from '../../domain/testdata.ts';
+import { dayRows } from '../../domain/dag.ts';
+import type { Overview } from '../../domain/oversikt.ts';
+import { assignment, at, code, work } from '../../domain/testdata.ts';
 import { timerCodeGroups } from '../../domain/timer.ts';
 import type { Timer } from '../../domain/types.ts';
-import { StartVy, type StartVyProps } from './StartVy';
+import { StartVy, type StartDay, type StartVyProps } from './StartVy';
 
 beforeAll(() => {
 	// jsdom has <dialog> but not showModal() or close(), which the sheets use (web-ui-react 0002).
@@ -63,14 +65,12 @@ describe('StartVy', () => {
 		render(<StartVy {...props()} />);
 		expect(screen.getByRole('button', { name: 'Byt tidkod, nu Möten i Uppdrag A' })).toBeTruthy();
 		expect(screen.getByText('0 min')).toBeTruthy();
-		expect(screen.getByText('Timern står still')).toBeTruthy();
 	});
 
-	it('shows the running time without seconds and when it started', () => {
+	it('shows the running time without seconds', () => {
 		render(<StartVy {...props({ timer: running })} />);
 		expect(screen.getByRole('button', { name: /^Byt tidkod, nu Utveckling/ })).toBeTruthy();
 		expect(screen.getByText('1 h 42')).toBeTruthy();
-		expect(screen.getByText('Startad 08:05 · Uppdrag A')).toBeTruthy();
 	});
 
 	it('lists the codes per assignment and chooses another', async () => {
@@ -119,6 +119,105 @@ describe('StartVy', () => {
 		expect(screen.getByText('Veckan är skickad')).toBeTruthy();
 		rerender(<StartVy {...props({ problem: 'failed' })} />);
 		expect(screen.getByText('Det gick inte att spara timern')).toBeTruthy();
+	});
+});
+
+describe('the overview', () => {
+	const a1 = groups[0]!.assignment;
+	const a2 = groups[1]!.assignment;
+	const overview = (total: number, unsent: number): Overview => ({
+		total,
+		perAssignment: [
+			{ assignment: a1, balance: 480, weekFlex: 60, weekActual: 1122, weekNorm: 2400 },
+			{ assignment: a2, balance: total - 480, weekFlex: 0, weekActual: 0, weekNorm: 0 }
+		],
+		todayActual: 315,
+		todayNorm: 480,
+		unsent
+	});
+	const earlier = work('2026-11-25', '08:12', '09:00', 'c2');
+	const timerEntry = { ...work('2026-11-25', '09:00', '09:47'), id: 'timer-1' };
+	const day = (paused = false): StartDay => ({
+		rows: dayRows([earlier, timerEntry], '2026-11-25').reverse(),
+		arcs: [
+			{ from: 30, degrees: 20, colour: 2, running: false },
+			{ from: 50, degrees: 19.6, colour: 1, running: true }
+		],
+		paused,
+		runningId: 'timer-1',
+		describe: (e) =>
+			e.subject.kind === 'code' && e.subject.codeId === 'c2' ? 'Möten' : 'Utveckling',
+		accent: () => 'accent-kod-1'
+	});
+
+	it('shows the flex in the header and per assignment in a sheet', async () => {
+		const user = userEvent.setup();
+		render(<StartVy {...props({ overview: overview(390, 0) })} />);
+		const pill = screen.getByRole('button', { name: 'Flex +6,5 h' });
+		expect(pill.className).toContain('ton-ok');
+		await user.click(pill);
+		const sheet = screen.getByRole('dialog', { name: 'Flex' });
+		expect(within(sheet).getByText('Veckan 18 h 42 min av 40 h, +1,0 h')).toBeTruthy();
+		expect(within(sheet).getByText('−1,5 h')).toBeTruthy();
+		// An ended assignment has no week to show.
+		expect(within(sheet).queryByText(/Veckan 0 min/)).toBeNull();
+		await user.click(within(sheet).getByRole('button', { name: 'Stäng' }));
+		expect(screen.queryByRole('dialog', { name: 'Flex' })).toBeNull();
+	});
+
+	it('warns of a negative flex and the reports not sent', () => {
+		const { rerender } = render(<StartVy {...props({ overview: overview(-90, 2) })} />);
+		expect(screen.getByRole('button', { name: 'Flex −1,5 h' }).className).toContain('ton-varning');
+		expect(screen.getByText('2 rapporter ej skickade')).toBeTruthy();
+		rerender(<StartVy {...props({ overview: overview(-90, 0) })} />);
+		expect(screen.queryByText(/ej skickad/)).toBeNull();
+	});
+
+	it('shows today against the norm, the wheel and today’s rows newest first', () => {
+		const { container } = render(
+			<StartVy {...props({ timer: running, overview: overview(0, 0), day: day() })} />
+		);
+		expect(screen.getByText('5 h 15 min av 8 h idag')).toBeTruthy();
+		// The track, two arcs and the running timer's dot.
+		expect(container.querySelectorAll('.hjul__ring circle')).toHaveLength(4);
+		const links = screen.getAllByRole('link');
+		expect(links.map((l) => l.textContent)).toEqual([
+			expect.stringContaining('09:00–'),
+			expect.stringContaining('08:12–09:00'),
+			'Visa dagen'
+		]);
+		expect(links[0]!.getAttribute('href')).toBe('#/dag/2026-11-25');
+		expect(screen.getByText('Pågår')).toBeTruthy();
+	});
+
+	it('marks a gap as a pause and fills it', async () => {
+		const user = userEvent.setup();
+		const onPause = vi.fn();
+		const onFill = vi.fn();
+		const gappy: StartDay = {
+			...day(),
+			rows: dayRows(
+				[
+					earlier,
+					{
+						...timerEntry,
+						time: {
+							kind: 'interval',
+							start: at('2026-11-25', '09:30'),
+							end: at('2026-11-25', '09:47')
+						}
+					}
+				],
+				'2026-11-25'
+			).reverse()
+		};
+		render(<StartVy {...props({ overview: overview(0, 0), day: gappy, onPause, onFill })} />);
+		await user.click(screen.getByRole('button', { name: 'Paus' }));
+		expect(onPause).toHaveBeenCalledWith(true);
+		await user.click(screen.getByRole('button', { name: 'Fyll i' }));
+		expect(onFill).toHaveBeenCalledWith(
+			expect.objectContaining({ start: at('2026-11-25', '09:00') })
+		);
 	});
 });
 

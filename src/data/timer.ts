@@ -1,15 +1,6 @@
-// Following what the timer needs (issue 18): the running timer, the latest intervals for the
-// code a start uses, and the reports from the timer's week for the lock. Reading only; the
-// writes are in skrivning.ts.
-import {
-	collection,
-	limit,
-	onSnapshot,
-	orderBy,
-	query,
-	where,
-	type Firestore
-} from 'firebase/firestore';
+// Following what the start page and the day view need (issues 18, 19 and 29): the running timer,
+// the entries and the reports. Reading only; the writes are in skrivning.ts.
+import { collection, onSnapshot, query, where, type Firestore } from 'firebase/firestore';
 import type { Entry, Id, IsoWeek, Report, Timer } from '../domain/types.ts';
 import { entryCodec, reportCodec, timerCodec } from './dokument.ts';
 import { userDoc, userPath } from './skrivning.ts';
@@ -28,23 +19,29 @@ export const watchTimer = (
 		onError
 	);
 
-/** How many of the latest intervals are read to find the code a start uses. */
-export const LATEST_ENTRIES = 10;
-
-/** Follows the latest intervals by start; whole-day absence has no start and is left out. */
-export const watchLatestEntries = (
+/** Follows every entry: flex counts all of them, and the start page shows today's. */
+export const watchEntries = (
 	db: Firestore,
 	uid: Id,
 	onChange: (entries: Entry[]) => void,
 	onError?: () => void
 ) =>
 	onSnapshot(
-		query(
-			collection(db, 'users', uid, 'entries'),
-			orderBy('time.start', 'desc'),
-			limit(LATEST_ENTRIES)
-		),
+		collection(db, 'users', uid, 'entries'),
 		(snapshot) => onChange(snapshot.docs.map((d) => entryCodec.fromData(d.id, d.data()))),
+		onError
+	);
+
+/** Follows every report: flex, the unsent reports and the lock of the timer's weeks. */
+export const watchReports = (
+	db: Firestore,
+	uid: Id,
+	onChange: (reports: Report[]) => void,
+	onError?: () => void
+) =>
+	onSnapshot(
+		collection(db, 'users', uid, 'reports'),
+		(snapshot) => onChange(snapshot.docs.map((d) => reportCodec.fromData(d.id, d.data()))),
 		onError
 	);
 

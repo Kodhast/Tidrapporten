@@ -5,8 +5,9 @@
  * (web-ui's README, "Appen sätter"). Shapes, measures and the parts come from @kodhast/web-ui and are
  * never written over here.
  *
- * PROVISIONAL: a neutral slate blue so that the skeleton has every colour web-ui needs. The look is
- * decided by the mockup in issue 16; the manifest colours in vite.config.ts and index.html follow.
+ * Kanel (cinnamon and apricot), which the owner chose in the mockup of issue 16 on 2026-11-25. The
+ * colours the mockup's Kanel does not set (tertiary, outline, error …) are still the neutral ones
+ * from the first skeleton. The manifest colours in vite.config.ts and index.html follow.
  */
 
 :root {
@@ -29,21 +30,21 @@
 
 :root {
 	color-scheme: light;
-	--kh-primary: #2f5d8a;
+	--kh-primary: #7a452a;
 	--kh-on-primary: #ffffff;
-	--kh-primary-container: #d4e3f5;
-	--kh-on-primary-container: #12344f;
-	--kh-secondary: #4f5d6b;
+	--kh-primary-container: #ffdcc8;
+	--kh-on-primary-container: #2e1203;
+	--kh-secondary: #b3541a;
 	--kh-on-secondary: #ffffff;
-	--kh-secondary-container: #dbe3ec;
-	--kh-on-secondary-container: #26323e;
+	--kh-secondary-container: #f3e4da;
+	--kh-on-secondary-container: #3a2519;
 	--kh-tertiary: #6a5a8c;
 	--kh-on-tertiary: #ffffff;
-	--kh-background: #f4f6f9;
-	--kh-on-background: #191c20;
-	--kh-on-surface: #191c20;
+	--kh-background: #fbf4ef;
+	--kh-on-background: #231915;
+	--kh-on-surface: #231915;
 	--kh-surface-variant: #e2e6ec;
-	--kh-on-surface-variant: #454b53;
+	--kh-on-surface-variant: #57463d;
 	--kh-outline: #747a82;
 	--kh-outline-variant: #c8ced6;
 	--kh-error: #ba1a1a;
@@ -55,9 +56,16 @@
 	--kh-inverse-primary: #9fc7f0;
 	--kh-scrim: #000000;
 	--kh-card: #ffffff;
-	--kh-row-tint: #eef2f7;
-	--kh-toolbar: #1f2a36;
-	--kh-on-toolbar: #e8eef5;
+	--kh-row-tint: #f3e7df;
+	--kh-toolbar: #33211a;
+	--kh-on-toolbar: #fbede4;
+
+	/* The wheel's colours (issue 19): codes by their order, gaps and the day's track. */
+	--kod-1: #b0673d;
+	--kod-2: #f0a26b;
+	--kod-3: #d9b8a2;
+	--lucka: #ecc56a;
+	--spar: #eddcd0;
 
 	--kh-depth-highlight: rgb(255 255 255 / 0.3);
 	--kh-depth-sheen: rgb(255 255 255 / 0.12);
@@ -69,17 +77,17 @@
 @media (prefers-color-scheme: dark) {
 	:root {
 		color-scheme: dark;
-		--kh-primary: #9fc7f0;
-		--kh-on-primary: #0b3150;
-		--kh-primary-container: #1d4a70;
-		--kh-on-primary-container: #d4e3f5;
-		--kh-secondary: #bcc7d3;
-		--kh-on-secondary: #26323e;
-		--kh-secondary-container: #3a4652;
-		--kh-on-secondary-container: #dbe3ec;
+		--kh-primary: #ffb68f;
+		--kh-on-primary: #4a2208;
+		--kh-primary-container: #633519;
+		--kh-on-primary-container: #ffdcc8;
+		--kh-secondary: #ffb68a;
+		--kh-on-secondary: #552000;
+		--kh-secondary-container: #4a3428;
+		--kh-on-secondary-container: #f3e4da;
 		--kh-tertiary: #d1c1f5;
 		--kh-on-tertiary: #3a2c5a;
-		--kh-background: #14181d;
+		--kh-background: #1a1411;
 		--kh-on-background: #e2e6ec;
 		--kh-on-surface: #e2e6ec;
 		--kh-surface-variant: #2a3038;
@@ -94,10 +102,16 @@
 		--kh-inverse-on-surface: #2e3136;
 		--kh-inverse-primary: #2f5d8a;
 		--kh-scrim: #000000;
-		--kh-card: #1d2229;
-		--kh-row-tint: #222830;
-		--kh-toolbar: #e2e6ec;
-		--kh-on-toolbar: #1f2a36;
+		--kh-card: #251d19;
+		--kh-row-tint: #2d241f;
+		--kh-toolbar: #fbede4;
+		--kh-on-toolbar: #33211a;
+
+		--kod-1: #d58a5c;
+		--kod-2: #f2b07f;
+		--kod-3: #7d5f4e;
+		--lucka: #e2b95a;
+		--spar: #342923;
 
 		--kh-depth-highlight: rgb(255 255 255 / 0.4);
 		--kh-depth-sheen: rgb(255 255 255 / 0.14);
@@ -120,18 +134,28 @@ body {
 
 /*
  * Tones (web-ui's README, "Toner"): a class per tone that a part with a tone takes.
- * ton-varning: the cloud budget's warning (issue 28). Amber, provisional like the rest until the
- * Kanel theme from issue 16 replaces it.
+ * ton-varning: the cloud budget's warning (issue 28) and a flex below zero. ton-ok: a flex at zero
+ * or above (issue 19). The mockup's tones.
  */
 .ton-varning {
-	--kh-tone-container: #ffe0b2;
-	--kh-tone-content: #4a2800;
+	--kh-tone-container: #fbe7c6;
+	--kh-tone-content: #5c3b00;
+}
+
+.ton-ok {
+	--kh-tone-container: #dcefdc;
+	--kh-tone-content: #1f4d22;
 }
 
 @media (prefers-color-scheme: dark) {
 	.ton-varning {
-		--kh-tone-container: #5a3a00;
-		--kh-tone-content: #ffdcae;
+		--kh-tone-container: #4a3510;
+		--kh-tone-content: #ffdea6;
+	}
+
+	.ton-ok {
+		--kh-tone-container: #23402a;
+		--kh-tone-content: #c4ebc6;
 	}
 }
 
@@ -185,14 +209,53 @@ body {
 }
 
 /*
- * The timer on the start page (issue 18): the code chip, the running time and a line under it,
- * centred where the wheel from issue 19 will go round them.
+ * The working day's wheel on the start page (issue 19, mockup "Arbetsdagens hjul"): 07–19 round
+ * the timer's code chip, running time and the day's time against the norm.
  */
-.timer {
-	display: grid;
-	justify-items: center;
-	gap: var(--kh-space-s);
-	padding-block: var(--kh-space-xl);
+.hjul {
+	position: relative;
+	inline-size: 320px;
+	block-size: 296px;
+	margin-inline: auto;
+}
+
+.hjul__ring {
+	display: block;
+}
+
+.hjul__ring text {
+	fill: var(--kh-on-surface-variant);
+	font: 700 12px var(--kh-font-body);
+}
+
+.hjul__mitt {
+	position: absolute;
+	inset-inline: 0;
+	inset-block-start: 96px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--kh-space-xs);
+}
+
+/* The code's colour in the chip: an <svg> circle, which the chip sizes as its icon. */
+.kodprick circle {
+	fill: var(--kh-accent);
+}
+
+/* The wheel's arcs take the colour of their class. */
+.hjul__ring circle {
+	fill: none;
+	stroke: var(--kh-accent);
+}
+
+.hjul__ring .spar {
+	--kh-accent: var(--spar);
+}
+
+.hjul__ring .prick {
+	fill: var(--kh-accent);
+	stroke: var(--kh-background);
 }
 
 /* The day view (issue 29, mockup "Dagvy"). */
@@ -232,4 +295,32 @@ body {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+}
+
+/* The code colours in the wheel and on the rows' stripe (issue 19). */
+.accent-kod-1 {
+	--kh-accent: var(--kod-1);
+}
+
+.accent-kod-2 {
+	--kh-accent: var(--kod-2);
+}
+
+.accent-kod-3 {
+	--kh-accent: var(--kod-3);
+}
+
+.accent-lucka {
+	--kh-accent: var(--lucka);
+}
+
+/* The flex sheet's total (mockup "Flex per uppdrag"). */
+.flex-totalt {
+	display: flex;
+	align-items: baseline;
+	gap: var(--kh-space-s);
+}
+
+.centrerad {
+	justify-content: center;
 }

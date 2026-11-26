@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 // Brand colours live in src/tema.css; the manifest needs its own copy because it is read
 // before any CSS. The look is provisional until the mockup in issue 16 settles it.
-const background = '#f4f6f9';
+const background = '#fbf4ef';
 
 export default defineConfig({
 	plugins: [

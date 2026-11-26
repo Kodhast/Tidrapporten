@@ -1,21 +1,22 @@
 // The day view (mockup "Dagvy", issue 29): the day's intervals and gaps in order, the overlap
 // warning, the day's sum and the button that adds an interval. Gets plain values; DagRutt connects
 // it to Firestore.
-import { Button, Notice, PeriodPicker, Pill, Row, TopBar } from '@kodhast/web-ui-react';
+import { Button, Notice, PeriodPicker, TopBar } from '@kodhast/web-ui-react';
 import type { ReactNode } from 'react';
 import { dayName, minutesLabel, spanLabel, type DayRow, type DaySum } from '../../domain/dag.ts';
 import type { Span } from '../../domain/intervall.ts';
 import type { Entry, IsoDate } from '../../domain/types.ts';
 import { OfflineIcon, WarningIcon } from '../ikoner';
 import { href } from '../rutter.ts';
-
-const MINUTE = 60_000;
+import { DagRader } from './DagRader';
 
 export interface DagVyProps {
 	date: IsoDate;
 	rows: readonly DayRow[];
 	/** The entries' names: "Uppdrag A · Möten" and "Semester · Uppdrag A". */
 	describe: (entry: Entry) => string;
+	/** The class that colours an entry's stripe by its code. */
+	accent: (entry: Entry) => string;
 	assignmentName: (id: string) => string;
 	overlap: [Span, Span] | null;
 	sum: DaySum;
@@ -83,11 +84,15 @@ export function DagVy(props: DagVyProps) {
 					<p className="kh-text-body dampad">Ingen tid den här dagen.</p>
 				) : (
 					<>
-						<div className="kh-card radlista">
-							{rows.map((row) => (
-								<DayRowView key={rowKey(row)} row={row} {...props} />
-							))}
-						</div>
+						<DagRader
+							rows={rows}
+							describe={props.describe}
+							accent={props.accent}
+							paused={props.paused}
+							open={(entry) => ({ onPress: () => props.onOpen(entry) })}
+							onFill={props.onFill}
+							onPause={props.onPause}
+						/>
 						{sum.total > 0 && (
 							<div className="kh-card summa">
 								<span className="kh-text-caption dampad">SUMMA</span>
@@ -110,58 +115,5 @@ export function DagVy(props: DagVyProps) {
 			</div>
 			{props.sheet}
 		</>
-	);
-}
-
-const rowKey = (row: DayRow) => (row.kind === 'gap' ? `gap-${row.start}` : row.entry.id);
-
-function DayRowView({
-	row,
-	paused,
-	describe,
-	onOpen,
-	onFill,
-	onPause
-}: { row: DayRow } & DagVyProps) {
-	if (row.kind === 'allDay') {
-		return (
-			<Row title="Hela dagen" subtitle={describe(row.entry)} onPress={() => onOpen(row.entry)} />
-		);
-	}
-	if (row.kind === 'interval') {
-		return (
-			<Row
-				title={<span className="tabular">{spanLabel(row)}</span>}
-				subtitle={describe(row.entry)}
-				accentClass={row.overlap ? 'accent-fel' : undefined}
-				trailing={
-					row.overlap ? (
-						<Pill tone="ton-fel">Överlapp</Pill>
-					) : (
-						<span className="kh-text-item-subtitle tabular">
-							{minutesLabel(Math.round((row.end - row.start) / MINUTE))}
-						</span>
-					)
-				}
-				onPress={() => onOpen(row.entry)}
-			/>
-		);
-	}
-	return (
-		<Row
-			tinted
-			title={<span className="tabular">{`${paused ? 'Paus' : 'Lucka'} ${spanLabel(row)}`}</span>}
-			subtitle={paused ? minutesLabel(row.minutes) : `${minutesLabel(row.minutes)} utan tid`}
-			trailing={
-				<span className="knappar">
-					<Button variant="text" compact onPress={() => onPause(!paused)}>
-						{paused ? 'Ångra paus' : 'Paus'}
-					</Button>
-					<Button compact onPress={() => onFill(row)}>
-						Fyll i
-					</Button>
-				</span>
-			}
-		/>
 	);
 }

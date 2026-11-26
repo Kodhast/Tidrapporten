@@ -3,7 +3,17 @@
 import { clipToDay, gapsOnDay, overlaps, splitByDay, type Span } from './intervall.ts';
 import { longDate } from './installningar.ts';
 import { addDays, atLocalTime, clockOf } from './tid.ts';
-import type { ClockTime, Entry, Id, IsoDate, Minutes, UtcMillis } from './types.ts';
+import type {
+	AbsenceType,
+	Assignment,
+	ClockTime,
+	Entry,
+	Id,
+	IsoDate,
+	Minutes,
+	TimeCode,
+	UtcMillis
+} from './types.ts';
 
 const MINUTE = 60_000;
 
@@ -147,3 +157,21 @@ export const overlapping = (
 
 /** `2026-11-24` → `Tisdag 24 november`: the day without the year. */
 export const dayName = (date: IsoDate): string => longDate(date).replace(/ \d{4}$/, '');
+
+/** An entry's name in a row: "Uppdrag A · Möten", "Uppdrag A · Semester". */
+export const entryName = (
+	entry: Entry,
+	assignments: readonly Assignment[],
+	codes: Readonly<Record<Id, readonly TimeCode[]>>,
+	absenceTypes: readonly AbsenceType[]
+): string => {
+	const subject =
+		entry.subject.kind === 'code'
+			? (codes[entry.assignmentId] ?? []).find(
+					(c) => c.id === (entry.subject as { codeId: Id }).codeId
+				)?.name
+			: absenceTypes.find((t) => t.id === (entry.subject as { absenceTypeId: Id }).absenceTypeId)
+					?.name;
+	const assignment = assignments.find((a) => a.id === entry.assignmentId)?.name;
+	return [assignment, subject].filter(Boolean).join(' · ');
+};

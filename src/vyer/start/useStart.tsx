@@ -1,36 +1,52 @@
-// Connects the start page to Firestore (issue 18): follows the timer, the assignments and their
-// codes, the latest intervals and the reports of the timer's weeks, and gives the start page and
-// the tab row's main button. The writes go through src/data/skrivning.ts.
+// Connects the start page to Firestore (issues 18 and 19): follows the timer, the assignments with
+// their codes and receivers, the entries, the reports, the absence types, the free days and
+// today's pause mark, and gives the start page and the tab row's main button. The writes go
+// through src/data/skrivning.ts and src/data/dag.ts.
 import type { ToolbarAction } from '@kodhast/web-ui-react';
 import type { Firestore } from 'firebase/firestore';
 import { useEffect, useState, type ReactNode } from 'react';
-import { assignmentCodec } from '../../data/dokument.ts';
-import { assignmentsPath, watchCollection } from '../../data/installningar.ts';
-import { useCodes } from '../lyssnare.ts';
-import { startTimer, stopTimer, switchTimer } from '../../data/skrivning.ts';
-import { watchLatestEntries, watchReportsFrom, watchTimer } from '../../data/timer.ts';
-import { isTimerForgotten, suggestTimerEnd } from '../../domain/intervall.ts';
+import { newEntryId, setPause, watchPause } from '../../data/dag.ts';
+import { absenceTypeCodec, assignmentCodec, freeDayCodec } from '../../data/dokument.ts';
+import {
+	absenceTypesPath,
+	assignmentsPath,
+	freeDaysPath,
+	watchCollection
+} from '../../data/installningar.ts';
+import { saveEntry, startTimer, stopTimer, switchTimer } from '../../data/skrivning.ts';
+import { watchEntries, watchReports, watchTimer } from '../../data/timer.ts';
+import { dayRows, entryName, isOnDay } from '../../domain/dag.ts';
+import { absenceCountings } from '../../domain/flex.ts';
+import { freeDaysByDate } from '../../domain/helgdagar.ts';
+import { codeColour, wheelArc } from '../../domain/hjul.ts';
+import { isTimerForgotten, suggestTimerEnd, type Span } from '../../domain/intervall.ts';
 import { fullDayNorm, termsOn } from '../../domain/norm.ts';
-import { dateOf, isoWeekOf } from '../../domain/tid.ts';
+import { overview } from '../../domain/oversikt.ts';
+import { dateOf } from '../../domain/tid.ts';
 import {
 	choiceNames,
 	startChoice,
 	stopBlockedOffline,
 	timerCodeGroups,
+	timerEntry,
 	type CodeChoice
 } from '../../domain/timer.ts';
 import type {
+	AbsenceType,
 	Assignment,
 	Entry,
+	FreeDay,
 	Id,
-	IsoWeek,
 	Report,
 	TimeCode,
 	Timer,
 	UtcMillis
 } from '../../domain/types.ts';
+import { useCodes, useReceivers } from '../lyssnare.ts';
+import { IntervallArk } from '../dag/IntervallArk';
+import type { HjulArc } from './Hjul';
 import { PlayIcon, StopIcon } from '../ikoner';
-import { StartVy, type TimerProblem } from './StartVy';
+import { StartVy, type StartDay, type TimerProblem } from './StartVy';
 
 const MINUTE = 60_000;
 
@@ -68,8 +84,13 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const [timer, setTimer] = useState<Timer | null | undefined>(undefined);
 	const [loadedAssignments, setAssignments] = useState<Assignment[] | null>(null);
 	const assignments = loadedAssignments ?? [];
-	const [latest, setLatest] = useState<Entry[]>([]);
-	const [loadedReports, setReports] = useState<{ week: IsoWeek; values: Report[] } | null>(null);
+	const [entries, setEntries] = useState<Entry[] | null>(null);
+	const [reports, setReports] = useState<Report[] | null>(null);
+	const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
+	const [freeDays, setFreeDays] = useState<FreeDay[] | null>(null);
+	const [pause, setPaused] = useState<{ date: string; paused: boolean } | null>(null);
+	// A gap that is being filled in the interval sheet, as in the day view.
+	const [filling, setFilling] = useState<{ gap: Span; newId: Id } | null>(null);
 	const [picked, setPicked] = useState<CodeChoice | null>(null);
 	const [problem, setProblem] = useState<TimerProblem>(null);
 	// The timer whose ten-hour question was answered "Jag jobbar fortfarande", until the app is
@@ -84,23 +105,27 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 		() => watchCollection(db, uid, assignmentsPath, assignmentCodec, setAssignments),
 		[db, uid]
 	);
-	useEffect(() => watchLatestEntries(db, uid, setLatest, failed), [db, uid]);
-	// From the week the timer started, or this week: listening from the start, the reports are
-	// known before the app goes offline.
-	const fromWeek = isoWeekOf(dateOf(timer ? Math.min(timer.start, now) : now));
+	// All entries and reports: flex counts every week. Listening from the start, the reports of the
+	// timer's weeks are known before the app goes offline.
+	// A failed read leaves no entries rather than a page that waits for them, and the notice says why.
 	useEffect(
 		() =>
-			watchReportsFrom(
-				db,
-				uid,
-				fromWeek,
-				(values) => setReports({ week: fromWeek, values }),
-				failed
-			),
-		[db, uid, fromWeek]
+			watchEntries(db, uid, setEntries, () => {
+				setEntries((known) => known ?? []);
+				failed();
+			}),
+		[db, uid]
 	);
-	// Until the reports of the timer's weeks have come, a stop could not know whether to log.
-	const reports = loadedReports?.week === fromWeek ? loadedReports.values : null;
+	useEffect(() => watchReports(db, uid, setReports, failed), [db, uid]);
+	useEffect(
+		() => watchCollection(db, uid, absenceTypesPath, absenceTypeCodec, setAbsenceTypes),
+		[db, uid]
+	);
+	useEffect(() => watchCollection(db, uid, freeDaysPath, freeDayCodec, setFreeDays), [db, uid]);
+	useEffect(
+		() => watchPause(db, uid, today, (paused) => setPaused({ date: today, paused }), failed),
+		[db, uid, today]
+	);
 	useEffect(() => {
 		const shown = () => {
 			if (document.visibilityState === 'visible') setDismissed(null);
@@ -109,11 +134,9 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 		return () => document.removeEventListener('visibilitychange', shown);
 	}, []);
 
-	const codes = useCodes(
-		db,
-		uid,
-		assignments.map((a) => a.id)
-	);
+	const assignmentIds = assignments.map((a) => a.id);
+	const codes = useCodes(db, uid, assignmentIds);
+	const receivers = useReceivers(db, uid, assignmentIds);
 	const groups = timerCodeGroups(assignments, codes, today);
 	// Until the timer, the assignments and their codes have come, nothing is offered: no empty
 	// state that is not true, and no start with the wrong code.
@@ -121,8 +144,9 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 		timer === undefined ||
 		loadedAssignments === null ||
 		reports === null ||
+		entries === null ||
 		assignments.some((a) => codes[a.id] === undefined);
-	const next = picked && choiceNames(groups, picked) ? picked : startChoice(groups, latest);
+	const next = picked && choiceNames(groups, picked) ? picked : startChoice(groups, entries ?? []);
 
 	const write = (save: () => Promise<unknown>) => {
 		setProblem(null);
@@ -179,6 +203,49 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 	const workday = terms ? fullDayNorm(terms) : 8 * 60;
 	const names = timer && timerNames(assignments, codes, timer);
 
+	// The running timer counts as an interval up to now: on the wheel, in today's list and in flex.
+	const runningEntry = timer ? timerEntry(timer, Math.max(now, timer.start)) : null;
+	const withTimer = [...(entries ?? []), ...(runningEntry ? [runningEntry] : [])];
+	const known =
+		!loading &&
+		absenceTypes !== null &&
+		freeDays !== null &&
+		assignments.every((a) => receivers[a.id] !== undefined);
+	const summary =
+		known &&
+		overview({
+			assignments,
+			receivers,
+			entries: entries ?? [],
+			reports: reports ?? [],
+			freeDays: freeDaysByDate(freeDays),
+			countings: absenceCountings(absenceTypes),
+			timer: timer ?? null,
+			now
+		});
+	const colourOf = (entry: Pick<Entry, 'assignmentId' | 'subject'>) => codeColour(entry, codes);
+	const todays = withTimer.filter((e) => isOnDay(e, today));
+	const day: StartDay | null = loading
+		? null
+		: {
+				// Newest first, as the mockup shows the day.
+				rows: dayRows(todays, today).reverse(),
+				arcs: todays.flatMap((entry): HjulArc[] => {
+					const arc = wheelArc(entry, today);
+					return arc
+						? [{ ...arc, colour: colourOf(entry), running: entry.id === runningEntry?.id }]
+						: [];
+				}),
+				paused: pause?.date === today && pause.paused,
+				runningId: runningEntry?.id ?? null,
+				describe: (entry) => entryName(entry, assignments, codes, absenceTypes ?? []),
+				accent: (entry) => `accent-kod-${colourOf(entry)}`
+			};
+	const chipColour = timer
+		? colourOf(timer)
+		: next &&
+			colourOf({ assignmentId: next.assignmentId, subject: { kind: 'code', codeId: next.codeId } });
+
 	let action: ToolbarAction | undefined;
 	if (loading) {
 		action = undefined;
@@ -209,6 +276,41 @@ export function useStart(db: Firestore, uid: Id, online: boolean, banner: ReactN
 				problem={problem === 'blocked' && online ? null : problem}
 				onChoose={choose}
 				banner={banner}
+				overview={summary || null}
+				day={day}
+				chipColour={chipColour}
+				onPause={(on) => write(() => setPause(db, uid, today, on))}
+				onFill={(gap) => setFilling({ gap, newId: newEntryId(db, uid) })}
+				sheet={
+					filling && (
+						<IntervallArk
+							key={filling.newId}
+							isOpen
+							onOpenChange={(isOpen) => !isOpen && setFilling(null)}
+							date={today}
+							entry={null}
+							newId={filling.newId}
+							span={filling.gap}
+							// The code of the interval before the gap, as the day view does.
+							choice={startChoice(
+								groups,
+								(entries ?? []).filter(
+									(e) => e.time.kind === 'interval' && e.time.end <= filling.gap.start
+								)
+							)}
+							groups={groups}
+							absenceTypes={(absenceTypes ?? [])
+								.filter((t) => !t.archived)
+								.sort((a, b) => a.order - b.order)}
+							entries={todays}
+							reports={reports ?? []}
+							online={online}
+							onSave={(before, after, reason) =>
+								write(() => saveEntry(db, uid, before, after, reports ?? [], reason))
+							}
+						/>
+					)
+				}
 				forgotten={
 					timer && asking
 						? {

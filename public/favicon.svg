@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 	<title>Tidrapporten</title>
-	<circle cx="256" cy="256" r="216" fill="#2f5d8a" />
+	<circle cx="256" cy="256" r="216" fill="#7a452a" />
 	<circle cx="256" cy="256" r="168" fill="#ffffff" />
-	<path d="M256 136v120l80 56" fill="none" stroke="#2f5d8a" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+	<path d="M256 136v120l80 56" fill="none" stroke="#7a452a" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
 </svg>

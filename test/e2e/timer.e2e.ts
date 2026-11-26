@@ -31,9 +31,10 @@ test('start and stop give an interval named by the start', async ({ page, reques
 	await signIn(page, user);
 
 	await expect(chip(page)).toHaveText(/Utveckling/);
-	await expect(page.getByText('Timern står still')).toBeVisible();
+	await expect(page.getByText('0 min', { exact: true })).toBeVisible();
+	await expect(page.getByText('Pågår')).toBeHidden();
 	await startButton(page).click();
-	await expect(page.getByText(/^Startad \d\d:\d\d · Exempeluppdraget$/)).toBeVisible();
+	await expect(page.getByText('Pågår')).toBeVisible();
 	await stopButton(page).click();
 	await expect(startButton(page)).toBeVisible();
 
