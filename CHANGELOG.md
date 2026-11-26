@@ -3,6 +3,15 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.4.0
+
+- Påminnelser som notiser i telefonen: ingen timer igång på morgonen, timern igång på kvällen, en
+  dag utan tid, veckorapporten inte skickad på fredagen och flexsaldot över gränsen. Knapparna i
+  notisen startar eller stoppar timern eller öppnar dagen eller veckan. Varje påminnelse slås av
+  och på och får sin tid i Inställningar → Påminnelser, där också notiserna på enheten slås på och en
+  provnotis kan skickas. Notiserna visar inga uppdrag eller mottagare. Kommer efter nästa release,
+  när nycklarna för notiser finns (#22).
+
 ## 1.3.0
 
 - Kontot uppe till höger, som i Kodhästs andra appar: din Google-bild i sidhuvudet och en meny med

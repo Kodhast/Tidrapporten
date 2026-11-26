@@ -125,3 +125,19 @@ test('nothing can be saved offline, and the view says why', async ({ page, conte
 	await context.setOffline(false);
 	await expect(save(page)).toBeEnabled();
 });
+
+test('a reminder that is turned off stays off after a reload (issue 22)', async ({ page }) => {
+	await signIn(page, uid('paminnelser'));
+	await page.getByRole('button', { name: /^Konto och inställningar/ }).click();
+	await page.getByRole('menuitem', { name: 'Inställningar' }).click();
+	await page.getByRole('link', { name: /^Påminnelser/ }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Påminnelser' })).toBeVisible();
+	const late = page.getByRole('switch', { name: 'Timern går sent' });
+	await expect(late).toBeChecked();
+	// Controlled by the saved value, so the state changes when the save is back.
+	await late.click();
+	await expect(late).not.toBeChecked();
+	await page.reload();
+	await expect(page.getByRole('switch', { name: 'Timern går sent' })).not.toBeChecked();
+	await expect(page.getByRole('switch', { name: 'Ingen timer igång' })).toBeChecked();
+});

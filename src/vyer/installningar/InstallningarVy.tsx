@@ -155,6 +155,12 @@ export function InstallningarVy({
 							subtitle={`${plural(absenceTypes, 'frånvarotyp', 'frånvarotyper')} · ${plural(freeDays, 'egen ledig dag', 'egna lediga dagar')}`}
 							navigates
 						/>
+						<Row
+							href={href({ view: 'paminnelser' })}
+							title="Påminnelser"
+							subtitle="Notiser om timer, dagar utan tid, veckorapport och flex"
+							navigates
+						/>
 					</div>
 				</section>
 

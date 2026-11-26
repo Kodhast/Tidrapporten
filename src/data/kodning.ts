@@ -57,9 +57,13 @@ export const stringMap = (value: unknown): Record<string, string> =>
 		Object.entries(asRecord(value)).filter((e): e is [string, string] => typeof e[1] === 'string')
 	);
 
-/** A Firestore Timestamp (or plain milliseconds) as UTC milliseconds. */
+/**
+ * A Firestore Timestamp (or plain milliseconds) as UTC milliseconds. Any object with toMillis is
+ * taken, so that the functions read the Admin SDK's Timestamp with the same codecs (issue 22).
+ */
 export const millis = (value: unknown, fallback = 0): UtcMillis => {
-	if (value instanceof Timestamp) return value.toMillis();
+	if (typeof (value as { toMillis?: unknown } | null)?.toMillis === 'function')
+		return (value as Timestamp).toMillis();
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
 	return fallback;
 };

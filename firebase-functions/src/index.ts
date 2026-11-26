@@ -8,8 +8,11 @@ import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onMessagePublished } from 'firebase-functions/v2/pubsub';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { RefusedFile, restoreMissing, type RestoreEffects } from './aterstall.ts';
 import { handleBudget, type BudgetEffects } from './budget.ts';
+import { reminderEffects } from './paminnelser-effekter.ts';
+import { runReminders, sendTest } from './paminnelser.ts';
 
 initializeApp();
 
@@ -105,6 +108,40 @@ export const aterstall = onCall(
 			if (error instanceof RefusedFile) throw new HttpsError('invalid-argument', error.message);
 			logger.error('aterstall: misslyckades', { uid });
 			throw new HttpsError('internal', 'Återställningen misslyckades.');
+		}
+	}
+);
+
+/**
+ * The reminders (issue 22), every 15 minutes. Runs in drift (release.yml) as
+ * tidrapporten-paminnelser: Cloud Datastore User and Firebase Cloud Messaging API Admin in drift,
+ * nothing more (docs/drift.md).
+ */
+export const paminnelser = onSchedule(
+	{
+		schedule: 'every 15 minutes',
+		timeZone: 'Europe/Stockholm',
+		region: REGION,
+		serviceAccount: 'tidrapporten-paminnelser@',
+		maxInstances: 1,
+		retryCount: 0
+	},
+	async (event) => {
+		await runReminders(Date.parse(event.scheduleTime) || Date.now(), reminderEffects);
+	}
+);
+
+/** The test notification from the reminder settings, to the signed-in user's devices. */
+export const provnotis = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-paminnelser@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		try {
+			return { devices: await sendTest(uid, reminderEffects) };
+		} catch {
+			logger.error('provnotis: misslyckades', { uid });
+			throw new HttpsError('internal', 'Provnotisen gick inte att skicka.');
 		}
 	}
 );

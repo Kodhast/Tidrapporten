@@ -45,7 +45,9 @@ import { UppdragVy } from './UppdragVy';
 
 type SettingsRoute = Extract<
 	Route,
-	{ view: 'installningar' | 'uppdrag' | 'mottagare' | 'franvaro' | 'arbetsgivare' | 'kund' }
+	{
+		view: 'installningar' | 'uppdrag' | 'mottagare' | 'franvaro' | 'arbetsgivare' | 'kund';
+	}
 >;
 
 export interface InstallningarRuttProps {

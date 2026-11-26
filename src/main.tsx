@@ -16,6 +16,7 @@ import { finishSignIn } from './firebase/auth';
 import { DagRutt } from './vyer/dag/DagRutt';
 import { KontoProvider } from './vyer/konto';
 import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
+import { PaminnelserRutt } from './vyer/installningar/PaminnelserRutt';
 import { KomIgangRutt } from './vyer/kom-igang/KomIgangRutt';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
@@ -26,7 +27,7 @@ import { RapportRutt, VeckaRutt } from './vyer/vecka/VeckaRutt';
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
 
-const { auth, db, functions } = startFirebase();
+const { app, auth, db, functions, vapidKey } = startFirebase();
 // Read once, before React, so that StrictMode's second effect run cannot sign in twice.
 const signInError = finishSignIn(auth);
 // The app icon's shortcut, read once for the same reason (issue 59); the start page empties it
@@ -118,6 +119,15 @@ function Root() {
 						/>
 					) : route.view === 'kom-igang' ? (
 						<KomIgangRutt db={db} uid={shownUid} online={online} />
+					) : route.view === 'paminnelser' ? (
+						<PaminnelserRutt
+							db={db}
+							functions={functions}
+							app={app}
+							vapidKey={vapidKey}
+							uid={shownUid}
+							online={online}
+						/>
 					) : route.view !== 'idag' && route.view !== 'om' ? (
 						<InstallningarRutt
 							db={db}

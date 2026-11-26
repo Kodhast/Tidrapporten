@@ -23,7 +23,11 @@ export const USER_COLLECTIONS = [
 	'devices'
 ] as const;
 export const ASSIGNMENT_COLLECTIONS = ['codes', 'receivers'] as const;
-/** The rules allow `state` document by document, so it cannot be listed as a collection. */
+/**
+ * The rules allow `state` document by document, so it cannot be listed as a collection.
+ * `state/reminders` is left out: the reminder function's record of what it sent (issue 22), which
+ * only it writes and the app cannot read.
+ */
 export const STATE_DOCUMENTS = ['timer', 'settings'] as const;
 
 export type JsonValue =

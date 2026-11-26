@@ -13,7 +13,8 @@ import {
 	EMULATOR_PORTS,
 	environmentFor,
 	firebaseOptions,
-	FUNCTIONS_REGION
+	FUNCTIONS_REGION,
+	vapidKeyFor
 } from './config';
 
 export interface Firebase {
@@ -21,6 +22,8 @@ export interface Firebase {
 	auth: Auth;
 	db: Firestore;
 	functions: Functions;
+	/** The Web Push key for the reminders (issue 22); null where it is not set up. */
+	vapidKey: string | null;
 }
 
 declare global {
@@ -34,7 +37,8 @@ export function startFirebase(): Firebase {
 	// Compared inline so that Vite replaces it with a constant and drops the branch below from
 	// every build without the variable, drift included.
 	const useEmulator = import.meta.env.VITE_FIREBASE_EMULATOR === 'true';
-	const app = initializeApp(firebaseOptions(environmentFor(import.meta.env.MODE, useEmulator)));
+	const environment = environmentFor(import.meta.env.MODE, useEmulator);
+	const app = initializeApp(firebaseOptions(environment));
 	const auth = getAuth(app);
 	// The offline cache serves reads offline; which writes are allowed offline is the data
 	// layer's choice (ADR 0012): reports go through transactions, which need the server.
@@ -53,5 +57,5 @@ export function startFirebase(): Firebase {
 			return (await signInForTest(auth, uid)).user.uid;
 		};
 	}
-	return { app, auth, db, functions };
+	return { app, auth, db, functions, vapidKey: vapidKeyFor(environment) };
 }

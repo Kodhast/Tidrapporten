@@ -33,6 +33,9 @@ Som ett fält, och dessutom:
   `ASSIGNMENT_COLLECTIONS` under ett uppdrag), ett dokument under `state` i `STATE_DOCUMENTS`.
   Provet i `export.test.ts` jämför listorna med `firestore.rules` och fäller en samling som saknas.
 - **Playwright:** `test/e2e/export.e2e.ts` får ett dokument i den nya samlingen.
+- **Undantag:** härledd data som bara en funktion skriver och som klienten inte når hålls
+  utanför exporten och reglerna, med skälet i en kommentar och i `docs/drift.md`. Ett:
+  `state/reminders`, påminnelsefunktionens minne av vad som är skickat (issue 22).
 - **Den dagliga backupen** (beslut 0018) tar hela databasen och behöver ingen ändring. Lägg
   samlingen i `collections` i `scripts/backup.sh`, som räknar dokumenten i återställningsprovet.
 
