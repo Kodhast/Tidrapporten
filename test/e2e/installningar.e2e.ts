@@ -35,6 +35,8 @@ const mapCode = async (page: Page, internal: string, target: string) => {
 
 const addReceiver = async (page: Page, name: string, code: string) => {
 	await page.getByRole('link', { name: 'Lägg till mottagare' }).click();
+	// The assignment view has a Namn field too: wait until the receiver view is shown.
+	await expect(page.getByRole('heading', { level: 1, name: 'Ny mottagare' })).toBeVisible();
 	await page.getByLabel('Namn').fill(name);
 	await addInSheet(page, 'Lägg till kod', 'Kod och namn', code);
 	await mapCode(page, 'Utveckling', code);
@@ -51,6 +53,7 @@ test('an assignment with two codes and two mapped receivers is still there after
 	await signIn(page, uid('installningar'));
 	await page.getByRole('link', { name: 'Inställningar' }).click();
 	await page.getByRole('link', { name: 'Lägg till uppdrag' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Nytt uppdrag' })).toBeVisible();
 
 	await page.getByLabel('Namn').fill('Exempeluppdraget');
 	await page.getByLabel('Omfattning').fill('80');
