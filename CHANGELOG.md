@@ -7,7 +7,7 @@ Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör �
 
 - Veckan: en ny flik med veckans faktiska tid, norm och flex och en rapport per mottagare i
   kedjans ordning. Rapporten föreslås fylld mot normen eller som faktisk tid per kvart, timmarna
-  per kod justeras i halvtimmar, och avskriften visar mottagarens koder med timmar per dag.
+  per kod justeras i kvartar, och avskriften visar mottagarens koder med timmar per dag.
   "Markera som skickad" låser rapporten som den ser ut då; den låses upp med ett skäl, och
   upplåsningen och den nya sändningen loggas (#20).
 

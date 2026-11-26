@@ -91,7 +91,7 @@ test('suggest, send and lock, then unlock with a reason and send again', async (
 	await expect(page.getByText('1 rapport att skicka')).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Uppdrag A · 42,5 h' })).toBeVisible();
 
-	// Filled to the norm: 40 h, and half an hour more.
+	// Filled to the norm: 40 h, and a quarter more (ADR 0013).
 	await page.getByRole('link', { name: /1 · Arbetsgivaren/ }).click();
 	await expect(page.getByRole('heading', { name: 'Arbetsgivaren · vecka 47' })).toBeVisible();
 	await expect(
@@ -100,12 +100,12 @@ test('suggest, send and lock, then unlock with a reason and send again', async (
 	await page.getByRole('button', { name: 'Öka 1001 Arbete' }).click();
 	await page.getByRole('link', { name: 'Visa avskriften' }).click();
 	await expect(page.getByRole('heading', { name: 'Avskrift · Arbetsgivaren' })).toBeVisible();
-	await expect(page.getByRole('row', { name: /^Totalt/ })).toContainText('40,5');
+	await expect(page.getByRole('row', { name: /^Totalt/ })).toContainText('40,25');
 	await page.getByRole('button', { name: 'Markera som skickad' }).click();
 	await expect(page.getByText(/^Skickad .* · låst$/)).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Markera som skickad' })).toBeHidden();
 	await expect.poll(async () => status(await reportOnServer(request, user))).toBe('sent');
-	expect(sum(await reportOnServer(request, user))).toBe(40.5 * 60);
+	expect(sum(await reportOnServer(request, user))).toBe(40.25 * 60);
 	expect(await stored(request, user, 'changeLog')).toHaveLength(0);
 
 	// Unlock: a reason is required, and the unlock is logged.

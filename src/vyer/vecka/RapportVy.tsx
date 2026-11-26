@@ -90,7 +90,7 @@ export function RapportVy(props: RapportVyProps) {
 										label={row.name}
 										value={lineMinutes(row.line) / 60}
 										onChange={(hours) => props.onChange(row.line, Math.round(hours * 60))}
-										step={0.5}
+										step={0.25}
 										min={0}
 										max={168}
 										formatOptions={{ maximumFractionDigits: 2 }}
@@ -99,7 +99,7 @@ export function RapportVy(props: RapportVyProps) {
 							/>
 						))}
 					</div>
-					<p className="kh-text-item-subtitle">Timmar för veckan, steg om en halvtimme.</p>
+					<p className="kh-text-item-subtitle">Timmar för veckan, steg om en kvart.</p>
 				</section>
 				{props.first &&
 					(props.first.minutes === sum ? (

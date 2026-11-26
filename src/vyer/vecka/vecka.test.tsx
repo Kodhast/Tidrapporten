@@ -179,7 +179,7 @@ describe('RapportRutt', () => {
 		await user.click(screen.getByRole('radio', { name: 'Fyll mot normen' }));
 		expect(screen.getByText('16 h, samma som till Arbetsgivaren')).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: 'Öka 1002 Möten' }));
-		expect(screen.getByText('16,5 h, men 16 h till Arbetsgivaren')).toBeTruthy();
+		expect(screen.getByText('16,25 h, men 16 h till Arbetsgivaren')).toBeTruthy();
 		expect(screen.getByRole('link', { name: 'Visa avskriften' }).getAttribute('href')).toBe(
 			`#/vecka/${WEEK}/a1/r2/avskrift`
 		);
@@ -190,10 +190,10 @@ describe('RapportRutt', () => {
 			within(within(table).getByRole('row', { name: new RegExp(`^${name}`) }))
 				.getAllByRole('cell')
 				.map((c) => c.textContent);
-		// Filled: Monday 8, Tuesday 6; Möten 2 + the half hour on Tuesday.
+		// Filled: Monday 8, Tuesday 6; Möten 2 + the quarter on Tuesday.
 		expect(cells('1001 Utveckling')).toEqual(['8', '6', '–', '–', '–', '14']);
-		expect(cells('1002 Möten')).toEqual(['–', '2,5', '–', '–', '–', '2,5']);
-		expect(cells('Totalt')).toEqual(['8', '8,5', '–', '–', '–', '16,5']);
+		expect(cells('1002 Möten')).toEqual(['–', '2,25', '–', '–', '–', '2,25']);
+		expect(cells('Totalt')).toEqual(['8', '8,25', '–', '–', '–', '16,25']);
 		expect(screen.getByText('Lördag och söndag')).toBeTruthy();
 
 		await user.click(screen.getByRole('button', { name: 'Markera som skickad' }));
@@ -207,7 +207,7 @@ describe('RapportRutt', () => {
 			mode: 'fillNorm',
 			lines: [
 				{ receiverCodeId: 'K-utv', minutesPerDay: [480, 360, 0, 0, 0, 0, 0] },
-				{ receiverCodeId: 'K-mote', minutesPerDay: [0, 150, 0, 0, 0, 0, 0] }
+				{ receiverCodeId: 'K-mote', minutesPerDay: [0, 135, 0, 0, 0, 0, 0] }
 			],
 			snapshot: {
 				assignmentName: 'Uppdrag A',
