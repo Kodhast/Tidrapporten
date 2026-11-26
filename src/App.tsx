@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { BudgetStatus } from './domain/budget';
 import { startSignIn } from './firebase/auth';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
-import { ClockIcon, SettingsIcon } from './vyer/ikoner';
+import { CalendarIcon, ClockIcon, SettingsIcon } from './vyer/ikoner';
 import { href, type Route } from './vyer/rutter';
 
 export interface AppProps {
@@ -16,7 +16,7 @@ export interface AppProps {
 	/** The view in the address; the start page when left out. */
 	route?: Route;
 	/** The view for a route below the start page, made by the caller, which has Firestore: the
-	 * settings (issue 17) and the day (issue 29). */
+	 * settings (issue 17), the day (issue 29) and the week (issue 20). */
 	settings?: ReactNode;
 	/** The start page with the timer for a signed-in user, made by the caller (issue 18). */
 	start?: ReactNode;
@@ -24,9 +24,14 @@ export interface AppProps {
 	timerAction?: ToolbarAction;
 }
 
-// The week (issue 20) joins the tab row when it exists.
 const TABS = [
 	{ id: 'idag', label: 'Idag', icon: <ClockIcon />, href: href({ view: 'idag' }) },
+	{
+		id: 'vecka',
+		label: 'Veckan',
+		icon: <CalendarIcon />,
+		href: href({ view: 'vecka', week: null })
+	},
 	{
 		id: 'installningar',
 		label: 'Inställningar',
@@ -72,7 +77,9 @@ export function App({
 						<p className="kh-text-body">
 							{route.view === 'dag'
 								? 'Logga in för att se dagen.'
-								: 'Logga in för att se inställningarna.'}
+								: route.view === 'vecka' || route.view === 'rapport'
+									? 'Logga in för att se veckan.'
+									: 'Logga in för att se inställningarna.'}
 						</p>
 						<SignIn uid={uid} />
 					</div>
@@ -84,7 +91,7 @@ export function App({
 		<>
 			{content}
 			{/* The views below a tab have their own back arrow and no tab row, as in the mockup. */}
-			{(onStart || route.view === 'installningar') && (
+			{(onStart || route.view === 'installningar' || route.view === 'vecka') && (
 				<Toolbar
 					tabs={TABS}
 					selected={route.view}

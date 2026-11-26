@@ -17,6 +17,7 @@ import { InstallningarRutt } from './vyer/installningar/InstallningarRutt';
 import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
 import { useStart } from './vyer/start/useStart';
+import { RapportRutt, VeckaRutt } from './vyer/vecka/VeckaRutt';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
@@ -70,6 +71,20 @@ function Root() {
 			settings={
 				route.view === 'dag' ? (
 					<DagRutt db={db} uid={shownUid} date={route.date} online={online} />
+				) : route.view === 'vecka' ? (
+					<VeckaRutt db={db} uid={shownUid} week={route.week} />
+				) : route.view === 'rapport' ? (
+					// One key per report, so that a change stays from the report to its transcript.
+					<RapportRutt
+						key={`${route.week}_${route.assignmentId}_${route.receiverId}`}
+						db={db}
+						uid={shownUid}
+						week={route.week}
+						assignmentId={route.assignmentId}
+						receiverId={route.receiverId}
+						transcript={route.transcript}
+						online={online}
+					/>
 				) : route.view !== 'idag' ? (
 					<InstallningarRutt db={db} uid={shownUid} route={route} online={online} />
 				) : null

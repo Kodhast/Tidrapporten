@@ -56,3 +56,24 @@ export const WorkIcon = () => (
 		<path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z" />
 	</svg>
 );
+
+/** The week tab and the week picker's label. */
+export const CalendarIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z" />
+	</svg>
+);
+
+/** A sent report, locked. */
+export const LockIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" />
+	</svg>
+);
+
+/** All is as it should be. */
+export const CheckIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+	</svg>
+);

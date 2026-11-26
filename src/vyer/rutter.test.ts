@@ -16,6 +16,16 @@ describe('the routes', () => {
 		[
 			'#/installningar/uppdrag/a1/mottagare/r-2',
 			{ view: 'mottagare', assignmentId: 'a1', id: 'r-2' }
+		],
+		['#/vecka', { view: 'vecka', week: null }],
+		['#/vecka/2026-W53', { view: 'vecka', week: '2026-W53' }],
+		[
+			'#/vecka/2026-W47/a1/r1',
+			{ view: 'rapport', week: '2026-W47', assignmentId: 'a1', receiverId: 'r1', transcript: false }
+		],
+		[
+			'#/vecka/2026-W47/a1/r1/avskrift',
+			{ view: 'rapport', week: '2026-W47', assignmentId: 'a1', receiverId: 'r1', transcript: true }
 		]
 	];
 
@@ -32,7 +42,10 @@ describe('the routes', () => {
 		'#/installningar/uppdrag/',
 		'#/dag/2026-02-30',
 		'#/dag/2026-13-45',
-		'#/dag/igar'
+		'#/dag/igar',
+		'#/vecka/2027-W53',
+		'#/vecka/2026-W00',
+		'#/vecka/2026-W47/a1'
 	])('opens the start page for %j', (hash) => {
 		expect(parseRoute(hash)).toEqual({ view: 'idag' });
 	});

@@ -3,6 +3,14 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.10.0
+
+- Veckan: en ny flik med veckans faktiska tid, norm och flex och en rapport per mottagare i
+  kedjans ordning. Rapporten föreslås fylld mot normen eller som faktisk tid per kvart, timmarna
+  per kod justeras i halvtimmar, och avskriften visar mottagarens koder med timmar per dag.
+  "Markera som skickad" låser rapporten som den ser ut då; den låses upp med ett skäl, och
+  upplåsningen och den nya sändningen loggas (#20).
+
 ## 0.9.0
 
 - Startsidan: arbetsdagens hjul 07–19 runt timern med dagens intervall i tidkodens färg, dagens

@@ -42,35 +42,13 @@ import type {
 	Timer,
 	UtcMillis
 } from '../../domain/types.ts';
-import { useCodes, useReceivers } from '../lyssnare.ts';
+import { useCodes, useNow, useReceivers } from '../lyssnare.ts';
 import { IntervallArk } from '../dag/IntervallArk';
 import type { HjulArc } from './Hjul';
 import { PlayIcon, StopIcon } from '../ikoner';
 import { StartVy, type StartDay, type TimerProblem } from './StartVy';
 
 const MINUTE = 60_000;
-
-/** The time, moved on at each whole minute and when the app is shown again. */
-const useNow = (): UtcMillis => {
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		let timeout: ReturnType<typeof setTimeout>;
-		const tick = () => {
-			setNow(Date.now());
-			timeout = setTimeout(tick, MINUTE - (Date.now() % MINUTE));
-		};
-		timeout = setTimeout(tick, MINUTE - (Date.now() % MINUTE));
-		const shown = () => {
-			if (document.visibilityState === 'visible') setNow(Date.now());
-		};
-		document.addEventListener('visibilitychange', shown);
-		return () => {
-			clearTimeout(timeout);
-			document.removeEventListener('visibilitychange', shown);
-		};
-	}, []);
-	return now;
-};
 
 export interface Start {
 	view: ReactNode;
