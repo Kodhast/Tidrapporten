@@ -17,9 +17,12 @@ export default defineConfig({
 			registerType: 'autoUpdate',
 			injectRegister: 'script-defer',
 			includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+			// The app's own worker (issue 22): the cache as before and the reminders' notifications.
 			// The sign-in must reach Cloudflare Access and the Pages Function, never the cached app
-			// (decision 0017).
-			workbox: { navigateFallbackDenylist: [/^\/inloggning/, /^\/cdn-cgi\//] },
+			// (decision 0017); src/sw.ts keeps that.
+			strategies: 'injectManifest',
+			srcDir: 'src',
+			filename: 'sw.ts',
 			manifest: {
 				name: 'Tidrapporten',
 				short_name: 'Tid',

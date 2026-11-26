@@ -5,11 +5,29 @@
 import { CloudBillingClient } from '@google-cloud/billing';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onMessagePublished } from 'firebase-functions/v2/pubsub';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import {
+	absenceTypeCodec,
+	assignmentCodec,
+	deviceCodec,
+	entryCodec,
+	freeDayCodec,
+	receiverCodec,
+	reportCodec,
+	settingsCodec,
+	timerCodec,
+	type Codec
+} from '../../src/data/dokument.ts';
+import { absenceCountings } from '../../src/domain/flex.ts';
+import { freeDaysByDate } from '../../src/domain/helgdagar.ts';
+import type { Receiver } from '../../src/domain/types.ts';
 import { RefusedFile, restoreMissing, type RestoreEffects } from './aterstall.ts';
 import { handleBudget, type BudgetEffects } from './budget.ts';
+import { runReminders, sendTest, type ReminderEffects } from './paminnelser.ts';
 
 initializeApp();
 
@@ -105,6 +123,129 @@ export const aterstall = onCall(
 			if (error instanceof RefusedFile) throw new HttpsError('invalid-argument', error.message);
 			logger.error('aterstall: misslyckades', { uid });
 			throw new HttpsError('internal', 'Återställningen misslyckades.');
+		}
+	}
+);
+
+const all = async <T>(path: string, codec: Codec<T>, parentId?: string): Promise<T[]> =>
+	(await getFirestore().collection(path).get()).docs.map((d) =>
+		codec.fromData(d.id, d.data(), parentId)
+	);
+
+/** Tokens Cloud Messaging answers that it no longer knows: the device is gone. */
+const GONE = new Set([
+	'messaging/registration-token-not-registered',
+	'messaging/invalid-registration-token'
+]);
+
+const reminderEffects: ReminderEffects = {
+	users: async () => {
+		const devices = await getFirestore().collectionGroup('devices').select().get();
+		return [
+			...new Set(devices.docs.map((d) => d.ref.parent.parent?.id).filter((id) => id))
+		] as string[];
+	},
+	settings: async (uid) =>
+		settingsCodec.fromData('settings', (await userDoc(uid, 'state/settings').get()).data() ?? {}),
+	handled: async (uid) => {
+		const sent = (await userDoc(uid, 'state/reminders').get()).get('handled') as unknown;
+		return typeof sent === 'object' && sent !== null ? (sent as Record<string, number>) : {};
+	},
+	saveHandled: async (uid, handled) => {
+		await userDoc(uid, 'state/reminders').set({
+			handled,
+			schemaVersion: 1,
+			updatedAt: FieldValue.serverTimestamp()
+		});
+	},
+	load: async (uid, now) => {
+		const base = `users/${uid}`;
+		const [assignments, entries, reports, freeDays, absenceTypes, pauses, timer] =
+			await Promise.all([
+				all(`${base}/assignments`, assignmentCodec),
+				all(`${base}/entries`, entryCodec),
+				all(`${base}/reports`, reportCodec),
+				all(`${base}/freeDays`, freeDayCodec),
+				all(`${base}/absenceTypes`, absenceTypeCodec),
+				getFirestore().collection(`${base}/pauses`).select().get(),
+				userDoc(uid, 'state/timer').get()
+			]);
+		const receivers: Record<string, Receiver[]> = Object.fromEntries(
+			await Promise.all(
+				assignments.map(
+					async (a) =>
+						[a.id, await all(`${base}/assignments/${a.id}/receivers`, receiverCodec, a.id)] as const
+				)
+			)
+		);
+		return {
+			assignments,
+			receivers,
+			entries,
+			reports,
+			freeDays: freeDaysByDate(freeDays),
+			countings: absenceCountings(absenceTypes),
+			timer: timer.exists ? timerCodec.fromData('timer', timer.data()!) : null,
+			now,
+			pauses: new Set(pauses.docs.map((d) => d.id))
+		};
+	},
+	devices: (uid) => all(`users/${uid}/devices`, deviceCodec),
+	send: async (tokens, notice) => {
+		if (tokens.length === 0) return [];
+		// A data message: the app's service worker draws it with its button (src/sw.ts). A reminder
+		// that has waited an hour is no longer worth showing.
+		const { responses } = await getMessaging().sendEach(
+			tokens.map((token) => ({
+				token,
+				data: { title: notice.title, body: notice.body, url: notice.url, action: notice.action },
+				webpush: { headers: { TTL: '3600', Urgency: 'high' } }
+			}))
+		);
+		return tokens.filter((_, i) => {
+			const code = responses[i]?.error?.code;
+			return code !== undefined && GONE.has(code);
+		});
+	},
+	removeDevices: async (uid, ids) => {
+		const batch = getFirestore().batch();
+		for (const id of ids) batch.delete(userDoc(uid, `devices/${id}`));
+		await batch.commit();
+	},
+	info: (message, fields) => logger.info(message, fields),
+	error: (message, fields) => logger.error(message, fields)
+};
+
+/**
+ * The reminders (issue 22), every 15 minutes. Runs in drift (release.yml) as
+ * tidrapporten-paminnelser: Cloud Datastore User and Firebase Cloud Messaging API Admin in drift,
+ * nothing more (docs/drift.md).
+ */
+export const paminnelser = onSchedule(
+	{
+		schedule: 'every 15 minutes',
+		timeZone: 'Europe/Stockholm',
+		region: REGION,
+		serviceAccount: 'tidrapporten-paminnelser@',
+		maxInstances: 1,
+		retryCount: 0
+	},
+	async (event) => {
+		await runReminders(Date.parse(event.scheduleTime) || Date.now(), reminderEffects);
+	}
+);
+
+/** The test notification from the reminder settings, to the signed-in user's devices. */
+export const provnotis = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-paminnelser@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		try {
+			return { devices: await sendTest(uid, reminderEffects) };
+		} catch {
+			logger.error('provnotis: misslyckades', { uid });
+			throw new HttpsError('internal', 'Provnotisen gick inte att skicka.');
 		}
 	}
 );

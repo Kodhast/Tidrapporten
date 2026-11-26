@@ -55,3 +55,18 @@ export function environmentFor(mode: string, useEmulator: boolean): Environment 
 export function firebaseOptions(environment: Environment): FirebaseOptions {
 	return options[environment];
 }
+
+/**
+ * The public half of each project's Web Push key pair (Firebase console → Project settings →
+ * Cloud Messaging → Web Push certificates). Not a secret: browsers get it to subscribe. Null until
+ * the owner has made the pair; the reminder settings then say that notifications are not set up.
+ */
+const vapidKeys: Record<Environment, string | null> = {
+	test: null,
+	drift: null,
+	emulator: null
+};
+
+export function vapidKeyFor(environment: Environment): string | null {
+	return vapidKeys[environment];
+}
