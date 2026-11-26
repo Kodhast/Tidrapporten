@@ -10,6 +10,8 @@ import { DOCUMENTS, seed, seedAssignment, signIn, stored, uid, type StoredDoc } 
 // Made-up data.
 
 const COLLECTIONS = [
+	'employers',
+	'customers',
 	'assignments',
 	'assignments/a1/codes',
 	'assignments/a1/receivers',
@@ -25,6 +27,13 @@ const COLLECTIONS = [
 /** Made-up documents in every collection below the user. */
 const seedEverything = async (request: APIRequestContext, user: string) => {
 	await seedAssignment(request, user, ['Utveckling']);
+	await seed(request, user, 'employers/g1', {
+		name: 'Exempelkonsult AB',
+		suggestionMode: 'fillNorm',
+		archived: false,
+		order: 0
+	});
+	await seed(request, user, 'customers/k1', { name: 'Kund A', archived: false, order: 0 });
 	await seed(request, user, 'assignments/a1/receivers/r1', {
 		name: 'Arbetsgivaren',
 		position: 1,
@@ -106,7 +115,9 @@ test('the export holds every document the server has', async ({ page, request })
 			'assignments/a1/codes/c1',
 			'assignments/a1/receivers/r1',
 			'changeLog/l1',
+			'customers/k1',
 			'devices/d1',
+			'employers/g1',
 			'pauses/2026-11-16',
 			'reports/a1_r1_2026-W47',
 			'state/settings'

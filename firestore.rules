@@ -16,11 +16,15 @@ rules_version = '2';
 // Days are strings 'YYYY-MM-DD', weeks 'YYYY-Www', clock times 'HH:MM'. Lengths are whole minutes.
 //
 // assignments/{id}: name string 1–100, startDate day, endDate day|null, terms list 1–50,
-//   openingFlex int, standardDay list ≤ 20, archived bool, order int, lastChangeId string|null
+//   openingFlex int, standardDay list ≤ 20, archived bool, order int, lastChangeId string|null,
+//   employerId id|null, customerId id|null (ADR 0019)
+// employers/{id}: name string 1–100, suggestionMode 'fillNorm'|'actualQuarter', archived bool,
+//   order int (ADR 0019)
+// customers/{id}: name string 1–100, archived bool, order int (ADR 0019)
 // assignments/{id}/codes/{id}: name string 1–100, billable bool, archived bool, order int
 // assignments/{id}/receivers/{id}: name string 1–100, position int ≥ 1, suggestionMode
 //   'fillNorm'|'actualQuarter', codes list ≤ 100, mapping map ≤ 200 keys, archived bool,
-//   lastChangeId string|null
+//   lastChangeId string|null, party {kind 'employer'|'customer', id}|null (ADR 0019)
 // absenceTypes/{id}: name string 1–100, counting 'fillsNorm'|'flexWithdrawal'|'worked',
 //   archived bool, order int, lastChangeId string|null
 // freeDays/{day}: free bool, name string ≤ 100, lastChangeId string|null
@@ -137,6 +141,12 @@ service cloud.firestore {
       return data().keys().hasOnly(fields(own)) && data().keys().hasAll(fields(own));
     }
 
+    // Like hasExactly, but the fields in `added` may be missing: a client still on an older
+    // version (a cached PWA) writes without them, and the app reads them as null (ADR 0019).
+    function hasExactlyOrOlder(own, added) {
+      return data().keys().hasOnly(fields(own.concat(added))) && data().keys().hasAll(fields(own));
+    }
+
     function isValidSubject(subject) {
       return subject is map && (
         (subject.keys().hasOnly(['kind', 'codeId']) && subject.keys().hasAll(['kind', 'codeId'])
@@ -161,8 +171,8 @@ service cloud.firestore {
     // ---------- Validators ----------
 
     function isValidAssignment() {
-      return hasExactly(['name', 'startDate', 'endDate', 'terms', 'openingFlex', 'standardDay',
-          'archived', 'order', 'lastChangeId'])
+      return hasExactlyOrOlder(['name', 'startDate', 'endDate', 'terms', 'openingFlex', 'standardDay',
+          'archived', 'order', 'lastChangeId'], ['employerId', 'customerId'])
         && isName(data().name)
         && isDay(data().startDate)
         && (data().endDate == null || (isDay(data().endDate) && data().endDate >= data().startDate))
@@ -171,7 +181,30 @@ service cloud.firestore {
         && data().standardDay is list && data().standardDay.size() <= 20
         && data().archived is bool
         && data().order is int
-        && isIdOrNull(data().lastChangeId);
+        && isIdOrNull(data().lastChangeId)
+        && isIdOrNull(data().get('employerId', null))
+        && isIdOrNull(data().get('customerId', null));
+    }
+
+    function isValidEmployer() {
+      return hasExactly(['name', 'suggestionMode', 'archived', 'order'])
+        && isName(data().name)
+        && data().suggestionMode in ['fillNorm', 'actualQuarter']
+        && data().archived is bool
+        && data().order is int;
+    }
+
+    function isValidCustomer() {
+      return hasExactly(['name', 'archived', 'order'])
+        && isName(data().name)
+        && data().archived is bool
+        && data().order is int;
+    }
+
+    function isValidParty(party) {
+      return party == null || (party is map
+        && party.keys().hasOnly(['kind', 'id']) && party.keys().hasAll(['kind', 'id'])
+        && party.kind in ['employer', 'customer'] && isId(party.id));
     }
 
     function isValidCode() {
@@ -183,15 +216,16 @@ service cloud.firestore {
     }
 
     function isValidReceiver() {
-      return hasExactly(['name', 'position', 'suggestionMode', 'codes', 'mapping', 'archived',
-          'lastChangeId'])
+      return hasExactlyOrOlder(['name', 'position', 'suggestionMode', 'codes', 'mapping', 'archived',
+          'lastChangeId'], ['party'])
         && isName(data().name)
         && data().position is int && data().position >= 1
         && data().suggestionMode in ['fillNorm', 'actualQuarter']
         && data().codes is list && data().codes.size() <= 100
         && data().mapping is map && data().mapping.size() <= 200
         && data().archived is bool
-        && isIdOrNull(data().lastChangeId);
+        && isIdOrNull(data().lastChangeId)
+        && isValidParty(data().get('party', null));
     }
 
     function isValidAbsenceType() {
@@ -380,6 +414,20 @@ service cloud.firestore {
               || isLoggedSetting(uid, 'assignments/' + assignmentId + '/receivers/' + receiverId));
           allow delete: if false;
         }
+      }
+
+      // Employers and customers (ADR 0019). Their names are copied to receivers, so nothing here
+      // alters the flex and no change is logged.
+      match /employers/{employerId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidEmployer();
+        allow delete: if false;
+      }
+
+      match /customers/{customerId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidCustomer();
+        allow delete: if false;
       }
 
       match /absenceTypes/{typeId} {

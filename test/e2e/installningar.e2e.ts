@@ -34,17 +34,35 @@ const addReceiver = async (page: Page, name: string, code: string) => {
 	await page.getByRole('link', { name: 'Tillbaka' }).click();
 };
 
-test('an assignment with two codes and two mapped receivers is still there after a reload', async ({
+const addParty = async (page: Page, link: string, field: string, name: string) => {
+	await page.getByRole('link', { name: link }).click();
+	await page.getByLabel(field).fill(name);
+	await save(page).click();
+	await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+	await page.getByRole('link', { name: 'Tillbaka' }).click();
+};
+
+test('an employer, a customer and an assignment that gets both as receivers (ADR 0019)', async ({
 	page
 }) => {
 	await signIn(page, uid('installningar'));
 	await page.getByRole('link', { name: 'Inställningar' }).click();
+	await addParty(page, 'Lägg till arbetsgivare', 'Arbetsgivare', 'Exempelkonsult AB');
+	await addParty(page, 'Lägg till kund', 'Kund', 'Kund A');
+	await expect(page.getByRole('link', { name: /Kund A/ })).toContainText('Inga uppdrag än');
+
 	await page.getByRole('link', { name: 'Lägg till uppdrag' }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Nytt uppdrag' })).toBeVisible();
-
 	await page.getByLabel('Namn').fill('Exempeluppdraget');
 	await page.getByLabel('Omfattning').fill('80');
 	await page.getByLabel('Ingående flexsaldo').fill('4,5');
+	// The only employer is chosen from the start.
+	await expect(page.getByRole('button', { name: /^Arbetsgivare/ })).toContainText(
+		'Exempelkonsult AB'
+	);
+	await page.getByRole('button', { name: /^Kund/ }).click();
+	await page.getByRole('dialog').getByRole('button', { name: 'Kund A' }).click();
+	await expect(page.getByRole('switch', { name: /Kunden får också veckorapporten/ })).toBeChecked();
 	await addInSheet(page, 'Lägg till tidkod', 'Namn', 'Utveckling');
 	await page.getByRole('button', { name: 'Lägg till tidkod' }).click();
 	await page.getByRole('dialog').getByLabel('Namn').fill('Intern tid');
@@ -53,8 +71,7 @@ test('an assignment with two codes and two mapped receivers is still there after
 	await save(page).click();
 	await expect(page.getByRole('link', { name: 'Lägg till mottagare' })).toBeVisible();
 
-	await addReceiver(page, 'Arbetsgivaren', '1001 Arbete');
-	await addReceiver(page, 'Kund A', 'K-10 Utveckling');
+	await addReceiver(page, 'Mellanhanden', 'M-1 Konsult');
 
 	await page.reload();
 	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
@@ -62,22 +79,20 @@ test('an assignment with two codes and two mapped receivers is still there after
 	await expect(page.getByLabel('Ingående flexsaldo')).toHaveValue('+4,5');
 	await expect(page.getByRole('switch', { name: /Intern tid/ })).not.toBeChecked();
 	await expect(page.getByRole('switch', { name: /Utveckling/ })).toBeChecked();
-	await expect(page.getByRole('link', { name: /1 · Arbetsgivaren/ })).toContainText(
+	await expect(page.getByRole('link', { name: /1 · Exempelkonsult AB/ })).toContainText(
 		'flexen räknas härifrån'
 	);
+	await expect(page.getByRole('link', { name: /3 · Mellanhanden/ })).toBeVisible();
+	// The customer's codes are ours, mapped one to one.
 	await page.getByRole('link', { name: /2 · Kund A/ }).click();
-	await expect(page.getByRole('button', { name: /^Utveckling/ })).toContainText(
-		'→ K-10 Utveckling'
-	);
-	await expect(page.getByRole('button', { name: /^Intern tid/ })).toContainText(
-		'→ K-10 Utveckling'
-	);
+	await expect(page.getByRole('button', { name: /^Utveckling/ })).toContainText('→ Utveckling');
+	await expect(page.getByRole('button', { name: /^Intern tid/ })).toContainText('→ Intern tid');
 
 	await page.getByRole('link', { name: 'Tillbaka' }).click();
 	await page.getByRole('link', { name: 'Tillbaka' }).click();
-	await expect(page.getByRole('link', { name: /Exempeluppdraget/ })).toContainText(
-		'80 % · 2 tidkoder · 2 mottagare'
-	);
+	await expect(page.getByRole('heading', { level: 2, name: 'Exempelkonsult AB' })).toBeVisible();
+	await expect(page.getByRole('link', { name: /Exempeluppdraget/ })).toContainText('Kund A · 80 %');
+	await expect(page.getByRole('link', { name: /^Kund A/ })).toContainText('1 uppdrag');
 });
 
 test('the default absence types are there at the first sign-in', async ({ page }) => {
@@ -98,8 +113,8 @@ test('the default absence types are there at the first sign-in', async ({ page }
 
 test('nothing can be saved offline, and the view says why', async ({ page, context }) => {
 	await signIn(page, uid('offline'));
-	await page.goto('/#/installningar/uppdrag/ny');
-	await page.getByLabel('Namn').fill('Exempeluppdraget');
+	await page.goto('/#/installningar/arbetsgivare/ny');
+	await page.getByLabel('Arbetsgivare').fill('Exempelkonsult AB');
 	await expect(save(page)).toBeEnabled();
 
 	await context.setOffline(true);

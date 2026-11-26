@@ -8,6 +8,8 @@ import {
 	assignmentCodec,
 	codeCodec,
 	type Codec,
+	customerCodec,
+	employerCodec,
 	DEFAULT_SETTINGS,
 	deviceCodec,
 	entryCodec,
@@ -58,12 +60,38 @@ export const roundTrips: [string, Codec<never>, unknown, string, string?][] = [
 		assignmentCodec as Codec<never>,
 		assignment({
 			endDate: '2026-12-31',
-			standardDay: [{ start: '08:00', end: '17:00', codeId: 'c1' }]
+			standardDay: [{ start: '08:00', end: '17:00', codeId: 'c1' }],
+			employerId: 'g1',
+			customerId: 'k1'
 		}),
 		'a1'
 	],
+	[
+		'employer',
+		employerCodec as Codec<never>,
+		{
+			id: 'g1',
+			name: 'Exempelkonsult AB',
+			suggestionMode: 'actualQuarter',
+			archived: true,
+			order: 2
+		},
+		'g1'
+	],
+	[
+		'customer',
+		customerCodec as Codec<never>,
+		{ id: 'k1', name: 'Kund A', archived: true, order: 1 },
+		'k1'
+	],
 	['time code', codeCodec as Codec<never>, code('c1', { billable: false, order: 2 }), 'c1', 'a1'],
-	['receiver', receiverCodec as Codec<never>, receiver(), 'r1', 'a1'],
+	[
+		'receiver',
+		receiverCodec as Codec<never>,
+		receiver({ party: { kind: 'customer', id: 'k1' } }),
+		'r1',
+		'a1'
+	],
 	[
 		'absence type',
 		absenceTypeCodec as Codec<never>,

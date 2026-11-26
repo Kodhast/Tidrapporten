@@ -47,6 +47,8 @@ const ruleStateDocuments = [...below.matchAll(/match \/state\/(\w+) /g)].map((m)
 /** Where each fixture is stored, by the codec's name in the round trips. */
 const collectionOf: Record<string, string> = {
 	assignment: 'assignments',
+	employer: 'employers',
+	customer: 'customers',
 	'time code': 'assignments/a1/codes',
 	receiver: 'assignments/a1/receivers',
 	'absence type': 'absenceTypes',

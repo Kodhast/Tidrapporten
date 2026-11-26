@@ -11,6 +11,7 @@ import {
 	freeDayErrors,
 	genitive,
 	plural,
+	receiversForNewAssignment,
 	isEve,
 	isIsoDate,
 	longDate,
@@ -131,7 +132,9 @@ const valid = {
 	scope: '80',
 	workday: '8',
 	openingFlex: '+4,5',
-	startDate: '2026-11-02'
+	startDate: '2026-11-02',
+	employerId: 'g1',
+	customerId: ''
 };
 
 describe('readAssignmentForm', () => {
@@ -142,7 +145,9 @@ describe('readAssignmentForm', () => {
 				scopePercent: 80,
 				workdayMinutes: 480,
 				openingFlex: 270,
-				startDate: '2026-11-02'
+				startDate: '2026-11-02',
+				employerId: 'g1',
+				customerId: null
 			},
 			errors: null
 		});
@@ -159,7 +164,9 @@ describe('readAssignmentForm', () => {
 				scope: '0',
 				workday: '25',
 				openingFlex: 'mycket',
-				startDate: ''
+				startDate: '',
+				employerId: '',
+				customerId: ''
 			}).errors
 		).toEqual({
 			name: 'Skriv ett namn',
@@ -177,6 +184,80 @@ describe('readAssignmentForm', () => {
 	});
 });
 
+describe('readAssignmentForm: the employer (ADR 0019)', () => {
+	it('requires an employer for a new assignment', () => {
+		expect(readAssignmentForm({ ...valid, employerId: '' }, true).errors).toEqual({
+			employerId: 'Välj arbetsgivare'
+		});
+	});
+
+	it('lets an assignment from before ADR 0019 stay without one', () => {
+		expect(readAssignmentForm({ ...valid, employerId: '' }).values).toMatchObject({
+			employerId: null,
+			customerId: null
+		});
+	});
+});
+
+describe('receiversForNewAssignment (ADR 0019)', () => {
+	const employer = {
+		id: 'g1',
+		name: 'Exempelkonsult AB',
+		suggestionMode: 'actualQuarter' as const,
+		archived: false,
+		order: 0
+	};
+	const customer = { id: 'k1', name: 'Kund A', archived: false, order: 0 };
+	const codes = [
+		code('c2', { name: 'Möten', order: 1 }),
+		code('c1', { name: 'Utveckling', order: 0 }),
+		code('c3', { name: 'Gammal', order: 2, archived: true })
+	];
+	let n = 0;
+	const makeId = () => `id${++n}`;
+
+	it('puts the employer first and the customer second, each with the codes mapped one to one', () => {
+		n = 0;
+		expect(receiversForNewAssignment('a1', codes, employer, customer, makeId)).toEqual([
+			{
+				id: 'id3',
+				assignmentId: 'a1',
+				name: 'Exempelkonsult AB',
+				position: 1,
+				suggestionMode: 'actualQuarter',
+				codes: [
+					{ id: 'id1', name: 'Utveckling' },
+					{ id: 'id2', name: 'Möten' }
+				],
+				mapping: { c1: 'id1', c2: 'id2' },
+				archived: false,
+				party: { kind: 'employer', id: 'g1' }
+			},
+			{
+				id: 'id6',
+				assignmentId: 'a1',
+				name: 'Kund A',
+				position: 2,
+				suggestionMode: 'fillNorm',
+				codes: [
+					{ id: 'id4', name: 'Utveckling' },
+					{ id: 'id5', name: 'Möten' }
+				],
+				mapping: { c1: 'id4', c2: 'id5' },
+				archived: false,
+				party: { kind: 'customer', id: 'k1' }
+			}
+		]);
+	});
+
+	it('gives only the employer when the customer does not get the report', () => {
+		const receivers = receiversForNewAssignment('a1', [], employer, null, makeId);
+		expect(receivers.map((r) => [r.name, r.position, r.codes, r.mapping])).toEqual([
+			['Exempelkonsult AB', 1, [], {}]
+		]);
+	});
+});
+
 describe('assignmentForm', () => {
 	it('starts a new assignment at 100 %, 8 h, no balance, today', () => {
 		expect(assignmentForm(null, '2026-11-26')).toEqual({
@@ -184,8 +265,11 @@ describe('assignmentForm', () => {
 			scope: '100',
 			workday: '8',
 			openingFlex: '0',
-			startDate: '2026-11-26'
+			startDate: '2026-11-26',
+			employerId: '',
+			customerId: ''
 		});
+		expect(assignmentForm(null, '2026-11-26', 'g1').employerId).toBe('g1');
 	});
 
 	it('shows the terms in force today', () => {
@@ -219,6 +303,8 @@ const values = (overrides: Partial<AssignmentValues> = {}): AssignmentValues => 
 	workdayMinutes: 480,
 	openingFlex: 0,
 	startDate: '2026-01-01',
+	employerId: null,
+	customerId: null,
 	...overrides
 });
 
@@ -281,7 +367,15 @@ describe('termsAfter: a changed scope applies from today (ADR 0012)', () => {
 
 describe('assignmentAfter and the log', () => {
 	it('makes a new assignment with the given id and order', () => {
-		expect(assignmentAfter(null, values({ openingFlex: 270 }), '2026-11-26', 'ny1', 3)).toEqual({
+		expect(
+			assignmentAfter(
+				null,
+				values({ openingFlex: 270, employerId: 'g1', customerId: 'k1' }),
+				'2026-11-26',
+				'ny1',
+				3
+			)
+		).toEqual({
 			id: 'ny1',
 			name: 'Exempeluppdraget',
 			startDate: '2026-01-01',
@@ -290,7 +384,9 @@ describe('assignmentAfter and the log', () => {
 			openingFlex: 270,
 			standardDay: [],
 			archived: false,
-			order: 3
+			order: 3,
+			employerId: 'g1',
+			customerId: 'k1'
 		});
 	});
 

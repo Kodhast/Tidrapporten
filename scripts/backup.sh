@@ -13,7 +13,7 @@ test_project=dagboken-497114
 db='(default)'
 
 # The collections in src/data/export.ts; the count includes every user's documents.
-collections=(assignments codes receivers absenceTypes freeDays entries pauses reports changeLog devices state)
+collections=(employers customers assignments codes receivers absenceTypes freeDays entries pauses reports changeLog devices state)
 
 count() { # project database collection
   curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \

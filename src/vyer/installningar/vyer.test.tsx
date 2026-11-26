@@ -1,11 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ABSENCE_TYPES } from '../../domain/installningar.ts';
-import { assignment, code } from '../../domain/testdata.ts';
+import { assignment, code, customer, employer } from '../../domain/testdata.ts';
 import type { Receiver } from '../../domain/types.ts';
 import { FranvaroVy } from './FranvaroVy';
 import { InstallningarVy } from './InstallningarVy';
 import { MottagareVy } from './MottagareVy';
+import { PartVy } from './PartVy';
 import { UppdragVy } from './UppdragVy';
 
 // The views' first render with made-up data; what the forms do is tested in the domain and in
@@ -22,6 +23,7 @@ const receiver = (overrides: Partial<Receiver> = {}): Receiver => ({
 	codes: [{ id: 'k1', name: '1001 Utveckling' }],
 	mapping: { c1: 'k1' },
 	archived: false,
+	party: null,
 	...overrides
 });
 
@@ -33,11 +35,12 @@ const codes = [
 describe('InstallningarVy', () => {
 	const props = {
 		assignments: [
-			assignment({ id: 'a2', name: 'Uppdrag B', order: 1 }),
-			assignment({ id: 'a1', name: 'Uppdrag A', order: 0 }),
+			assignment({ id: 'a2', name: 'Uppdrag B', order: 1, employerId: 'g1' }),
+			assignment({ id: 'a1', name: 'Uppdrag A', order: 0, employerId: 'g1', customerId: 'k1' }),
 			assignment({ id: 'a3', name: 'Gamla uppdraget', archived: true, order: 2 })
 		],
-		counts: { a1: { codes: 3, receivers: 2 }, a2: { codes: 1, receivers: 1 } },
+		employers: [employer()],
+		customers: [customer(), customer({ id: 'k2', name: 'Kund B', order: 1 })],
 		absenceTypes: 6,
 		freeDays: 1,
 		scopeToday: { a1: 80, a2: 20 },
@@ -46,18 +49,34 @@ describe('InstallningarVy', () => {
 		onRestore: () => Promise.resolve({ restored: 0, existed: 0 })
 	};
 
-	it('lists the assignments in order, archived last, with scope and counts', () => {
+	it('shows the assignments under one heading when there is no employer yet', () => {
+		const markup = renderToStaticMarkup(<InstallningarVy {...props} employers={[]} />);
+		expect(markup).toContain('>Uppdrag<');
+		expect(markup).not.toContain('Uppdrag utan arbetsgivare');
+	});
+
+	it('lists the assignments under their employer in order, the rest after, and the customers', () => {
 		const markup = renderToStaticMarkup(<InstallningarVy {...props} />);
 		expect(markup).toContain('Inställningar');
+		const employerAt = markup.indexOf('Exempelkonsult AB');
 		const a = markup.indexOf('Uppdrag A');
 		const b = markup.indexOf('Uppdrag B');
+		const without = markup.indexOf('Uppdrag utan arbetsgivare');
 		const old = markup.indexOf('Gamla uppdraget');
-		expect(a).toBeGreaterThan(-1);
+		expect(employerAt).toBeGreaterThan(-1);
+		expect(employerAt).toBeLessThan(a);
 		expect(a).toBeLessThan(b);
-		expect(b).toBeLessThan(old);
-		expect(markup).toContain('80 % · 3 tidkoder · 2 mottagare');
-		expect(markup).toContain('20 % · 1 tidkod · 1 mottagare');
-		expect(markup).toContain('Arkiverat · 100 % · 0 tidkoder · 0 mottagare');
+		expect(b).toBeLessThan(without);
+		expect(without).toBeLessThan(old);
+		expect(markup).toContain('Kund A · 80 %');
+		expect(markup).toContain('Ingen kund · 20 %');
+		expect(markup).toContain('Arkiverat · Välj arbetsgivare · Ingen kund · 100 %');
+		expect(markup).toContain('href="#/installningar/arbetsgivare/g1"');
+		expect(markup).toContain('href="#/installningar/kund/k1"');
+		expect(markup).toContain('1 uppdrag');
+		expect(markup).toContain('Inga uppdrag än');
+		expect(markup).toContain('href="#/installningar/kund/ny"');
+		expect(markup).toContain('href="#/installningar/arbetsgivare/ny"');
 		expect(markup).toContain('href="#/installningar/uppdrag/a1"');
 		expect(markup).toContain('href="#/installningar/uppdrag/ny"');
 		expect(markup).toContain('6 frånvarotyper · 1 egen ledig dag');
@@ -79,6 +98,8 @@ describe('UppdragVy', () => {
 			receiver(),
 			receiver({ id: 'r0', name: 'Arbetsgivaren', position: 1, mapping: {} })
 		],
+		employers: [employer()],
+		customers: [customer()],
 		nextOrder: 1,
 		today: '2026-11-26',
 		online: true,
@@ -93,7 +114,10 @@ describe('UppdragVy', () => {
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);
 		expect(markup).toContain('value="100"');
 		expect(markup).toContain('value="2026-11-26"');
-		expect(markup).toContain('Spara uppdraget först');
+		expect(markup).toContain('Exempelkonsult AB');
+		expect(markup).toContain('Ingen kund');
+		expect(markup).toContain('Arbetsgivaren blir mottagare 1');
+		expect(markup).not.toContain('Kunden får också veckorapporten');
 		expect(markup).not.toContain('Arkivera');
 	});
 
@@ -111,6 +135,24 @@ describe('UppdragVy', () => {
 		expect(markup).toContain('href="#/installningar/uppdrag/a1/mottagare/ny"');
 		expect(markup).toContain('Arkivera uppdraget');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);
+	});
+
+	it('asks for the employer of an assignment from before ADR 0019', () => {
+		const markup = renderToStaticMarkup(
+			<UppdragVy
+				{...props}
+				employers={[employer(), employer({ id: 'g2', name: 'Annan konsult AB', order: 1 })]}
+				assignment={assignment()}
+			/>
+		);
+		expect(markup).toContain('Välj arbetsgivare');
+	});
+
+	it('asks for an employer first when there is none', () => {
+		const markup = renderToStaticMarkup(
+			<UppdragVy {...props} employers={[]} assignment={null} codes={[]} receivers={[]} />
+		);
+		expect(markup).toContain('href="#/installningar/arbetsgivare/ny"');
 	});
 
 	it('offers to restore an archived assignment, not offline', () => {
@@ -184,5 +226,25 @@ describe('FranvaroVy', () => {
 	it('turns the eves’ switches off offline', () => {
 		const markup = renderToStaticMarkup(<FranvaroVy {...props} online={false} />);
 		expect(markup).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
+	});
+});
+
+describe('PartVy', () => {
+	it('shows an employer with its suggestion for the report', () => {
+		const markup = renderToStaticMarkup(
+			<PartVy kind="employer" value={employer()} nextOrder={1} online onSave={noSave} />
+		);
+		expect(markup).toContain('value="Exempelkonsult AB"');
+		expect(markup).toContain('Veckorapporten till arbetsgivaren');
+		expect(markup).toContain('Fyll mot normen');
+	});
+
+	it('starts a new customer empty, without the suggestion', () => {
+		const markup = renderToStaticMarkup(
+			<PartVy kind="customer" value={null} nextOrder={1} online onSave={noSave} />
+		);
+		expect(markup).toContain('Ny kund');
+		expect(markup).not.toContain('Veckorapporten till arbetsgivaren');
+		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);
 	});
 });

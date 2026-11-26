@@ -88,7 +88,8 @@ export function MottagareVy({
 		suggestionMode: mode,
 		codes: ownCodes,
 		mapping: cleanMapping(mapping, ownCodes),
-		archived: receiver?.archived ?? false
+		archived: receiver?.archived ?? false,
+		party: receiver?.party ?? null
 	};
 	const dirty =
 		receiver === null ||

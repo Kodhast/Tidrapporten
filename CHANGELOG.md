@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.1.0
+
+- Arbetsgivare och kunder: inställningarna visar uppdragen under sin arbetsgivare, och kunderna
+  med antal uppdrag. Ett nytt uppdrag väljer arbetsgivare och kund och får arbetsgivaren som
+  mottagare 1, och kunden som mottagare 2 om den också ska få veckorapporten. Mottagarnas koder
+  blir uppdragets tidkoder (#65).
+
 ## 1.0.0
 
 - Första versionen i drift på tid.kodhast.com: timer, dagvy, startsida med flex, veckorapporter

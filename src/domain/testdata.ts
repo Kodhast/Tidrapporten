@@ -4,6 +4,8 @@ import type {
 	AbsenceType,
 	Assignment,
 	ClockTime,
+	Customer,
+	Employer,
 	Entry,
 	Id,
 	IsoDate,
@@ -38,6 +40,8 @@ export const assignment = (overrides: Partial<Assignment> = {}): Assignment => (
 	standardDay: [],
 	archived: false,
 	order: 0,
+	employerId: null,
+	customerId: null,
 	...overrides
 });
 
@@ -118,6 +122,7 @@ export const receiver = (overrides: Partial<Receiver> = {}): Receiver => ({
 		utbildning: 'R-arbete'
 	},
 	archived: false,
+	party: null,
 	...overrides
 });
 
@@ -141,4 +146,21 @@ export const report = (
 	],
 	snapshot: null,
 	lastChangeId: null
+});
+
+export const employer = (overrides: Partial<Employer> = {}): Employer => ({
+	id: 'g1',
+	name: 'Exempelkonsult AB',
+	suggestionMode: 'fillNorm',
+	archived: false,
+	order: 0,
+	...overrides
+});
+
+export const customer = (overrides: Partial<Customer> = {}): Customer => ({
+	id: 'k1',
+	name: 'Kund A',
+	archived: false,
+	order: 0,
+	...overrides
 });

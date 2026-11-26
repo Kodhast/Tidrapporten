@@ -7,10 +7,14 @@ import type {
 	AbsenceType,
 	Assignment,
 	AssignmentTerms,
+	Customer,
+	Employer,
 	Id,
 	IsoDate,
 	Minutes,
 	Receiver,
+	ReceiverParty,
+	SuggestionMode,
 	TimeCode
 } from './types.ts';
 
@@ -95,6 +99,8 @@ export interface AssignmentForm {
 	workday: string; // hours at 100 %
 	openingFlex: string; // signed hours
 	startDate: IsoDate;
+	employerId: Id; // '' = none chosen
+	customerId: Id; // '' = no customer
 }
 
 export type AssignmentFormErrors = Partial<Record<keyof AssignmentForm, string>>;
@@ -105,13 +111,20 @@ export interface AssignmentValues {
 	workdayMinutes: Minutes;
 	openingFlex: Minutes;
 	startDate: IsoDate;
+	employerId: Id | null;
+	customerId: Id | null;
 }
 
-/** The values of a valid form, or the errors per field. */
+/**
+ * The values of a valid form, or the errors per field. A new assignment needs an employer
+ * (ADR 0019); one from before it may stay without.
+ */
 export const readAssignmentForm = (
-	form: AssignmentForm
+	form: AssignmentForm,
+	requireEmployer = false
 ): { values: AssignmentValues; errors: null } | { values: null; errors: AssignmentFormErrors } => {
 	const errors: AssignmentFormErrors = {};
+	if (requireEmployer && form.employerId === '') errors.employerId = 'Välj arbetsgivare';
 	const name = nameError(form.name);
 	if (name) errors.name = name;
 	const scope = /^\d{1,3}$/.test(form.scope.trim()) ? Number(form.scope) : NaN;
@@ -128,21 +141,32 @@ export const readAssignmentForm = (
 			scopePercent: scope,
 			workdayMinutes: workday!,
 			openingFlex: openingFlex!,
-			startDate: form.startDate
+			startDate: form.startDate,
+			employerId: form.employerId || null,
+			customerId: form.customerId || null
 		},
 		errors: null
 	};
 };
 
-/** The form for an assignment, or for a new one starting today. */
-export const assignmentForm = (assignment: Assignment | null, today: IsoDate): AssignmentForm => {
+/**
+ * The form for an assignment, or for a new one starting today with `employerId`, the only
+ * employer when there is one, chosen.
+ */
+export const assignmentForm = (
+	assignment: Assignment | null,
+	today: IsoDate,
+	employerId: Id = ''
+): AssignmentForm => {
 	if (!assignment) {
 		return {
 			name: '',
 			scope: '100',
 			workday: formatHours(DEFAULT_WORKDAY_MINUTES),
 			openingFlex: '0',
-			startDate: today
+			startDate: today,
+			employerId,
+			customerId: ''
 		};
 	}
 	const terms = currentTerms(assignment, today);
@@ -151,7 +175,9 @@ export const assignmentForm = (assignment: Assignment | null, today: IsoDate): A
 		scope: String(terms.scopePercent),
 		workday: formatHours(terms.workdayMinutes),
 		openingFlex: formatHours(assignment.openingFlex, true),
-		startDate: assignment.startDate
+		startDate: assignment.startDate,
+		employerId: assignment.employerId ?? '',
+		customerId: assignment.customerId ?? ''
 	};
 };
 
@@ -210,8 +236,43 @@ export const assignmentAfter = (
 	openingFlex: values.openingFlex,
 	standardDay: before?.standardDay ?? [],
 	archived: before?.archived ?? false,
-	order: before?.order ?? order
+	order: before?.order ?? order,
+	employerId: values.employerId,
+	customerId: values.customerId
 });
+
+/**
+ * The receivers a new assignment starts with (ADR 0019): the employer first, so that the flex
+ * counts against it, and the customer second when it gets the report too. Each gets the
+ * assignment's codes as its own, mapped one to one; absence is left for the owner to map.
+ */
+export const receiversForNewAssignment = (
+	assignmentId: Id,
+	codes: readonly TimeCode[],
+	employer: Employer,
+	customer: Customer | null,
+	makeId: () => Id = newId
+): Receiver[] => {
+	const active = [...codes].filter((c) => !c.archived).sort((a, b) => a.order - b.order);
+	const parties: [ReceiverParty, string, SuggestionMode][] = [
+		[{ kind: 'employer', id: employer.id }, employer.name, employer.suggestionMode]
+	];
+	if (customer) parties.push([{ kind: 'customer', id: customer.id }, customer.name, 'fillNorm']);
+	return parties.map(([party, name, suggestionMode], i) => {
+		const own = active.map((c) => ({ id: makeId(), name: c.name }));
+		return {
+			id: makeId(),
+			assignmentId,
+			name,
+			position: i + 1,
+			suggestionMode,
+			codes: own,
+			mapping: Object.fromEntries(active.map((c, j) => [c.id, own[j]!.id])),
+			archived: false,
+			party
+		};
+	});
+};
 
 /** Whether a change of the assignment needs a log entry (ADR 0016). */
 export const assignmentChangeIsLogged = (before: Assignment | null, after: Assignment): boolean =>

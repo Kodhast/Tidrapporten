@@ -1,22 +1,18 @@
-// The settings' first view (mockup "Inställningar"): the assignments, and the way to absence
-// types and free days.
+// The settings' first view (mockup "Inställningar – arbetsgivare och kunder"): the assignments
+// under their employer, the customers, and the way to absence types and free days.
 import { buttonClass, Header, Row } from '@kodhast/web-ui-react';
 import { plural } from '../../domain/installningar.ts';
-import type { Assignment, Id } from '../../domain/types.ts';
+import type { Assignment, Customer, Employer, Id } from '../../domain/types.ts';
 import { ClockIcon } from '../ikoner';
 import { href } from '../rutter.ts';
 import { OfflineNotice } from './delar';
 import { Export, type RestoreResult } from './Export';
 import type { ExportFile } from '../../data/exportformat.ts';
 
-export interface AssignmentCounts {
-	codes: number;
-	receivers: number;
-}
-
 export interface InstallningarVyProps {
 	assignments: readonly Assignment[];
-	counts: Readonly<Record<Id, AssignmentCounts>>;
+	employers: readonly Employer[];
+	customers: readonly Customer[];
 	absenceTypes: number;
 	freeDays: number;
 	scopeToday: Readonly<Record<Id, number>>;
@@ -25,9 +21,14 @@ export interface InstallningarVyProps {
 	onRestore: (file: ExportFile) => Promise<RestoreResult>;
 }
 
+/** Archived last, otherwise in the user's order. */
+const inOrder = <T extends { archived: boolean; order: number }>(items: readonly T[]): T[] =>
+	[...items].sort((a, b) => Number(a.archived) - Number(b.archived) || a.order - b.order);
+
 export function InstallningarVy({
 	assignments,
-	counts,
+	employers,
+	customers,
 	absenceTypes,
 	freeDays,
 	scopeToday,
@@ -35,33 +36,87 @@ export function InstallningarVy({
 	onExport,
 	onRestore
 }: InstallningarVyProps) {
-	const sorted = [...assignments].sort(
-		(a, b) => Number(a.archived) - Number(b.archived) || a.order - b.order
+	const sorted = inOrder(assignments);
+	const customerName = new Map(customers.map((c) => [c.id, c.name]));
+	const employerIds = new Set(employers.map((e) => e.id));
+	// Assignments from before ADR 0019 have no employer until one is chosen.
+	const withoutEmployer = sorted.filter((a) => !a.employerId || !employerIds.has(a.employerId));
+
+	const assignmentRows = (list: readonly Assignment[]) =>
+		list.map((a) => {
+			const parts = [
+				(a.customerId && customerName.get(a.customerId)) || 'Ingen kund',
+				`${scopeToday[a.id] ?? 100} %`
+			];
+			if (employers.length > 0 && withoutEmployer.includes(a)) parts.unshift('Välj arbetsgivare');
+			if (a.archived) parts.unshift('Arkiverat');
+			return (
+				<Row
+					key={a.id}
+					href={href({ view: 'uppdrag', id: a.id })}
+					title={a.name}
+					subtitle={parts.join(' · ')}
+					inactive={a.archived}
+					navigates
+				/>
+			);
+		});
+
+	const addAssignment = (
+		<div>
+			<a className={buttonClass()} href={href({ view: 'uppdrag', id: null })}>
+				Lägg till uppdrag
+			</a>
+		</div>
 	);
+
 	return (
 		<>
 			<Header icon={<ClockIcon />} name="Tidrapporten" title="Inställningar" />
 			<div className="innehall">
 				<OfflineNotice online={online} />
-				<section className="sektion">
-					<h2 className="kh-text-section-title">Uppdrag</h2>
-					{sorted.length > 0 && (
+				{inOrder(employers).map((e) => (
+					<section key={e.id} className="sektion">
+						<h2 className="kh-text-section-title">{e.name}</h2>
 						<div className="kh-card radlista">
-							{sorted.map((a) => {
-								const c = counts[a.id] ?? { codes: 0, receivers: 0 };
-								const parts = [
-									`${scopeToday[a.id] ?? 100} %`,
-									plural(c.codes, 'tidkod', 'tidkoder'),
-									plural(c.receivers, 'mottagare', 'mottagare')
-								];
-								if (a.archived) parts.unshift('Arkiverat');
+							<Row
+								href={href({ view: 'arbetsgivare', id: e.id })}
+								title="Arbetsgivaren"
+								subtitle={e.archived ? 'Arkiverad' : 'Namn och förslag för rapporten'}
+								inactive={e.archived}
+								navigates
+							/>
+							{assignmentRows(sorted.filter((a) => a.employerId === e.id))}
+						</div>
+					</section>
+				))}
+				{(withoutEmployer.length > 0 || employers.length === 0) && (
+					<section className="sektion">
+						<h2 className="kh-text-section-title">
+							{employers.length > 0 ? 'Uppdrag utan arbetsgivare' : 'Uppdrag'}
+						</h2>
+						{withoutEmployer.length > 0 && (
+							<div className="kh-card radlista">{assignmentRows(withoutEmployer)}</div>
+						)}
+					</section>
+				)}
+				{addAssignment}
+
+				<section className="sektion">
+					<h2 className="kh-text-section-title">Kunder</h2>
+					{customers.length > 0 && (
+						<div className="kh-card radlista">
+							{inOrder(customers).map((c) => {
+								const count = assignments.filter(
+									(a) => a.customerId === c.id && !a.archived
+								).length;
 								return (
 									<Row
-										key={a.id}
-										href={href({ view: 'uppdrag', id: a.id })}
-										title={a.name}
-										subtitle={parts.join(' · ')}
-										inactive={a.archived}
+										key={c.id}
+										href={href({ view: 'kund', id: c.id })}
+										title={c.name}
+										subtitle={count > 0 ? plural(count, 'uppdrag', 'uppdrag') : 'Inga uppdrag än'}
+										inactive={c.archived}
 										navigates
 									/>
 								);
@@ -69,11 +124,20 @@ export function InstallningarVy({
 						</div>
 					)}
 					<div>
-						<a className={buttonClass()} href={href({ view: 'uppdrag', id: null })}>
-							Lägg till uppdrag
+						<a className={buttonClass({ variant: 'text' })} href={href({ view: 'kund', id: null })}>
+							Lägg till kund
 						</a>
 					</div>
 				</section>
+
+				<div>
+					<a
+						className={buttonClass({ variant: 'text' })}
+						href={href({ view: 'arbetsgivare', id: null })}
+					>
+						Lägg till arbetsgivare
+					</a>
+				</div>
 
 				<section className="sektion">
 					<h2 className="kh-text-section-title">Tid</h2>
