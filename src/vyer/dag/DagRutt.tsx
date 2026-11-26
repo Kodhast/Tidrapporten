@@ -8,7 +8,8 @@ import { absenceTypeCodec, assignmentCodec } from '../../data/dokument.ts';
 import { absenceTypesPath, assignmentsPath, watchCollection } from '../../data/installningar.ts';
 import { saveEntry } from '../../data/skrivning.ts';
 import { watchReportsFrom } from '../../data/timer.ts';
-import { dayRows, daySum, firstOverlap, isOnDay } from '../../domain/dag.ts';
+import { dayRows, daySum, entryName, firstOverlap, isOnDay } from '../../domain/dag.ts';
+import { codeColour } from '../../domain/hjul.ts';
 import type { Span } from '../../domain/intervall.ts';
 import { addDays, isoWeekOf } from '../../domain/tid.ts';
 import { startChoice, timerCodeGroups, type CodeChoice } from '../../domain/timer.ts';
@@ -95,16 +96,7 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 		return [...groups, { assignment: own, codes: codes[own.id] ?? [] }];
 	};
 	const assignmentName = (id: Id) => (assignments ?? []).find((a) => a.id === id)?.name ?? '';
-	const describe = (entry: Entry) => {
-		const subject =
-			entry.subject.kind === 'code'
-				? (codes[entry.assignmentId] ?? []).find(
-						(c) => c.id === (entry.subject as { codeId: Id }).codeId
-					)?.name
-				: absenceTypes.find((t) => t.id === (entry.subject as { absenceTypeId: Id }).absenceTypeId)
-						?.name;
-		return [assignmentName(entry.assignmentId), subject].filter(Boolean).join(' · ');
-	};
+	const describe = (entry: Entry) => entryName(entry, assignments ?? [], codes, absenceTypes);
 
 	const open = (entry: Entry | null, span: Span | null, choice: CodeChoice | null) =>
 		setSheet({ entry, span, choice, newId: newEntryId(db, uid), key: Date.now() });
@@ -146,6 +138,7 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 			date={date}
 			rows={dayRows(shown, date)}
 			describe={describe}
+			accent={(entry) => `accent-kod-${codeColour(entry, codes)}`}
 			assignmentName={assignmentName}
 			overlap={firstOverlap(shown, date)}
 			sum={daySum(shown, date)}

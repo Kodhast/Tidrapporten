@@ -1,10 +1,14 @@
-// The start page (mockup "Idag – timern går"): the timer's code chip and running time where the
-// wheel goes in issue 19, the offline notice and the forgotten-timer question. Gets plain values;
-// useStart connects it to Firestore.
-import { buttonClass, Chip, EmptyState, Header, Notice } from '@kodhast/web-ui-react';
+// The start page (mockup "Idag – arbetsdagens hjul", issue 19): the flex in the header, the wheel
+// round the timer's code chip and running time, today's time against the norm, today's intervals
+// and gaps, the reports not yet sent, the offline notice and the forgotten-timer question. Gets
+// plain values; useStart connects it to Firestore.
+import { buttonClass, Chip, EmptyState, Header, Notice, Pill } from '@kodhast/web-ui-react';
 import { useState, type ReactNode } from 'react';
-import { dayName } from '../../domain/dag.ts';
-import { clockOf, isoWeekOf } from '../../domain/tid.ts';
+import { dayName, minutesLabel, type DayRow } from '../../domain/dag.ts';
+import type { CodeColour } from '../../domain/hjul.ts';
+import type { Span } from '../../domain/intervall.ts';
+import { flexLabel, isFlexNegative, type Overview } from '../../domain/oversikt.ts';
+import { isoWeekOf } from '../../domain/tid.ts';
 import {
 	choiceNames,
 	elapsedLabel,
@@ -12,10 +16,13 @@ import {
 	type CodeChoice,
 	type CodeGroup
 } from '../../domain/timer.ts';
-import type { IsoDate, Timer, UtcMillis } from '../../domain/types.ts';
+import type { Entry, Id, IsoDate, Timer, UtcMillis } from '../../domain/types.ts';
 import { ClockIcon, ExpandIcon, OfflineIcon, WarningIcon, WorkIcon } from '../ikoner';
+import { DagRader } from '../dag/DagRader';
 import { href } from '../rutter.ts';
+import { FlexArk } from './FlexArk';
 import { GlomdTimer, type GlomdTimerProps } from './GlomdTimer';
+import { Hjul, type HjulArc } from './Hjul';
 import { KodLista } from './KodLista';
 
 /** Why the last press did not do what it should. */
@@ -40,6 +47,26 @@ export interface StartVyProps {
 	forgotten: Omit<GlomdTimerProps, 'isOpen' | 'timer' | 'now'> | null;
 	/** The budget banner (issue 28). */
 	banner?: ReactNode;
+	/** Flex, the week, today's time and the unsent reports; null until everything has come. */
+	overview?: Overview | null;
+	/** Today's intervals and gaps, newest first, and their arcs on the wheel. */
+	day?: StartDay | null;
+	/** The colour of the code the chip shows. */
+	chipColour?: CodeColour | null;
+	onPause?: (paused: boolean) => void;
+	onFill?: (gap: Span) => void;
+	/** The interval sheet for a gap that is filled, when open. */
+	sheet?: ReactNode;
+}
+
+export interface StartDay {
+	rows: readonly DayRow[];
+	arcs: readonly HjulArc[];
+	paused: boolean;
+	/** The running timer's entry among the rows. */
+	runningId: Id | null;
+	describe: (entry: Entry) => string;
+	accent: (entry: Entry) => string;
 }
 
 /** `2026-11-25` → `Onsdag 25 november · vecka 48`. */
@@ -58,14 +85,37 @@ export function StartVy({
 	problem,
 	onChoose,
 	forgotten,
-	banner
+	banner,
+	overview = null,
+	day = null,
+	chipColour = null,
+	onPause = () => {},
+	onFill = () => {},
+	sheet
 }: StartVyProps) {
 	const [choosing, setChoosing] = useState(false);
+	const [showingFlex, setShowingFlex] = useState(false);
 	const current = timer ? timerChoice(timer) : next;
 	const names = timer ? timerNames : current && choiceNames(groups, current);
 	return (
 		<>
-			<Header icon={<ClockIcon />} name="Tidrapporten" title="Idag" subtitle={daySubtitle(today)} />
+			<Header
+				icon={<ClockIcon />}
+				name="Tidrapporten"
+				title="Idag"
+				subtitle={daySubtitle(today)}
+				trailing={
+					overview &&
+					overview.perAssignment.length > 0 && (
+						<Pill
+							tone={isFlexNegative(overview.total) ? 'ton-varning' : 'ton-ok'}
+							onPress={() => setShowingFlex(true)}
+						>
+							{`Flex ${flexLabel(overview.total)}`}
+						</Pill>
+					)
+				}
+			/>
 			<div className="innehall">
 				{!online && (
 					<Notice
@@ -108,29 +158,59 @@ export function StartVy({
 						note="Har du flex sedan tidigare anger du den som ingående saldo i uppdraget."
 					/>
 				) : (
-					<div className="timer">
-						<Chip
-							trailing={<ExpandIcon />}
-							onPress={() => setChoosing(true)}
-							aria-label={`Byt tidkod, nu ${names ? `${names.code} i ${names.assignment}` : 'ingen'}`}
-						>
-							{names?.code || 'Välj tidkod'}
-						</Chip>
-						<span className="kh-text-big-number">
-							{timer ? elapsedLabel(timer.start, now) : '0 min'}
-						</span>
-						<span className="kh-text-item-subtitle dampad">
-							{timer
-								? `Startad ${clockOf(timer.start)}${names?.assignment ? ` · ${names.assignment}` : ''}`
-								: 'Timern står still'}
-						</span>
-						{/* Until the day's intervals are on the start page (issue 19). */}
+					<>
+						<Hjul arcs={day?.arcs ?? []}>
+							<Chip
+								icon={
+									chipColour && (
+										<svg className={`kodprick accent-kod-${chipColour}`} viewBox="0 0 10 10">
+											<circle cx="5" cy="5" r="5" />
+										</svg>
+									)
+								}
+								trailing={<ExpandIcon />}
+								onPress={() => setChoosing(true)}
+								aria-label={`Byt tidkod, nu ${names ? `${names.code} i ${names.assignment}` : 'ingen'}`}
+							>
+								{names?.code || 'Välj tidkod'}
+							</Chip>
+							<span className="kh-text-big-number tabular">
+								{timer ? elapsedLabel(timer.start, now) : '0 min'}
+							</span>
+							{overview && (
+								<span className="kh-text-item-subtitle dampad">
+									{`${minutesLabel(overview.todayActual)} av ${minutesLabel(overview.todayNorm)} idag`}
+								</span>
+							)}
+						</Hjul>
+						{day && day.rows.length > 0 && (
+							<DagRader
+								rows={day.rows}
+								describe={day.describe}
+								accent={day.accent}
+								paused={day.paused}
+								runningId={day.runningId}
+								open={() => ({ href: href({ view: 'dag', date: today }) })}
+								onFill={onFill}
+								onPause={onPause}
+							/>
+						)}
 						<a
 							className={buttonClass({ variant: 'text' })}
 							href={href({ view: 'dag', date: today })}
 						>
-							Dagens intervall
+							Visa dagen
 						</a>
+					</>
+				)}
+				{/* Also when every assignment has ended: their weeks may still need a report. */}
+				{overview && overview.unsent > 0 && (
+					<div className="kh-pills centrerad">
+						<Pill tone="ton-varning">
+							{overview.unsent === 1
+								? '1 rapport ej skickad'
+								: `${overview.unsent} rapporter ej skickade`}
+						</Pill>
 					</div>
 				)}
 			</div>
@@ -142,6 +222,10 @@ export function StartVy({
 				running={timer !== null}
 				onChoose={onChoose}
 			/>
+			{overview && (
+				<FlexArk isOpen={showingFlex} onOpenChange={setShowingFlex} overview={overview} />
+			)}
+			{sheet}
 			{timer && forgotten && (
 				<GlomdTimer key={timer.start} isOpen timer={timer} now={now} {...forgotten} />
 			)}

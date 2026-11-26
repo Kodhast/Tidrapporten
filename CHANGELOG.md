@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.9.0
+
+- Startsidan: arbetsdagens hjul 07–19 runt timern med dagens intervall i tidkodens färg, dagens
+  tid mot normen, dagens intervall och luckor (nyast först, en lucka blir paus med ett tryck) och
+  antalet veckorapporter som inte är skickade. Flexen syns i sidhuvudet och per uppdrag med
+  veckan mot normen i ett ark. Appen har fått temat Kanel, ljust och mörkt (#19).
+
 ## 0.8.0
 
 - Dagvyn: dagens intervall i tidsordning, med luckorna emellan. Ett intervall rättas, läggs till

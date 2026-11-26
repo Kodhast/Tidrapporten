@@ -62,6 +62,7 @@ const day = (entries: Entry[], overrides: Partial<DagVyProps> = {}): DagVyProps 
 	date: DAY,
 	rows: dayRows(entries, DAY),
 	describe: describeEntry,
+	accent: () => 'accent-kod-1',
 	assignmentName: (id) => (id === 'a1' ? 'Uppdrag A' : 'Uppdrag B'),
 	overlap: firstOverlap(entries, DAY),
 	sum: daySum(entries, DAY),
