@@ -143,7 +143,33 @@ _dry_run_ och läs felet om den skarpa körningen fallerar.
 
 ## Backup
 
-Den dagliga exporten till Cloud Storage kommer i en egen PR (issue 21).
+**Daglig backup** (beslut 0018): Firestores schemalagda backuper i test och drift, en om dagen
+med 30 dagars lagringstid, och point-in-time recovery (7 dagar) i drift. Sätts upp en gång per
+projekt i Cloud Shell av projektets ägare:
+
+    bash scripts/backup.sh test
+    bash scripts/backup.sh drift
+
+**De senaste backuperna** (kontrolleras vid varje release; det finns inget larm):
+
+    gcloud firestore backups list --location=europe-west1 --project=device-streaming-5b35f7b8
+
+**Återställa** en backup: den blir en ny databas i samma projekt, och appen läser fortfarande
+`(default)`. Kontrollera den nya databasen och kopiera tillbaka det som saknas, eller byt namn
+genom att radera `(default)` och återställa dit. Det senare stoppar appen under tiden och är inte
+provat.
+
+    gcloud firestore databases restore --project=<projekt> \
+      --source-backup=projects/<projekt>/locations/europe-west1/backups/<id> \
+      --destination-database=<nytt-namn>
+
+**Provet** återställer den senaste backupen i test, jämför antalet dokument per samling och
+raderar den återställda databasen:
+
+    bash scripts/backup.sh prova
+
+**Ett misstag de senaste 7 dagarna i drift** återställs med PITR till en viss minut: se
+[Googles steg](https://firebase.google.com/docs/firestore/use-pitr).
 
 **JSON-exporten i appen** (Inställningar → Exportera all data) läser varje dokument under
 `users/{uid}` från servern, ändringsloggen inräknad, och laddar ner `tidrapporten-<datum>.json`:
