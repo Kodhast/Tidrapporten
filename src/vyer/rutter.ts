@@ -10,6 +10,8 @@ export type Route =
 	| { view: 'uppdrag'; id: Id | null } // null: a new assignment
 	| { view: 'mottagare'; assignmentId: Id; id: Id | null } // null: a new receiver
 	| { view: 'franvaro' }
+	| { view: 'arbetsgivare'; id: Id | null } // null: a new employer
+	| { view: 'kund'; id: Id | null } // null: a new customer
 	| { view: 'dag'; date: IsoDate }
 	| { view: 'vecka'; week: IsoWeek | null } // null: the current week
 	| {
@@ -54,6 +56,8 @@ export const parseRoute = (hash: string): Route => {
 			transcript: m[5] !== undefined
 		};
 	}
+	m = new RegExp(`^/installningar/(arbetsgivare|kund)/${ID}$`).exec(path);
+	if (m) return { view: m[1] as 'arbetsgivare' | 'kund', id: m[2] === 'ny' ? null : m[2]! };
 	m = new RegExp(`^/installningar/uppdrag/${ID}$`).exec(path);
 	if (m) return { view: 'uppdrag', id: m[1] === 'ny' ? null : m[1]! };
 	m = new RegExp(`^/installningar/uppdrag/${ID}/mottagare/${ID}$`).exec(path);
@@ -72,6 +76,9 @@ export const href = (route: Route): string => {
 			return '#/installningar/franvaro';
 		case 'uppdrag':
 			return `#/installningar/uppdrag/${route.id ?? 'ny'}`;
+		case 'arbetsgivare':
+		case 'kund':
+			return `#/installningar/${route.view}/${route.id ?? 'ny'}`;
 		case 'dag':
 			return `#/dag/${route.date}`;
 		case 'vecka':

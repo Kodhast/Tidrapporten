@@ -1,5 +1,5 @@
 // An assignment (mockup "Uppdrag"): name, scope, workday, start and opening balance, the internal
-// codes with billable, and the receivers in the chain.
+// codes with billable, the employer and customer (ADR 0019), and the receivers in the chain.
 import {
 	BottomSheet,
 	Button,
@@ -18,13 +18,21 @@ import {
 	nextNumber,
 	plural,
 	readAssignmentForm,
+	receiversForNewAssignment,
 	unmappedCodes,
 	type AssignmentForm
 } from '../../domain/installningar.ts';
-import type { Assignment, IsoDate, Receiver, TimeCode } from '../../domain/types.ts';
+import type {
+	Assignment,
+	Customer,
+	Employer,
+	IsoDate,
+	Receiver,
+	TimeCode
+} from '../../domain/types.ts';
 import type { CodeChange } from '../../data/installningar.ts';
 import { href } from '../rutter.ts';
-import { OfflineNotice, SaveFailed, useSave } from './delar';
+import { ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
 
 export const SUGGESTION_LABELS = {
 	fillNorm: 'Fyll mot normen',
@@ -35,11 +43,19 @@ export interface UppdragVyProps {
 	assignment: Assignment | null;
 	codes: readonly TimeCode[];
 	receivers: readonly Receiver[];
+	employers: readonly Employer[];
+	customers: readonly Customer[];
 	/** The order a new assignment gets. */
 	nextOrder: number;
 	today: IsoDate;
 	online: boolean;
-	onSave: (before: Assignment | null, after: Assignment, codes: CodeChange[]) => Promise<void>;
+	/** `receivers`: a new assignment's first receivers, from its employer and customer. */
+	onSave: (
+		before: Assignment | null,
+		after: Assignment,
+		codes: CodeChange[],
+		receivers: Receiver[]
+	) => Promise<void>;
 }
 
 const sameForm = (a: AssignmentForm, b: AssignmentForm) =>
@@ -49,21 +65,37 @@ export function UppdragVy({
 	assignment,
 	codes,
 	receivers,
+	employers,
+	customers,
 	nextOrder,
 	today,
 	online,
 	onSave
 }: UppdragVyProps) {
-	const initialForm = assignmentForm(assignment, today);
+	// Archived ones are not offered, except the one already chosen.
+	const offered = <T extends { id: string; archived: boolean; order: number }>(
+		items: readonly T[],
+		chosen: string | null | undefined
+	) => items.filter((i) => !i.archived || i.id === chosen).sort((a, b) => a.order - b.order);
+	const employerOptions = offered(employers, assignment?.employerId);
+	const customerOptions = offered(customers, assignment?.customerId);
+	// A new assignment starts with the employer when there is only one to choose.
+	const initialForm = assignmentForm(
+		assignment,
+		today,
+		employerOptions.length === 1 ? employerOptions[0]!.id : ''
+	);
 	const [form, setForm] = useState(initialForm);
 	const sortedCodes = [...codes].sort((a, b) => a.order - b.order);
 	const [codeList, setCodeList] = useState<TimeCode[]>(sortedCodes);
 	const [adding, setAdding] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [newBillable, setNewBillable] = useState(true);
+	const [customerReceives, setCustomerReceives] = useState(true);
 	const save = useSave();
 
-	const read = readAssignmentForm(form);
+	// A new assignment needs an employer; one from before ADR 0019 may stay without.
+	const read = readAssignmentForm(form, !assignment || assignment.employerId !== null);
 	const changedCodes: CodeChange[] = codeList.flatMap((after) => {
 		const before = codes.find((c) => c.id === after.id) ?? null;
 		return before && before.name === after.name && before.billable === after.billable
@@ -86,7 +118,18 @@ export function UppdragVy({
 			...c,
 			after: { ...c.after, assignmentId: after.id }
 		}));
-		void save.run(() => onSave(assignment, after, withParent));
+		const employer = employers.find((e) => e.id === after.employerId);
+		const customer = customers.find((c) => c.id === after.customerId);
+		const firstReceivers =
+			!assignment && employer
+				? receiversForNewAssignment(
+						after.id,
+						withParent.map((c) => c.after),
+						employer,
+						customerReceives ? (customer ?? null) : null
+					)
+				: [];
+		void save.run(() => onSave(assignment, after, withParent, firstReceivers));
 	};
 
 	const addCode = () => {
@@ -156,6 +199,28 @@ export function UppdragVy({
 							errorMessage={error('workday')}
 						/>
 					</div>
+					{employerOptions.length > 0 ? (
+						<ChoiceRow
+							label="Arbetsgivare"
+							placeholder="Välj arbetsgivare"
+							options={employerOptions}
+							value={form.employerId}
+							onChange={set('employerId')}
+							error={error('employerId')}
+						/>
+					) : (
+						<p className="kh-text-item-subtitle">
+							Ett uppdrag hör till en arbetsgivare.{' '}
+							<a href={href({ view: 'arbetsgivare', id: null })}>Lägg till arbetsgivaren först</a>.
+						</p>
+					)}
+					<ChoiceRow
+						label="Kund"
+						options={customerOptions}
+						value={form.customerId}
+						onChange={set('customerId')}
+						noneLabel="Ingen kund"
+					/>
 					<TextField
 						label="Startdatum"
 						type="date"
@@ -207,9 +272,22 @@ export function UppdragVy({
 				<section className="sektion">
 					<h2 className="kh-text-section-title">Mottagare i ordning</h2>
 					{!assignment ? (
-						<p className="kh-text-item-subtitle dampad">
-							Spara uppdraget först, sedan lägger du till mottagarna.
-						</p>
+						<>
+							{form.customerId !== '' && (
+								<div className="kh-card radlista">
+									<SwitchRow
+										title="Kunden får också veckorapporten"
+										subtitle="Blir mottagare 2, efter arbetsgivaren"
+										isSelected={customerReceives}
+										onChange={setCustomerReceives}
+									/>
+								</div>
+							)}
+							<p className="kh-text-item-subtitle dampad">
+								Arbetsgivaren blir mottagare 1, och flexen räknas mot den. Fler mottagare lägger du
+								till när uppdraget är sparat.
+							</p>
+						</>
 					) : (
 						<>
 							{sortedReceivers.length > 0 && (
@@ -261,7 +339,7 @@ export function UppdragVy({
 								isDisabled={!online || save.pending}
 								onPress={() =>
 									void save.run(() =>
-										onSave(assignment, { ...assignment, archived: !assignment.archived }, [])
+										onSave(assignment, { ...assignment, archived: !assignment.archived }, [], [])
 									)
 								}
 							>

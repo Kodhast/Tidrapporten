@@ -16,6 +16,8 @@ import type {
 	AbsenceType,
 	Assignment,
 	ChangeAction,
+	Customer,
+	Employer,
 	FreeDay,
 	Id,
 	Receiver,
@@ -25,6 +27,8 @@ import {
 	absenceTypeCodec,
 	assignmentCodec,
 	codeCodec,
+	customerCodec,
+	employerCodec,
 	freeDayCodec,
 	receiverCodec,
 	type Codec
@@ -50,6 +54,8 @@ export const codesPath = (assignmentId: Id) => userPath('assignments', assignmen
 export const receiversPath = (assignmentId: Id) =>
 	userPath('assignments', assignmentId, 'receivers');
 export const absenceTypesPath = 'absenceTypes';
+export const employersPath = 'employers';
+export const customersPath = 'customers';
 export const freeDaysPath = 'freeDays';
 
 /**
@@ -93,15 +99,17 @@ export interface CodeChange {
 }
 
 /**
- * Saves an assignment and its codes together. A change of the start, end, opening balance or
- * terms is logged (ADR 0016); a new assignment and the codes are not.
+ * Saves an assignment and its codes together, and the receivers a new assignment starts with
+ * (ADR 0019). A change of the start, end, opening balance or terms is logged (ADR 0016), and so
+ * is each new receiver, which may take position 1; a new assignment and the codes are not.
  */
 export const saveAssignment = (
 	db: Firestore,
 	uid: Id,
 	before: Assignment | null,
 	after: Assignment,
-	codes: readonly CodeChange[] = []
+	codes: readonly CodeChange[] = [],
+	receivers: readonly Receiver[] = []
 ): Promise<void> =>
 	runTransaction(db, async (tx) => {
 		write(
@@ -124,6 +132,55 @@ export const saveAssignment = (
 				false
 			);
 		}
+		for (const receiver of receivers) {
+			write(
+				db,
+				uid,
+				tx,
+				userPath(receiversPath(after.id), receiver.id),
+				null,
+				receiverCodec.toData(receiver),
+				true
+			);
+		}
+	});
+
+/** Saves an employer (ADR 0019). Its name is copied to receivers, so a change is not logged. */
+export const saveEmployer = (
+	db: Firestore,
+	uid: Id,
+	before: Employer | null,
+	after: Employer
+): Promise<void> =>
+	runTransaction(db, async (tx) => {
+		write(
+			db,
+			uid,
+			tx,
+			userPath(employersPath, after.id),
+			before && employerCodec.toData(before),
+			employerCodec.toData(after),
+			false
+		);
+	});
+
+/** Saves a customer (ADR 0019), like an employer. */
+export const saveCustomer = (
+	db: Firestore,
+	uid: Id,
+	before: Customer | null,
+	after: Customer
+): Promise<void> =>
+	runTransaction(db, async (tx) => {
+		write(
+			db,
+			uid,
+			tx,
+			userPath(customersPath, after.id),
+			before && customerCodec.toData(before),
+			customerCodec.toData(after),
+			false
+		);
 	});
 
 /** Saves a receiver. A new one, or a moved one, may change who counts for flex: logged. */

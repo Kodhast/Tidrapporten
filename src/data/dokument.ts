@@ -6,7 +6,9 @@ import type {
 	Assignment,
 	AssignmentTerms,
 	ChangeLogEntry,
+	Customer,
 	Device,
+	Employer,
 	Entry,
 	EntrySubject,
 	EntryTime,
@@ -15,6 +17,7 @@ import type {
 	PauseMark,
 	Receiver,
 	ReceiverCode,
+	ReceiverParty,
 	Report,
 	ReportLine,
 	ReportSnapshot,
@@ -76,6 +79,29 @@ export const assignmentCodec: Codec<Assignment> = {
 		openingFlex: int(d.openingFlex),
 		standardDay: list(d.standardDay).map(slot),
 		archived: bool(d.archived),
+		order: int(d.order),
+		employerId: strOrNull(d.employerId),
+		customerId: strOrNull(d.customerId)
+	})
+};
+
+export const employerCodec: Codec<Employer> = {
+	toData: (value) => without(value, 'id'),
+	fromData: (id, d) => ({
+		id,
+		name: str(d.name),
+		suggestionMode: oneOf(d.suggestionMode, ['fillNorm', 'actualQuarter'], 'fillNorm'),
+		archived: bool(d.archived),
+		order: int(d.order)
+	})
+};
+
+export const customerCodec: Codec<Customer> = {
+	toData: (value) => without(value, 'id'),
+	fromData: (id, d) => ({
+		id,
+		name: str(d.name),
+		archived: bool(d.archived),
 		order: int(d.order)
 	})
 };
@@ -90,6 +116,13 @@ export const codeCodec: Codec<TimeCode> = {
 		archived: bool(d.archived),
 		order: int(d.order)
 	})
+};
+
+const party = (value: unknown): ReceiverParty | null => {
+	if (value === null || typeof value !== 'object') return null;
+	const p = asRecord(value);
+	const id = strOrNull(p.id);
+	return id && (p.kind === 'employer' || p.kind === 'customer') ? { kind: p.kind, id } : null;
 };
 
 const receiverCode = (value: unknown): ReceiverCode => {
@@ -107,7 +140,8 @@ export const receiverCodec: Codec<Receiver> = {
 		suggestionMode: oneOf(d.suggestionMode, ['fillNorm', 'actualQuarter'], 'fillNorm'),
 		codes: list(d.codes).map(receiverCode),
 		mapping: stringMap(d.mapping),
-		archived: bool(d.archived)
+		archived: bool(d.archived),
+		party: party(d.party)
 	})
 };
 

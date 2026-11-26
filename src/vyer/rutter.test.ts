@@ -17,6 +17,10 @@ describe('the routes', () => {
 			'#/installningar/uppdrag/a1/mottagare/r-2',
 			{ view: 'mottagare', assignmentId: 'a1', id: 'r-2' }
 		],
+		['#/installningar/arbetsgivare/ny', { view: 'arbetsgivare', id: null }],
+		['#/installningar/arbetsgivare/g1', { view: 'arbetsgivare', id: 'g1' }],
+		['#/installningar/kund/ny', { view: 'kund', id: null }],
+		['#/installningar/kund/k-2', { view: 'kund', id: 'k-2' }],
 		['#/vecka', { view: 'vecka', week: null }],
 		['#/vecka/2026-W53', { view: 'vecka', week: '2026-W53' }],
 		[
@@ -40,6 +44,8 @@ describe('the routes', () => {
 		'#/okand',
 		'#/installningar/uppdrag/a b',
 		'#/installningar/uppdrag/',
+		'#/installningar/kund/',
+		'#/installningar/mellanhand/m1',
 		'#/dag/2026-02-30',
 		'#/dag/2026-13-45',
 		'#/dag/igar',

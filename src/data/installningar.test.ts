@@ -98,6 +98,7 @@ const receiver: Receiver = {
 	suggestionMode: 'fillNorm',
 	codes: [{ id: 'k1', name: '1001' }],
 	mapping: { c1: 'k1' },
+	party: null,
 	archived: false
 };
 

@@ -11,6 +11,8 @@ export const EXPORT_VERSION = 1;
 
 /** The collections directly below the user, and those below each assignment. */
 export const USER_COLLECTIONS = [
+	'employers',
+	'customers',
 	'assignments',
 	'absenceTypes',
 	'freeDays',

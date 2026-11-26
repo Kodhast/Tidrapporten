@@ -5,13 +5,14 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_ABSENCE_TYPES } from '../../domain/installningar.ts';
-import { assignment, code } from '../../domain/testdata.ts';
+import { assignment, code, customer, employer } from '../../domain/testdata.ts';
 import type { Receiver } from '../../domain/types.ts';
 import { useRoute } from '../rutter.ts';
 import { exportFile } from '../../data/exportformat.ts';
 import { Export } from './Export';
 import { FranvaroVy } from './FranvaroVy';
 import { MottagareVy } from './MottagareVy';
+import { PartVy } from './PartVy';
 import { UppdragVy } from './UppdragVy';
 
 beforeAll(() => {
@@ -40,12 +41,14 @@ describe('UppdragVy', () => {
 	const base = {
 		codes: [],
 		receivers: [],
+		employers: [employer()],
+		customers: [customer(), customer({ id: 'k2', name: 'Kund B', order: 1 })],
 		nextOrder: 2,
 		today: '2026-11-26',
 		online: true
 	};
 
-	it('saves a new assignment with its new codes', async () => {
+	it('saves a new assignment with its codes, under the only employer, with both receivers', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);
 		render(<UppdragVy {...base} assignment={null} onSave={onSave} />);
@@ -59,16 +62,22 @@ describe('UppdragVy', () => {
 		await user.click(within(sheet()).getByRole('switch', { name: /Debiterbar/ }));
 		await user.click(within(sheet()).getByRole('button', { name: 'Lägg till' }));
 		expect(screen.getByText('Inte debiterbar')).toBeTruthy();
+		expect(screen.getByText('Exempelkonsult AB')).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: /^Kund/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Kund B' }));
+		expect(screen.getByRole('switch', { name: /Kunden får också veckorapporten/ })).toBeTruthy();
 		await user.click(spara());
 
 		expect(onSave).toHaveBeenCalledOnce();
-		const [before, after, codeChanges] = onSave.mock.calls[0]!;
+		const [before, after, codeChanges, receivers] = onSave.mock.calls[0]!;
 		expect(before).toBeNull();
 		expect(after).toMatchObject({
 			name: 'Exempeluppdraget',
 			startDate: '2026-11-26',
 			terms: [{ from: '2026-11-26', scopePercent: 80, workdayMinutes: 480 }],
-			order: 2
+			order: 2,
+			employerId: 'g1',
+			customerId: 'k2'
 		});
 		expect(codeChanges).toEqual([
 			{
@@ -81,6 +90,36 @@ describe('UppdragVy', () => {
 				})
 			}
 		]);
+		expect(receivers).toMatchObject([
+			{ name: 'Exempelkonsult AB', position: 1, party: { kind: 'employer', id: 'g1' } },
+			{ name: 'Kund B', position: 2, party: { kind: 'customer', id: 'k2' } }
+		]);
+		expect(receivers[0].mapping).toEqual({ [codeChanges[0].after.id]: receivers[0].codes[0].id });
+	});
+
+	it('needs an employer chosen when there are several, and the customer as receiver is optional', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		render(
+			<UppdragVy
+				{...base}
+				employers={[employer(), employer({ id: 'g2', name: 'Annan konsult AB', order: 1 })]}
+				assignment={null}
+				onSave={onSave}
+			/>
+		);
+		await user.type(screen.getByLabelText('Namn'), 'Internt');
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		await user.click(screen.getByRole('button', { name: /^Arbetsgivare/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Annan konsult AB' }));
+		await user.click(screen.getByRole('button', { name: /^Kund/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Kund A' }));
+		await user.click(screen.getByRole('switch', { name: /Kunden får också veckorapporten/ }));
+		await user.click(spara());
+		const [, after, , receivers] = onSave.mock.calls[0]!;
+		expect(after).toMatchObject({ employerId: 'g2', customerId: 'k1' });
+		expect(receivers).toMatchObject([{ name: 'Annan konsult AB', position: 1 }]);
+		expect(receivers).toHaveLength(1);
 	});
 
 	it('shows an error once a field is wrong, and Spara stays off', async () => {
@@ -107,7 +146,37 @@ describe('UppdragVy', () => {
 
 		await user.click(screen.getByRole('button', { name: 'Arkivera uppdraget' }));
 		await waitFor(() => expect(screen.queryByText('Det gick inte att spara')).toBeNull());
-		expect(onSave.mock.calls[1]).toEqual([a, { ...a, archived: true }, []]);
+		expect(onSave.mock.calls[1]).toEqual([a, { ...a, archived: true }, [], []]);
+	});
+});
+
+describe('PartVy', () => {
+	it('saves a new employer with its suggestion for the report', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		render(<PartVy kind="employer" value={null} nextOrder={3} online onSave={onSave} />);
+		await user.type(screen.getByLabelText('Arbetsgivare'), '  Exempelkonsult AB ');
+		await user.click(screen.getByRole('radio', { name: 'Faktisk tid' }));
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(null, {
+			id: expect.any(String),
+			name: 'Exempelkonsult AB',
+			suggestionMode: 'actualQuarter',
+			archived: false,
+			order: 3
+		});
+	});
+
+	it('renames a customer, and Spara is off until the name changes', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const k = customer();
+		render(<PartVy kind="customer" value={k} nextOrder={3} online onSave={onSave} />);
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		await user.clear(screen.getByLabelText('Kund'));
+		await user.type(screen.getByLabelText('Kund'), 'Kund C');
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(k, { ...k, name: 'Kund C' });
 	});
 });
 
@@ -122,7 +191,8 @@ const kund: Receiver = {
 		{ id: 'k2', name: '1002 Möten' }
 	],
 	mapping: { c1: 'k1', semester: 'k2' },
-	archived: false
+	archived: false,
+	party: null
 };
 
 describe('MottagareVy', () => {
@@ -158,7 +228,8 @@ describe('MottagareVy', () => {
 			suggestionMode: 'actualQuarter',
 			codes: [{ id: own.id, name: 'M-1 Konsult' }],
 			mapping: { c1: own.id },
-			archived: false
+			archived: false,
+			party: null
 		});
 	});
 

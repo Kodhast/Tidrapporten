@@ -24,7 +24,9 @@ import {
 	absenceTypeCodec,
 	assignmentCodec,
 	codeCodec,
+	customerCodec,
 	deviceCodec,
+	employerCodec,
 	entryCodec,
 	freeDayCodec,
 	receiverCodec,
@@ -33,11 +35,13 @@ import {
 	timerCodec,
 	DEFAULT_SETTINGS
 } from '../../src/data/dokument.ts';
-import { createMeta, updateMeta } from '../../src/data/kodning.ts';
+import { createMeta, updateMeta, without } from '../../src/data/kodning.ts';
 import {
 	ensureDefaultAbsenceTypes,
 	saveAbsenceType,
 	saveAssignment,
+	saveCustomer,
+	saveEmployer,
 	saveFreeDay,
 	saveReceiver
 } from '../../src/data/installningar.ts';
@@ -141,7 +145,18 @@ const createAny = (db: Firestore, path: string, data: DocumentData) =>
 
 // A valid document of every kind, written as the data layer writes it.
 const valid: [string, DocumentData][] = [
-	['assignments/a1', assignmentCodec.toData(assignment())],
+	['assignments/a1', assignmentCodec.toData(assignment({ employerId: 'g1', customerId: 'k1' }))],
+	[
+		'employers/g1',
+		employerCodec.toData({
+			id: 'g1',
+			name: 'Exempelkonsult AB',
+			suggestionMode: 'fillNorm',
+			archived: false,
+			order: 0
+		})
+	],
+	['customers/k1', customerCodec.toData({ id: 'k1', name: 'Kund A', archived: false, order: 0 })],
 	['assignments/a1/codes/c1', codeCodec.toData(code('c1'))],
 	['assignments/a1/receivers/r1', receiverCodec.toData(receiver())],
 	[
@@ -176,6 +191,9 @@ const valid: [string, DocumentData][] = [
 	['state/settings', settingsCodec.toData(DEFAULT_SETTINGS)]
 ];
 
+/** The valid document at the path. */
+const validAt = (path: string): DocumentData => valid.find(([p]) => p === path)![1];
+
 describe('only the owner', () => {
 	it.each(valid)('can create, read and update %s', async (path, data) => {
 		await allowed(createAny(owner(), path, data));
@@ -186,6 +204,14 @@ describe('only the owner', () => {
 				? logged(owner(), path, data, true)
 				: updateDoc(at(owner(), path), { ...data, ...updateMeta() })
 		);
+	});
+
+	it('still takes an assignment and a receiver from a 1.0 client without the new fields', async () => {
+		const old = without(assignmentCodec.toData(assignment()), 'employerId', 'customerId');
+		await allowed(createAny(owner(), 'assignments/a1', old));
+		await allowed(updateDoc(at(owner(), 'assignments/a1'), { ...old, ...updateMeta() }));
+		const oldReceiver = without(receiverCodec.toData(receiver()), 'party');
+		await allowed(createAny(owner(), 'assignments/a1/receivers/r1', oldReceiver));
 	});
 
 	it.each(valid)(
@@ -222,9 +248,9 @@ describe('only the owner', () => {
 		const anonymousSignIn = env
 			.authenticatedContext(OWNER, { firebase: { sign_in_provider: 'anonymous', identities: {} } })
 			.firestore() as unknown as Firestore;
-		await denied(create(anonymousSignIn, 'entries/e1', valid[5]![1]));
+		await denied(create(anonymousSignIn, 'entries/e1', validAt('entries/e1')));
 		await env.withSecurityRulesDisabled((ctx) =>
-			setDoc(doc(ctx.firestore(), 'users', OWNER, 'entries/e1'), { ...valid[5]![1] })
+			setDoc(doc(ctx.firestore(), 'users', OWNER, 'entries/e1'), { ...validAt('entries/e1') })
 		);
 		await denied(getDoc(at(anonymousSignIn, 'entries/e1')));
 	});
@@ -298,6 +324,26 @@ describe('field validation', () => {
 		],
 		['a number as a name', 'assignments/a1', { ...assignmentCodec.toData(assignment()), name: 42 }],
 		[
+			'an employer id that is no id',
+			'assignments/a1',
+			{ ...assignmentCodec.toData(assignment()), employerId: 'g/1' }
+		],
+		[
+			'an employer without a name',
+			'employers/g1',
+			{ name: '', suggestionMode: 'fillNorm', archived: false, order: 0 }
+		],
+		[
+			'an employer with an unknown suggestion',
+			'employers/g1',
+			{ name: 'Exempelkonsult AB', suggestionMode: 'gissa', archived: false, order: 0 }
+		],
+		[
+			'a customer with an extra field',
+			'customers/k1',
+			{ name: 'Kund A', archived: false, order: 0, pris: 1 }
+		],
+		[
 			'a name over 100 characters',
 			'assignments/a1',
 			{ ...assignmentCodec.toData(assignment()), name: 'x'.repeat(101) }
@@ -329,6 +375,21 @@ describe('field validation', () => {
 			'position 0',
 			'assignments/a1/receivers/r1',
 			{ ...receiverCodec.toData(receiver()), position: 0 }
+		],
+		[
+			'a receiver linked to an unknown kind of party',
+			'assignments/a1/receivers/r1',
+			{ ...receiverCodec.toData(receiver()), party: { kind: 'mellanhand', id: 'm1' } }
+		],
+		[
+			'a receiver linked without an id',
+			'assignments/a1/receivers/r1',
+			{ ...receiverCodec.toData(receiver()), party: { kind: 'customer', id: null } }
+		],
+		[
+			'a receiver link with an extra key',
+			'assignments/a1/receivers/r1',
+			{ ...receiverCodec.toData(receiver()), party: { kind: 'customer', id: 'k1', namn: 'x' } }
 		],
 		[
 			'an unknown suggestion mode',
@@ -608,7 +669,12 @@ describe('changes that alter the flex (ADR 0016)', () => {
 			assignmentCodec.toData(assignment()),
 			{ terms: [{ from: '2026-01-01', scopePercent: 80, workdayMinutes: 480 }] }
 		],
-		['counting', 'absenceTypes/komp', valid[3]![1], { counting: 'flexWithdrawal' }],
+		[
+			'counting',
+			'absenceTypes/komp',
+			validAt('absenceTypes/semester'),
+			{ counting: 'flexWithdrawal' }
+		],
 		['position', 'assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { position: 2 }]
 	];
 
@@ -639,7 +705,7 @@ describe('changes that alter the flex (ADR 0016)', () => {
 	it('lets names, archiving and order change without a log entry', async () => {
 		for (const [path, data, change] of [
 			['assignments/a1', assignmentCodec.toData(assignment()), { name: 'Nytt namn', order: 2 }],
-			['absenceTypes/semester', valid[3]![1], { archived: true }],
+			['absenceTypes/semester', validAt('absenceTypes/semester'), { archived: true }],
 			['assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { name: 'Ny mottagare' }]
 		] as [string, DocumentData, DocumentData][]) {
 			await createAny(owner(), path, data);
@@ -650,7 +716,7 @@ describe('changes that alter the flex (ADR 0016)', () => {
 	it('needs a log entry for a new receiver and every new or changed free day', async () => {
 		await denied(create(owner(), 'assignments/a1/receivers/r2', receiverCodec.toData(receiver())));
 		await allowed(logged(owner(), 'assignments/a1/receivers/r2', receiverCodec.toData(receiver())));
-		const day = valid[4]![1];
+		const day = validAt('freeDays/2026-12-24');
 		await denied(create(owner(), 'freeDays/2026-12-24', day));
 		await allowed(logged(owner(), 'freeDays/2026-12-24', day));
 		await denied(updateDoc(at(owner(), 'freeDays/2026-12-24'), { ...day, ...updateMeta() }));
@@ -660,7 +726,7 @@ describe('changes that alter the flex (ADR 0016)', () => {
 
 	it('lets a new assignment and a new absence type be created without a log entry', async () => {
 		await allowed(create(owner(), 'assignments/a1', assignmentCodec.toData(assignment())));
-		await allowed(create(owner(), 'absenceTypes/semester', valid[3]![1]));
+		await allowed(create(owner(), 'absenceTypes/semester', validAt('absenceTypes/semester')));
 	});
 });
 
@@ -894,6 +960,41 @@ describe('the settings’ writes pass the rules (issue 17)', () => {
 		await allowed(saveReceiver(db, OWNER, r, { ...r, mapping: {} }));
 		await allowed(saveReceiver(db, OWNER, r, { ...r, position: 2 }));
 		expect(await logCount(db)).toBe(2);
+	});
+
+	it('saves employers and customers, and a new assignment with its receivers (ADR 0019)', async () => {
+		const db = owner();
+		const employer = {
+			id: 'g1',
+			name: 'Exempelkonsult AB',
+			suggestionMode: 'fillNorm' as const,
+			archived: false,
+			order: 0
+		};
+		const customer = { id: 'k1', name: 'Kund A', archived: false, order: 0 };
+		await allowed(saveEmployer(db, OWNER, null, employer));
+		await allowed(saveEmployer(db, OWNER, employer, { ...employer, name: 'Nytt namn' }));
+		await allowed(saveCustomer(db, OWNER, null, customer));
+		await allowed(saveCustomer(db, OWNER, customer, { ...customer, name: 'Kund B' }));
+		expect(await logCount(db)).toBe(0);
+		const a = assignment({ employerId: 'g1', customerId: 'k1' });
+		await allowed(
+			saveAssignment(
+				db,
+				OWNER,
+				null,
+				a,
+				[{ before: null, after: code('c1') }],
+				[
+					receiver({ id: 'r1', party: { kind: 'employer', id: 'g1' } }),
+					receiver({ id: 'r2', position: 2, party: { kind: 'customer', id: 'k1' } })
+				]
+			)
+		);
+		expect(await logCount(db)).toBe(2);
+		expect((await getDoc(at(db, 'assignments/a1/receivers/r2'))).data()).toMatchObject({
+			party: { kind: 'customer', id: 'k1' }
+		});
 	});
 
 	it('creates the default absence types once, and logs a changed counting', async () => {

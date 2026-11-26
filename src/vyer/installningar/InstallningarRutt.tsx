@@ -8,10 +8,14 @@ import {
 	absenceTypesPath,
 	assignmentsPath,
 	codesPath,
+	customersPath,
+	employersPath,
 	freeDaysPath,
 	receiversPath,
 	saveAbsenceType,
 	saveAssignment,
+	saveCustomer,
+	saveEmployer,
 	saveFreeDay,
 	saveReceiver,
 	watchCollection
@@ -20,6 +24,8 @@ import {
 	absenceTypeCodec,
 	assignmentCodec,
 	codeCodec,
+	customerCodec,
+	employerCodec,
 	freeDayCodec,
 	receiverCodec,
 	type Codec
@@ -29,16 +35,17 @@ import { exportFile, exportFileName } from '../../data/exportformat.ts';
 import { nextNumber } from '../../domain/installningar.ts';
 import { termsOn } from '../../domain/norm.ts';
 import { dateOf } from '../../domain/tid.ts';
-import type { Id, Receiver, TimeCode } from '../../domain/types.ts';
+import type { Id } from '../../domain/types.ts';
 import { replaceRoute, type Route } from '../rutter.ts';
 import { FranvaroVy } from './FranvaroVy';
-import { InstallningarVy, type AssignmentCounts } from './InstallningarVy';
+import { InstallningarVy } from './InstallningarVy';
 import { MottagareVy } from './MottagareVy';
+import { PartVy } from './PartVy';
 import { UppdragVy } from './UppdragVy';
 
 type SettingsRoute = Extract<
 	Route,
-	{ view: 'installningar' | 'uppdrag' | 'mottagare' | 'franvaro' }
+	{ view: 'installningar' | 'uppdrag' | 'mottagare' | 'franvaro' | 'arbetsgivare' | 'kund' }
 >;
 
 export interface InstallningarRuttProps {
@@ -67,34 +74,6 @@ function useCollection<T>(
 	}, [db, uid, path, codec, parentId]);
 	// Values from another path (the view changed) are not shown while the new ones load.
 	return state.path === path ? state.values : null;
-}
-
-/** The number of codes and receivers per assignment, for the list. */
-function useCounts(db: Firestore, uid: Id, ids: readonly Id[]): Record<Id, AssignmentCounts> {
-	const [counts, setCounts] = useState<Record<Id, AssignmentCounts>>({});
-	const key = ids.join(',');
-	useEffect(() => {
-		const stops = key
-			.split(',')
-			.filter(Boolean)
-			.flatMap((id) => {
-				const set = (field: keyof AssignmentCounts) => (values: unknown[]) =>
-					setCounts((c) => ({
-						...c,
-						[id]: { ...(c[id] ?? { codes: 0, receivers: 0 }), [field]: values.length }
-					}));
-				return [
-					watchCollection<TimeCode>(db, uid, codesPath(id), codeCodec, (v) =>
-						set('codes')(v.filter((c) => !c.archived))
-					),
-					watchCollection<Receiver>(db, uid, receiversPath(id), receiverCodec, (v) =>
-						set('receivers')(v.filter((r) => !r.archived))
-					)
-				];
-			});
-		return () => stops.forEach((stop) => stop());
-	}, [db, uid, key]);
-	return counts;
 }
 
 /** Saves the value as a JSON file through the browser's download. */
@@ -133,20 +112,18 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 		receiverCodec,
 		assignmentId ?? undefined
 	);
-	const counts = useCounts(
-		db,
-		uid,
-		route.view === 'installningar' ? (assignments ?? []).map((a) => a.id) : []
-	);
+	const employers = useCollection(db, uid, employersPath, employerCodec);
+	const customers = useCollection(db, uid, customersPath, customerCodec);
 
-	if (!assignments || !absenceTypes || !freeDays) return <Loading />;
+	if (!assignments || !absenceTypes || !freeDays || !employers || !customers) return <Loading />;
 
 	switch (route.view) {
 		case 'installningar':
 			return (
 				<InstallningarVy
 					assignments={assignments}
-					counts={counts}
+					employers={employers}
+					customers={customers}
 					absenceTypes={absenceTypes.filter((t) => !t.archived).length}
 					freeDays={freeDays.filter((d) => d.free).length}
 					scopeToday={Object.fromEntries(
@@ -182,12 +159,50 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					assignment={assignment}
 					codes={codes ?? []}
 					receivers={receivers ?? []}
+					employers={employers}
+					customers={customers}
 					nextOrder={nextNumber(assignments.map((a) => a.order))}
 					today={today}
 					online={online}
-					onSave={async (before, after, codeChanges) => {
-						await saveAssignment(db, uid, before, after, codeChanges);
+					onSave={async (before, after, codeChanges, firstReceivers) => {
+						await saveAssignment(db, uid, before, after, codeChanges, firstReceivers);
 						if (!before) replaceRoute({ view: 'uppdrag', id: after.id });
+					}}
+				/>
+			);
+		}
+		case 'arbetsgivare': {
+			const employer = route.id ? employers.find((e) => e.id === route.id) : null;
+			if (employer === undefined)
+				return <p className="kh-text-body innehall">Arbetsgivaren finns inte.</p>;
+			return (
+				<PartVy
+					key={route.id ?? 'ny'}
+					kind="employer"
+					value={employer}
+					nextOrder={nextNumber(employers.map((e) => e.order))}
+					online={online}
+					onSave={async (before, after) => {
+						await saveEmployer(db, uid, before, after);
+						if (!before) replaceRoute({ view: 'arbetsgivare', id: after.id });
+					}}
+				/>
+			);
+		}
+		case 'kund': {
+			const customer = route.id ? customers.find((c) => c.id === route.id) : null;
+			if (customer === undefined)
+				return <p className="kh-text-body innehall">Kunden finns inte.</p>;
+			return (
+				<PartVy
+					key={route.id ?? 'ny'}
+					kind="customer"
+					value={customer}
+					nextOrder={nextNumber(customers.map((c) => c.order))}
+					online={online}
+					onSave={async (before, after) => {
+						await saveCustomer(db, uid, before, after);
+						if (!before) replaceRoute({ view: 'kund', id: after.id });
 					}}
 				/>
 			);

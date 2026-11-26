@@ -7,6 +7,8 @@ import {
 	changeLogCodec,
 	codeCodec,
 	type Codec,
+	customerCodec,
+	employerCodec,
 	DEFAULT_SETTINGS,
 	deviceCodec,
 	entryCodec,
@@ -97,9 +99,29 @@ describe('tolerant reading', () => {
 		['report', reportCodec as Codec<never>],
 		['change log', changeLogCodec as Codec<never>],
 		['settings', settingsCodec as Codec<never>],
-		['device', deviceCodec as Codec<never>]
+		['device', deviceCodec as Codec<never>],
+		['employer', employerCodec as Codec<never>],
+		['customer', customerCodec as Codec<never>]
 	])('reads an empty %s document with defaults', (_, codec) => {
 		expect(() => codec.fromData('x', {}, 'a1')).not.toThrow();
+	});
+
+	it('reads documents from 1.0 without employer, customer or party as null (ADR 0019)', () => {
+		const old = without(assignmentCodec.toData(assignment()), 'employerId', 'customerId');
+		expect(assignmentCodec.fromData('a1', old)).toMatchObject({
+			employerId: null,
+			customerId: null
+		});
+		const oldReceiver = without(receiverCodec.toData(receiver()), 'party');
+		expect(receiverCodec.fromData('r1', oldReceiver, 'a1').party).toBeNull();
+		expect(
+			receiverCodec.fromData(
+				'r1',
+				{ ...oldReceiver, party: { kind: 'mellanhand', id: 'm1' } },
+				'a1'
+			).party
+		).toBeNull();
+		expect(employerCodec.fromData('g1', {})).toMatchObject({ suggestionMode: 'fillNorm' });
 	});
 
 	it('fills in the defaults the domain expects', () => {

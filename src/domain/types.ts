@@ -18,6 +18,25 @@ export interface Assignment {
 	standardDay: StandardDaySlot[];
 	archived: boolean;
 	order: number;
+	employerId: Id | null; // ADR 0019; null for assignments from before it
+	customerId: Id | null; // null: an internal assignment, or one from before ADR 0019
+}
+
+/** The owner's employer (ADR 0019); one employer can have several assignments. */
+export interface Employer {
+	id: Id;
+	name: string;
+	suggestionMode: SuggestionMode; // for the employer's report in a new assignment
+	archived: boolean;
+	order: number;
+}
+
+/** A customer (ADR 0019); free of the employers, so one customer can come via several. */
+export interface Customer {
+	id: Id;
+	name: string;
+	archived: boolean;
+	order: number;
 }
 
 export interface AssignmentTerms {
@@ -52,6 +71,13 @@ export interface Receiver {
 	codes: ReceiverCode[]; // in the receiver's order
 	mapping: Record<Id, Id>; // internal code or absence type id -> receiver code id
 	archived: boolean;
+	/** The employer or customer the receiver was made from (ADR 0019); null for anyone else. */
+	party: ReceiverParty | null;
+}
+
+export interface ReceiverParty {
+	kind: 'employer' | 'customer';
+	id: Id;
 }
 
 export interface ReceiverCode {
