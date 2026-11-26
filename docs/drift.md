@@ -175,6 +175,11 @@ gamla funktionsbyggen i Artifact Registry, utan vilken Firebase CLI stoppar en d
 device-streaming-5b35f7b8 --location europe-west1 --force`. En körning med _dry_run_ prövar
 inget av detta; den skarpa körningen skriver ut vad som saknas.
 
+**Authentication** måste vara startat i projektet (Firebase-konsolen → Authentication → Get
+started), annars nekar Firebase varje inloggning med `CONFIGURATION_NOT_FOUND` och appen säger
+"Inloggningen gick inte". Ingen inloggningsmetod behöver slås på; appen loggar in med custom
+token. Startat i test 2026-11-25 och i drift 2026-11-26.
+
 ## Backup
 
 **Daglig backup** (beslut 0018): Firestores schemalagda backuper i test och drift, en om dagen
