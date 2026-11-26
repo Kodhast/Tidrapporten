@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { dayName, overlapping, parseSpan, spanLabel } from '../../domain/dag.ts';
 import type { Span } from '../../domain/intervall.ts';
 import { entryChange } from '../../domain/lasning.ts';
-import { clockOf } from '../../domain/tid.ts';
+import { clockOf, dateOf } from '../../domain/tid.ts';
 import type { CodeGroup } from '../../domain/timer.ts';
 import type { AbsenceType, Entry, Id, IsoDate, Report } from '../../domain/types.ts';
 import { OfflineIcon, WarningIcon } from '../ikoner';
@@ -87,10 +87,16 @@ export function IntervallArk(props: IntervallArkProps) {
 	const absence = form.subject.startsWith('absence:');
 	const allDay = absence && form.allDay;
 	const subjectId = form.subject.slice(form.subject.indexOf(':') + 1);
-	const parsed = allDay ? null : parseSpan(date, form.start, form.end);
+	// A saved interval keeps the day it starts on: one from the evening before, opened on its
+	// second day, must not move a day on.
+	const startDay = entry?.time.kind === 'interval' ? dateOf(entry.time.start) : date;
+	const parsed = allDay ? null : parseSpan(startDay, form.start, form.end);
 	const span = parsed && 'span' in parsed ? parsed.span : null;
+	// An empty field is not wrong yet; Spara stays off until both are times.
 	const fieldError = (field: 'start' | 'end') =>
-		parsed && 'error' in parsed && parsed.error.field === field ? parsed.error.message : undefined;
+		parsed && 'error' in parsed && parsed.error.field === field && form[field].trim() !== ''
+			? parsed.error.message
+			: undefined;
 	const overlap = span && overlapping(entries, span, entry?.id ?? null);
 
 	const after: Entry | null =
@@ -123,7 +129,7 @@ export function IntervallArk(props: IntervallArkProps) {
 			isOpen={isOpen}
 			onOpenChange={onOpenChange}
 			title={entry ? 'Ändra intervall' : 'Nytt intervall'}
-			subtitle={dayName(date)}
+			subtitle={dayName(startDay)}
 			footer={
 				<div className="ark-fot">
 					{entry ? (

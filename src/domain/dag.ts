@@ -47,13 +47,18 @@ export const dayRows = (entries: readonly Entry[], date: IsoDate): DayRow[] => {
 		...gap,
 		minutes: Math.round((gap.end - gap.start) / MINUTE)
 	}));
+	// A gap comes after an interval with the same start; equal intervals keep their id order.
 	const timed = [...intervals, ...gaps].sort(
-		(a, b) => startOf(a) - startOf(b) || (a.kind === 'gap' ? 1 : -1)
+		(a, b) =>
+			startOf(a) - startOf(b) ||
+			Number(a.kind === 'gap') - Number(b.kind === 'gap') ||
+			idOf(a).localeCompare(idOf(b))
 	);
 	return [...allDay, ...timed];
 };
 
 const startOf = (row: DayRow): UtcMillis => (row.kind === 'allDay' ? 0 : row.start);
+const idOf = (row: DayRow): string => (row.kind === 'gap' ? '' : row.entry.id);
 
 /** The first pair of overlapping intervals on the day, as the warning names them. */
 export const firstOverlap = (entries: readonly Entry[], date: IsoDate): [Span, Span] | null => {

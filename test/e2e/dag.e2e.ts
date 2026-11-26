@@ -121,3 +121,33 @@ test('a correction in a sent week needs a reason and is logged', async ({ page, 
 		)
 		.toEqual(['Glömde stoppa timern']);
 });
+
+test('an interval from the evening before shows on its second day and keeps its day', async ({
+	page,
+	request
+}) => {
+	const user = uid('natt');
+	await seedAssignment(request, user, ['Utveckling']);
+	await seed(request, user, 'entries/e1', {
+		assignmentId: 'a1',
+		subject: { kind: 'code', codeId: 'c1' },
+		time: {
+			kind: 'interval',
+			start: new Date(atLocalTime('2026-11-23', '22:00')),
+			end: new Date(atLocalTime(DAY, '01:30'))
+		},
+		note: '',
+		schemaVersion: 1,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	});
+	await signIn(page, user);
+	await openDay(page);
+
+	await page.getByRole('button', { name: /22:00–01:30/ }).click();
+	const sheet = page.getByRole('dialog', { name: 'Ändra intervall' });
+	await sheet.getByLabel('Slut').fill('02:00');
+	await sheet.getByRole('button', { name: 'Spara' }).click();
+	await expect(page.getByRole('button', { name: /22:00–02:00/ })).toBeVisible();
+	await expect.poll(() => endOnServer(request, user, 'e1')).toBe(atLocalTime(DAY, '02:00'));
+});

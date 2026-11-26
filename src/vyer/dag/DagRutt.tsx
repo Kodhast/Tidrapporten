@@ -49,8 +49,8 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 	const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[]>([]);
 	const [reports, setReports] = useState<{ week: IsoWeek; values: Report[] } | null>(null);
 	const [sheet, setSheet] = useState<Sheet | null>(null);
-	const [failed, setFailed] = useState(false);
-	const fail = () => setFailed(true);
+	const [problem, setProblem] = useState<'read' | 'save' | null>(null);
+	const fail = () => setProblem('read');
 
 	useEffect(
 		() => watchDayEntries(db, uid, date, (entries) => setDay({ date, entries }), fail),
@@ -68,8 +68,9 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 		() => watchCollection(db, uid, absenceTypesPath, absenceTypeCodec, setAbsenceTypes),
 		[db, uid]
 	);
-	// From the day's week: an interval over Sunday midnight also touches the next one.
-	const week = isoWeekOf(date);
+	// From the week of the day before: an interval from Sunday evening shown on Monday touches the
+	// week before, and one over Sunday midnight the week after (where >= reaches).
+	const week = isoWeekOf(addDays(date, -1));
 	useEffect(
 		() => watchReportsFrom(db, uid, week, (values) => setReports({ week, values }), fail),
 		[db, uid, week]
@@ -115,8 +116,8 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 		);
 
 	const write = (save: () => Promise<void>) => {
-		setFailed(false);
-		save().catch(fail);
+		setProblem(null);
+		save().catch(() => setProblem('save'));
 	};
 
 	const sheetData = sheet && (
@@ -131,7 +132,7 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 			choice={sheet.choice}
 			groups={sheetGroups(sheet.entry)}
 			absenceTypes={absenceTypes.filter((t) => !t.archived).sort((a, b) => a.order - b.order)}
-			entries={shown}
+			entries={day?.date === date ? day.entries : []}
 			reports={knownReports ?? []}
 			online={online}
 			onSave={(before, after, reason) =>
@@ -150,7 +151,7 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 			sum={daySum(shown, date)}
 			paused={paused}
 			online={online}
-			failed={failed}
+			problem={problem}
 			loading={loading}
 			previous={addDays(date, -1)}
 			next={addDays(date, 1)}

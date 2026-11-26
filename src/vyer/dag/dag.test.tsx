@@ -67,7 +67,7 @@ const day = (entries: Entry[], overrides: Partial<DagVyProps> = {}): DagVyProps 
 	sum: daySum(entries, DAY),
 	paused: false,
 	online: true,
-	failed: false,
+	problem: null,
 	onDay: () => {},
 	previous: '2026-11-23',
 	next: '2026-11-25',
@@ -146,11 +146,13 @@ describe('DagVy', () => {
 		expect(onAdd).toHaveBeenCalledOnce();
 	});
 
-	it('says an empty day, offline and a failed save, and nothing while loading', () => {
-		const { rerender } = render(<DagVy {...day([], { online: false, failed: true })} />);
+	it('says an empty day, offline, a failed save or read, and nothing while loading', () => {
+		const { rerender } = render(<DagVy {...day([], { online: false, problem: 'save' })} />);
 		expect(screen.getByText('Ingen tid den här dagen.')).toBeTruthy();
 		expect(screen.getByText('Ingen anslutning')).toBeTruthy();
 		expect(screen.getByText('Det gick inte att spara')).toBeTruthy();
+		rerender(<DagVy {...day([], { problem: 'read' })} />);
+		expect(screen.getByText('Det gick inte att läsa dagen')).toBeTruthy();
 		rerender(<DagVy {...day([], { loading: true })} />);
 		expect(screen.queryByText('Ingen tid den här dagen.')).toBeNull();
 	});
@@ -290,9 +292,19 @@ describe('IntervallArk', () => {
 		);
 	});
 
-	it('starts empty for a new interval without a gap', () => {
+	it('keeps the start day of an interval from the evening before', async () => {
+		const onSave = vi.fn();
+		const late = work('2026-11-23', '22:00', '01:30', 'c1', DAY);
+		render(<IntervallArk {...sheet({ entry: late, onSave })} />);
+		expect(screen.getByText('Måndag 23 november')).toBeTruthy();
+		await userEvent.click(screen.getByRole('button', { name: 'Spara' }));
+		expect(onSave.mock.calls[0]![1]).toEqual(late);
+	});
+
+	it('starts empty for a new interval without a gap, without an error yet', () => {
 		render(<IntervallArk {...sheet({ groups: groups.slice(0, 1) })} />);
 		expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('');
+		expect(screen.queryByText('Skriv en tid som 16:05')).toBeNull();
 		expect(screen.queryByRole('radiogroup')).toBeNull();
 		expect((screen.getByRole('button', { name: 'Spara' }) as HTMLButtonElement).disabled).toBe(
 			true

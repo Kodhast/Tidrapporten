@@ -14,6 +14,7 @@ const feeds = vi.hoisted(() => ({
 	day: (() => {}) as (entries: Entry[]) => void,
 	pause: (() => {}) as (paused: boolean) => void,
 	reports: (() => {}) as (reports: Report[]) => void,
+	reportsFrom: '' as string,
 	collections: new Map<string, (values: unknown[]) => void>()
 }));
 
@@ -31,7 +32,8 @@ vi.mock('../../data/dag.ts', () => ({
 }));
 
 vi.mock('../../data/timer.ts', () => ({
-	watchReportsFrom: (_db: unknown, _uid: unknown, _week: unknown, on: typeof feeds.reports) => {
+	watchReportsFrom: (_db: unknown, _uid: unknown, week: string, on: typeof feeds.reports) => {
+		feeds.reportsFrom = week;
 		feeds.reports = on;
 		return () => {};
 	}
@@ -128,6 +130,12 @@ describe('DagRutt', () => {
 			reports,
 			''
 		);
+	});
+
+	it('reads the reports from the week of the day before, for an interval from Sunday', () => {
+		render(<DagRutt db={{} as Firestore} uid="testperson-1" date="2026-11-23" online />);
+		// Monday 23 November is in week 48; Sunday the 22nd in week 47.
+		expect(feeds.reportsFrom).toBe('2026-W47');
 	});
 
 	it('marks the day’s gaps as pauses', async () => {

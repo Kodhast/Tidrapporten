@@ -20,10 +20,10 @@ import { userDoc, userPath } from './skrivning.ts';
 const DAY_BEFORE = 24 * 60 * 60_000;
 
 /**
- * Follows the entries on a local day: intervals that start from 24 hours before the day (an
- * interval is at most 24 hours, so one from the evening before is found) up to the day's end,
- * and the whole-day absence that day. Entries from the day before that end before the day are
- * in the list too; the view leaves them out.
+ * Follows the entries around a local day: intervals that start from 24 hours before the day (an
+ * interval is at most 24 hours, so one from the evening before is found) up to the end of the next
+ * day, so that a new interval over midnight is warned of an overlap there, and the whole-day
+ * absence that day. The view leaves out what is not on the day.
  */
 export const watchDayEntries = (
 	db: Firestore,
@@ -34,7 +34,7 @@ export const watchDayEntries = (
 ) => {
 	const entries = collection(db, 'users', uid, 'entries');
 	const start = startOfDay(date);
-	const end = startOfDay(addDays(date, 1));
+	const end = startOfDay(addDays(date, 2));
 	let intervals: Entry[] | null = null;
 	let allDay: Entry[] | null = null;
 	const emit = () => {

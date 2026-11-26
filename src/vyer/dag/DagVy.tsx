@@ -1,5 +1,5 @@
 // The day view (mockup "Dagvy", issue 29): the day's intervals and gaps in order, the overlap
-// warning, the day's sum and the button that adds an interval. Gets plain values; useDag connects
+// warning, the day's sum and the button that adds an interval. Gets plain values; DagRutt connects
 // it to Firestore.
 import { Button, Notice, PeriodPicker, Pill, Row, TopBar } from '@kodhast/web-ui-react';
 import type { ReactNode } from 'react';
@@ -22,8 +22,8 @@ export interface DagVyProps {
 	/** The day's gaps are pauses. */
 	paused: boolean;
 	online: boolean;
-	/** The last save failed. */
-	failed: boolean;
+	/** A read or the last save failed. */
+	problem: 'read' | 'save' | null;
 	/** The day has not come yet. */
 	loading?: boolean;
 	onDay: (date: IsoDate) => void;
@@ -61,12 +61,14 @@ export function DagVy(props: DagVyProps) {
 						detail="Ändringar sparas i telefonen och skickas när nätet är tillbaka. En skickad vecka kan inte ändras förrän dess."
 					/>
 				)}
-				{props.failed && (
+				{props.problem && (
 					<Notice
 						tone="ton-fel"
 						icon={<WarningIcon />}
-						title="Det gick inte att spara"
-						detail="Det som visas är det senaste sparade läget."
+						title={
+							props.problem === 'save' ? 'Det gick inte att spara' : 'Det gick inte att läsa dagen'
+						}
+						detail="Det som visas är det senaste kända läget."
 					/>
 				)}
 				{overlap && (
