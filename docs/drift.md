@@ -87,8 +87,12 @@ Vem som får logga in avgör `ANVANDARE`, inte Access.
 | `FIREBASE_DEPLOY_DRIFT` | miljön `drift` | nyckel för `tidrapporten-deploy` i driftprojektet         |
 
 `tidrapporten-deploy` har rollerna Firebase Rules Admin, Cloud Datastore Index Admin och
-Service Usage Consumer. I driftprojektet har det dessutom Cloud Functions Admin och Service
-Account User på `tidrapporten-budget` (issue 28), för att driftsätta budgetfunktionen. Miljön `drift` får bara köras från `main`. Kontots id står i
+Service Usage Consumer. I driftprojektet har det dessutom, för att driftsätta funktionerna,
+Cloud Functions Admin, Firebase Viewer, Cloud Run Admin och Pub/Sub Editor, och Service
+Account User på `tidrapporten-budget` (issue 28), `tidrapporten-aterstall` (issue 57),
+standardkontot `device-streaming-5b35f7b8@appspot.gserviceaccount.com` och standardkontot för
+Compute `324013256111-compute@developer.gserviceaccount.com` (Firebase CLI kräver dem även när
+funktionerna har egna konton). Miljön `drift` får bara köras från `main`. Kontots id står i
 workflowen; det är ingen hemlighet.
 
 ## Funktionerna
@@ -159,9 +163,17 @@ stänger av, och `budget: avstängningen misslyckades`, `budget: vägrar stänga
 under 90 % och upprepade meddelanden efter stoppet loggas inte.
 
 **API:er i drift** (påslagna 2026-11-25): Cloud Functions, Cloud Build, Artifact Registry,
-Cloud Run, Eventarc och Cloud Billing. Att `tidrapporten-deploy` har alla roller som en
-2nd gen-funktion kräver vid första driftsättningen är inte provat; provkör `release.yml` med
-_dry_run_ och läs felet om den skarpa körningen fallerar.
+Cloud Run, Eventarc och Cloud Billing.
+
+**Första driftsättningen av funktionerna** (release 1.0, 2026-11-26) krävde också att ägaren gav
+Googles tjänstekonton i projektet roller, som Firebase CLI inte får sätta själv: Pub/Sub-agenten
+`service-324013256111@gcp-sa-pubsub.iam.gserviceaccount.com` fick Service Account Token
+Creator, och standardkontot för Compute `324013256111-compute@developer.gserviceaccount.com`
+fick Cloud Run Invoker och Eventarc Event Receiver. Dessutom en engångsinställning som rensar
+gamla funktionsbyggen i Artifact Registry, utan vilken Firebase CLI stoppar en deploy utan
+`--force`: `npx -y firebase-tools functions:artifacts:setpolicy --project
+device-streaming-5b35f7b8 --location europe-west1 --force`. En körning med _dry_run_ prövar
+inget av detta; den skarpa körningen skriver ut vad som saknas.
 
 ## Backup
 
