@@ -393,3 +393,8 @@ body {
 	display: flex;
 	justify-content: center;
 }
+
+/* The step's number in the top bar of the start at first use (issue 64). */
+.steg-nummer {
+	padding-inline-end: var(--kh-space-s);
+}

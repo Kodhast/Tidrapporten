@@ -6,6 +6,7 @@ import type { Id, IsoDate, IsoWeek } from '../domain/types.ts';
 
 export type Route =
 	| { view: 'idag' }
+	| { view: 'kom-igang' } // the start at first use (issue 64)
 	| { view: 'installningar' }
 	| { view: 'uppdrag'; id: Id | null } // null: a new assignment
 	| { view: 'mottagare'; assignmentId: Id; id: Id | null } // null: a new receiver
@@ -40,6 +41,7 @@ const WEEK = '(\\d{4})-W(\\d{2})';
 export const parseRoute = (hash: string): Route => {
 	const path = hash.replace(/^#/, '');
 	if (path === '/installningar') return { view: 'installningar' };
+	if (path === '/kom-igang') return { view: 'kom-igang' };
 	if (path === '/installningar/franvaro') return { view: 'franvaro' };
 	const day = /^\/dag\/(\d{4}-\d{2}-\d{2})$/.exec(path);
 	if (day && isValidDate(day[1]!)) return { view: 'dag', date: day[1]! };
@@ -72,6 +74,8 @@ export const href = (route: Route): string => {
 			return '#/';
 		case 'installningar':
 			return '#/installningar';
+		case 'kom-igang':
+			return '#/kom-igang';
 		case 'franvaro':
 			return '#/installningar/franvaro';
 		case 'uppdrag':

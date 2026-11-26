@@ -111,39 +111,97 @@ export const saveAssignment = (
 	codes: readonly CodeChange[] = [],
 	receivers: readonly Receiver[] = []
 ): Promise<void> =>
+	runTransaction(db, async (tx) => writeAssignment(db, uid, tx, before, after, codes, receivers));
+
+/**
+ * The start at first use (issue 64): the employer, the customer, a new assignment, its codes and
+ * its first receivers, in one transaction, so that nothing is saved unless everything is.
+ */
+export const saveFirstAssignment = (
+	db: Firestore,
+	uid: Id,
+	docs: {
+		employer: Employer;
+		customer: Customer | null;
+		assignment: Assignment;
+		codes: readonly TimeCode[];
+		receivers: readonly Receiver[];
+	}
+): Promise<void> =>
 	runTransaction(db, async (tx) => {
+		const { employer, customer, assignment } = docs;
 		write(
 			db,
 			uid,
 			tx,
-			userPath(assignmentsPath, after.id),
-			before && assignmentCodec.toData(before),
-			assignmentCodec.toData(after),
-			assignmentChangeIsLogged(before, after)
+			userPath(employersPath, employer.id),
+			null,
+			employerCodec.toData(employer),
+			false
 		);
-		for (const code of codes) {
+		if (customer) {
 			write(
 				db,
 				uid,
 				tx,
-				userPath(codesPath(after.id), code.after.id),
-				code.before && codeCodec.toData(code.before),
-				codeCodec.toData(code.after),
+				userPath(customersPath, customer.id),
+				null,
+				customerCodec.toData(customer),
 				false
 			);
 		}
-		for (const receiver of receivers) {
-			write(
-				db,
-				uid,
-				tx,
-				userPath(receiversPath(after.id), receiver.id),
-				null,
-				receiverCodec.toData(receiver),
-				true
-			);
-		}
+		writeAssignment(
+			db,
+			uid,
+			tx,
+			null,
+			assignment,
+			docs.codes.map((after) => ({ before: null, after })),
+			docs.receivers
+		);
 	});
+
+const writeAssignment = (
+	db: Firestore,
+	uid: Id,
+	tx: Transaction,
+	before: Assignment | null,
+	after: Assignment,
+	codes: readonly CodeChange[],
+	receivers: readonly Receiver[]
+) => {
+	write(
+		db,
+		uid,
+		tx,
+		userPath(assignmentsPath, after.id),
+		before && assignmentCodec.toData(before),
+		assignmentCodec.toData(after),
+		assignmentChangeIsLogged(before, after)
+	);
+	for (const code of codes) {
+		write(
+			db,
+			uid,
+			tx,
+			userPath(codesPath(after.id), code.after.id),
+			code.before && codeCodec.toData(code.before),
+			codeCodec.toData(code.after),
+			false
+		);
+	}
+	for (const receiver of receivers) {
+		write(
+			db,
+			uid,
+			tx,
+			userPath(receiversPath(after.id), receiver.id),
+			null,
+			receiverCodec.toData(receiver),
+			true
+		);
+	}
+};
 
 /** Saves an employer (ADR 0019). Its name is copied to receivers, so a change is not logged. */
 export const saveEmployer = (
