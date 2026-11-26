@@ -1,5 +1,6 @@
 // The timer (issue 18): which code a start uses, the entry a stop writes, the block on writing
 // into a sent week offline, and the end the owner types for a forgotten timer.
+import { CLOCK_ERROR, parseClock } from './dag.ts';
 import { entryChange } from './lasning.ts';
 import { addDays, atLocalTime, clockOf, dateOf } from './tid.ts';
 import type {
@@ -143,9 +144,8 @@ export type EndResult = { end: UtcMillis } | { error: string };
  * midnight, and `00:00` for midnight). It must be after the start and not later than now.
  */
 export const parseEnd = (text: string, timer: Timer, now: UtcMillis): EndResult => {
-	const match = /^([01]?\d|2[0-3])[:.]?([0-5]\d)$/.exec(text.trim());
-	if (!match) return { error: 'Skriv en tid som 16:05' };
-	const clock = `${match[1]!.padStart(2, '0')}:${match[2]}`;
+	const clock = parseClock(text);
+	if (!clock) return { error: CLOCK_ERROR };
 	const startDay = dateOf(timer.start);
 	let end = atLocalTime(startDay, clock);
 	if (end <= timer.start) {

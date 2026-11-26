@@ -3,6 +3,14 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 0.8.0
+
+- Dagvyn: dagens intervall i tidsordning, med luckorna emellan. Ett intervall rättas, läggs till
+  eller raderas i ett ark med start, slut, uppdrag och tidkod, och frånvaro registreras som ett
+  intervall eller en hel dag. En lucka fylls eller markeras som paus, och överlappande intervall
+  varnar. En rättning i en skickad vecka kräver ett skäl och skrivs i ändringsloggen. Dagvyn nås
+  med "Dagens intervall" på startsidan (#29).
+
 ## 0.7.0
 
 - Timern finns på startsidan: huvudknappen i flikraden startar och stoppar den, och kodchipet
