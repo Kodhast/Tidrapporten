@@ -1,6 +1,6 @@
 // What the service worker (src/sw.ts) does with a reminder (issue 22), kept apart so that it runs
 // in Vitest. A reminder comes as a Cloud Messaging data message with title, body, the address
-// to open and the button's label (firebase-functions/src/index.ts).
+// to open and the button's label (firebase-functions/src/paminnelser-effekter.ts).
 
 export interface Shown {
 	title: string;
