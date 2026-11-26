@@ -78,11 +78,14 @@ test('a change of code ends the interval and goes on from its end', async ({ pag
 	await expect(chip(page)).toHaveText(/Möten/);
 });
 
-test('a start in one tab shows in the other', async ({ page, context, request }) => {
+// Two browser contexts, as two devices: two tabs share Firestore's cache, where a timer started
+// in one tab can show in the other before the server has it and then vanish for a moment.
+test('a start on one device shows on the other', async ({ page, browser, request }) => {
 	const user = uid('synk');
 	await seedAssignment(request, user, ['Utveckling']);
 	await signIn(page, user);
-	const other = await context.newPage();
+	const device = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+	const other = await device.newPage();
 	await signIn(other, user);
 	await expect(startButton(other)).toBeVisible();
 
@@ -90,6 +93,7 @@ test('a start in one tab shows in the other', async ({ page, context, request })
 	await expect(stopButton(other)).toBeVisible({ timeout: 5_000 });
 	await stopButton(other).click();
 	await expect(startButton(page)).toBeVisible({ timeout: 5_000 });
+	await device.close();
 });
 
 test('start and stop offline reach Firestore once online', async ({ page, context, request }) => {
