@@ -166,7 +166,6 @@ describe('UppdragVy', () => {
 		const onSave = vi.fn().mockResolvedValue(undefined);
 		const a = assignment();
 		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
-		expect(screen.queryByLabelText('Omfattning och arbetsdag gäller från')).toBeNull();
 		await user.clear(screen.getByLabelText('Omfattning'));
 		await user.type(screen.getByLabelText('Omfattning'), '80');
 		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från') as HTMLInputElement;
@@ -183,6 +182,27 @@ describe('UppdragVy', () => {
 				{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
 			]
 		});
+	});
+
+	it('moves the day the scope in force applies from, without changing the scope (#79)', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		// 80 % from 2 November, but it really applied from 5 October.
+		const a = assignment({
+			terms: [
+				{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
+				{ from: '2026-11-02', scopePercent: 80, workdayMinutes: 480 }
+			]
+		});
+		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
+		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från');
+		await user.clear(from);
+		await user.type(from, '2026-10-05');
+		await user.click(spara());
+		expect(onSave.mock.calls[0]![1].terms).toEqual([
+			{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
+			{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+		]);
 	});
 
 	it('will not save an end before the start', async () => {

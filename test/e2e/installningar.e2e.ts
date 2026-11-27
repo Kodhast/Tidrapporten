@@ -76,7 +76,7 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 
 	await page.reload();
 	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
-	await expect(page.getByLabel('Omfattning')).toHaveValue('80');
+	await expect(page.getByLabel('Omfattning', { exact: true })).toHaveValue('80');
 	await expect(page.getByLabel('Ingående flexsaldo')).toHaveValue('+4,5');
 	await expect(page.getByRole('button', { name: /^Intern tid/ })).toContainText('Inte debiterbar');
 	await expect(page.getByRole('button', { name: /^Utveckling/ })).toContainText('Debiterbar');

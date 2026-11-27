@@ -145,8 +145,6 @@ export function UppdragVy({
 		void save.run(() => onSave(assignment, after, withParent, firstReceivers));
 	};
 
-	const termsChanged = form.scope !== initialForm.scope || form.workday !== initialForm.workday;
-
 	const applyCode = () => {
 		if (!codeSheet) return;
 		const { id, billable } = codeSheet;
@@ -225,6 +223,16 @@ export function UppdragVy({
 							errorMessage={error('workday')}
 						/>
 					</div>
+					{assignment && (
+						<TextField
+							label="Omfattning och arbetsdag gäller från"
+							type="date"
+							value={form.termsFrom ?? ''}
+							onChange={set('termsFrom')}
+							description="Dagarna före behåller sin norm. Ett tidigare datum rättar dem bakåt."
+							errorMessage={read.errors?.termsFrom}
+						/>
+					)}
 					{employerOptions.length > 0 ? (
 						<ChoiceRow
 							label="Arbetsgivare"
@@ -273,16 +281,6 @@ export function UppdragVy({
 						description="Flex du hade innan du började med appen"
 						errorMessage={error('openingFlex')}
 					/>
-					{assignment && termsChanged && (
-						<TextField
-							label="Omfattning och arbetsdag gäller från"
-							type="date"
-							value={form.termsFrom ?? ''}
-							onChange={set('termsFrom')}
-							description="Dagarna före behåller sin norm"
-							errorMessage={read.errors?.termsFrom}
-						/>
-					)}
 					{assignment && read.values && dirty && (
 						<p className="kh-text-item-subtitle dampad">
 							Ändringar som påverkar flexen skrivs i ändringsloggen.
