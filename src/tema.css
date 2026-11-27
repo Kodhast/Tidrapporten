@@ -342,6 +342,17 @@ body {
 	--kh-accent: var(--lucka);
 }
 
+/* The billing sheet's week and month side by side (mockup "Debitering", issue 23). */
+.debitering-totalt {
+	display: flex;
+	gap: var(--kh-space-xl);
+}
+
+.debitering-totalt > div {
+	display: flex;
+	flex-direction: column;
+}
+
 /* The flex sheet's total (mockup "Flex per uppdrag"). */
 .flex-totalt {
 	display: flex;
@@ -423,6 +434,8 @@ body {
 /* The flex on the start page's first row (issue 66): the header's end is the account's. */
 .flexrad {
 	display: flex;
+	flex-wrap: wrap;
+	gap: var(--kh-space-s);
 }
 
 /* Om Tidrapporten (issue 66). */
