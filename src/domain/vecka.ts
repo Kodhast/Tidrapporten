@@ -248,14 +248,16 @@ export const subjectName = (
 
 /**
  * The report as it is sent: its lines with time, and a snapshot of the names and the week's actual
- * time as they are now. `sentAt` is set by the server when it is stored.
+ * time as they are now. `sentAt` is set by the server when it is stored. A code taken off the
+ * receiver since the week was first sent keeps the name of `earlier`, the unlocked week's snapshot.
  */
 export const sentReport = (
 	report: Omit<Report, 'status' | 'snapshot'>,
 	assignment: Assignment,
 	receiver: Receiver,
 	actualMinutes: Minutes,
-	now: UtcMillis
+	now: UtcMillis,
+	earlier: ReportSnapshot | null = null
 ): Report => {
 	const lines = storedLines(report.lines);
 	const snapshot: ReportSnapshot = {
@@ -265,7 +267,9 @@ export const sentReport = (
 		codeNames: Object.fromEntries(
 			lines.map((l) => [
 				l.receiverCodeId,
-				receiver.codes.find((c) => c.id === l.receiverCodeId)?.name ?? l.receiverCodeId
+				receiver.codes.find((c) => c.id === l.receiverCodeId)?.name ??
+					earlier?.codeNames[l.receiverCodeId] ??
+					l.receiverCodeId
 			])
 		),
 		actualMinutes
@@ -273,11 +277,17 @@ export const sentReport = (
 	return { ...report, lines, status: 'sent', snapshot };
 };
 
-/** A receiver code's name: the snapshot's when the report was sent, else the receiver's. */
-export const codeName = (receiver: Receiver, report: Report | null, receiverCodeId: Id): string =>
-	report?.snapshot?.codeNames[receiverCodeId] ??
-	receiver.codes.find((c) => c.id === receiverCodeId)?.name ??
-	receiverCodeId;
+/**
+ * A receiver code's name: the snapshot's when the report is sent, else the receiver's, and for an
+ * unlocked week the snapshot's when the code has been taken off the receiver.
+ */
+export const codeName = (receiver: Receiver, report: Report | null, receiverCodeId: Id): string => {
+	const snapshot = report?.snapshot?.codeNames[receiverCodeId];
+	const current = receiver.codes.find((c) => c.id === receiverCodeId)?.name;
+	return (
+		(report?.status === 'sent' ? (snapshot ?? current) : (current ?? snapshot)) ?? receiverCodeId
+	);
+};
 
 /** Hours with a decimal comma and the unit: 2070 → `34,5 h`. */
 export const hoursLabel = (minutes: Minutes): string => `${formatHours(minutes)} h`;

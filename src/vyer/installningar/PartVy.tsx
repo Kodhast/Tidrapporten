@@ -60,6 +60,7 @@ export function PartVy(props: PartVyProps) {
 				: props.onSave(props.value, base)
 		);
 	// Archiving saves what is stored with the flag turned, not what the form has.
+	// The same call twice: the narrowing ties the value's type to its onSave.
 	const toggleArchived = () =>
 		void save.run(() =>
 			props.kind === 'employer'

@@ -193,7 +193,10 @@ appen laddar först ner JSON-exporten och anropar funktionen först när nedladd
 **`raderaUppdrag`** raderar ett uppdrag med tidkoder, mottagare, tider och rapporter och skriver en
 post i ändringsloggen före raderingen. Ett uppdrag med en skickad eller upplåst vecka raderas inte
 (funktionen svarar att det ska arkiveras), eftersom en låst vecka bara ändras via en loggad
-upplåsning. Båda körs som **`tidrapporten-radering`** med rollen Cloud Datastore User, och finns
+upplåsning. **`raderaDel`** (issue 80) raderar en arbetsgivare, kund, tidkod, frånvarotyp eller
+mottagare som inget använder, tar bort den ur mottagarnas mappningar och skriver en post i
+ändringsloggen i samma skrivning; det som används raderas inte (funktionen svarar att det ska
+arkiveras). Alla tre körs som **`tidrapporten-radering`** med rollen Cloud Datastore User, och finns
 bara i drift som de andra funktionerna; i testmiljön svarar knapparna att det inte gick.
 
 **Före första releasen med tömningen** i Cloud Shell:
@@ -209,7 +212,8 @@ bara i drift som de andra funktionerna; i testmiljön svarar knapparna att det i
       --role=roles/iam.serviceAccountUser
 
 **Loggar:** `tomning` och `raderaUppdrag` (info, med uid, uppdragets id och antal dokument),
-`tomning: misslyckades` och `raderaUppdrag: misslyckades` (error). Aldrig vad som raderades.
+`raderaDel` (info, med uid, slag, id och antal dokument), `tomning: misslyckades`,
+`raderaUppdrag: misslyckades` och `raderaDel: misslyckades` (error). Aldrig vad som raderades.
 
 **Ångra:** tömningen ångras med filen som laddades ner (Inställningar → Återställ från fil), eller
 med Firestores backup och PITR (avsnittet Backup).
