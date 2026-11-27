@@ -75,7 +75,10 @@ vi.mock('../../data/installningar.ts', () => ({
 const writes = vi.hoisted(() => ({
 	startTimer: vi.fn(),
 	stopTimer: vi.fn(),
+	stopPausedTimer: vi.fn(),
 	switchTimer: vi.fn(),
+	pauseTimer: vi.fn(),
+	moveTimerStart: vi.fn(),
 	saveEntry: vi.fn()
 }));
 
@@ -212,6 +215,73 @@ describe('useStart', () => {
 		act(() => listeners.reports(reports));
 		await user().click(screen.getByRole('button', { name: 'Stoppa timern' }));
 		expect(writes.stopTimer).toHaveBeenCalledWith({}, 'testperson-1', timer, NOW, reports);
+	});
+
+	describe('a pause on the timer (issue 95)', () => {
+		it('puts a lunch on the running timer from now and marks the day', async () => {
+			const u = user();
+			render(<Harness />);
+			const timer = running(at('2026-11-25', '08:05'));
+			feed({ timer });
+			await u.click(screen.getByRole('button', { name: 'Lunch' }));
+			await u.click(screen.getByRole('button', { name: 'Lunch 09:47–10:17' }));
+			expect(writes.pauseTimer).toHaveBeenCalledWith(
+				{},
+				'testperson-1',
+				timer,
+				{ from: NOW, until: at('2026-11-25', '10:17') },
+				[],
+				false
+			);
+		});
+
+		it('leaves a day already marked as paused as it is', async () => {
+			const u = user();
+			render(<Harness />);
+			feed({ timer: running(at('2026-11-25', '08:05')) });
+			act(() => listeners.pause(true));
+			await u.click(screen.getByRole('button', { name: 'Ärende' }));
+			await u.click(screen.getByRole('button', { name: 'Ärende 09:47–10:02' }));
+			expect(writes.pauseTimer.mock.calls[0]![5]).toBe(true);
+		});
+
+		it('shows the pause, comes back now, and stops without an interval', async () => {
+			const u = user();
+			render(<Harness />);
+			const timer = running(at('2026-11-25', '10:15'));
+			feed({ timer, entries: [{ ...work('2026-11-25', '08:05', '09:45'), id: 'timer-1' }] });
+			expect(screen.getByText('Paus till 10:15')).toBeTruthy();
+			expect(screen.getByText('1 h 40')).toBeTruthy();
+			expect(screen.queryByRole('button', { name: 'Lunch' })).toBeNull();
+			await u.click(screen.getByRole('button', { name: 'Tillbaka nu' }));
+			expect(writes.moveTimerStart).toHaveBeenCalledWith({}, 'testperson-1', timer, NOW);
+			await u.click(screen.getByRole('button', { name: 'Ändra pausen' }));
+			await u.click(screen.getByRole('radio', { name: '1 h' }));
+			await u.click(screen.getByRole('button', { name: 'Paus 09:45–10:45' }));
+			expect(writes.moveTimerStart).toHaveBeenLastCalledWith(
+				{},
+				'testperson-1',
+				timer,
+				at('2026-11-25', '10:45')
+			);
+			await u.click(screen.getByRole('button', { name: 'Stoppa timern' }));
+			expect(writes.stopPausedTimer).toHaveBeenCalledWith({}, 'testperson-1');
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+		});
+
+		it('stops without an interval in the pause’s last minute, from the button and the shortcut', async () => {
+			const u = user();
+			const timer = running(NOW + 30_000);
+			render(<Harness />);
+			feed({ timer });
+			await u.click(screen.getByRole('button', { name: 'Stoppa timern' }));
+			expect(writes.stopPausedTimer).toHaveBeenCalledTimes(1);
+			cleanup();
+			render(<Harness shortcut={pendingShortcut('stoppa')} />);
+			feed({ timer });
+			expect(writes.stopPausedTimer).toHaveBeenCalledTimes(2);
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+		});
 	});
 
 	it('changes the code of a running timer from now', async () => {

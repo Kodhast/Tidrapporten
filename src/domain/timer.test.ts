@@ -5,11 +5,15 @@ import {
 	choiceNames,
 	durationLabel,
 	elapsedLabel,
+	entryBefore,
+	isPaused,
 	parseEnd,
+	parsePause,
 	parseStart,
 	startChoice,
 	stopBlockedOffline,
 	suggestStart,
+	runningEntry,
 	timerCodeGroups,
 	timerEntry
 } from './timer.ts';
@@ -288,5 +292,87 @@ describe('suggestStart', () => {
 		expect(suggestStart(running, [])).toBe(running.start);
 		expect(suggestStart(running, [work('2026-11-24', '13:00', '17:00')])).toBe(running.start);
 		expect(suggestStart(running, [work('2026-11-25', '12:00', '13:00')])).toBe(running.start);
+	});
+});
+
+describe('a pause on the timer (issue 95)', () => {
+	// The timer runs from 08:15; at 11:52 the owner takes 30 minutes of lunch.
+	const running = timer(at('2026-11-25', '08:15'));
+	const now = at('2026-11-25', '11:52');
+
+	it('ends the interval where the pause begins and starts the timer where it ends', () => {
+		expect(parsePause('11:52', 30, running, now)).toEqual({
+			pause: { from: at('2026-11-25', '11:52'), until: at('2026-11-25', '12:22') }
+		});
+	});
+
+	it('takes a pause afterwards, already over', () => {
+		const later = at('2026-11-25', '15:00');
+		expect(parsePause('11:45', 45, running, later)).toEqual({
+			pause: { from: at('2026-11-25', '11:45'), until: at('2026-11-25', '12:30') }
+		});
+	});
+
+	it('refuses a pause that begins later than now or is not a time', () => {
+		expect(parsePause('12:10', 30, running, now)).toEqual({
+			error: 'Pausen kan inte börja senare än nu'
+		});
+		expect(parsePause('tolv', 30, running, now)).toEqual({ error: 'Skriv en tid som 16:05' });
+	});
+
+	it('refuses a pause within the timer’s first minute, which leaves no interval', () => {
+		const fresh = timer(at('2026-11-25', '11:51') + 20_000);
+		expect(parsePause('11:51', 15, fresh, now)).toEqual({
+			error: 'Pausen kan börja tidigast 11:53'
+		});
+		expect(parsePause('08:00', 15, running, now)).toEqual({
+			error: 'Pausen kan börja tidigast 08:16'
+		});
+	});
+
+	it('counts the real hours on the day summer time ends', () => {
+		// 25 October 2026: 01:30 to 03:30 local is three hours of interval; a pause of an hour
+		// from 03:30 ends 04:30.
+		const autumn = timer(at('2026-10-25', '01:30'));
+		const result = parsePause('03:30', 60, autumn, at('2026-10-25', '04:00'));
+		expect(result).toEqual({
+			pause: { from: at('2026-10-25', '03:30'), until: at('2026-10-25', '04:30') }
+		});
+		const { pause } = result as { pause: { from: number } };
+		expect(timerEntry(autumn, pause.from).time).toEqual({
+			kind: 'interval',
+			start: autumn.start,
+			end: at('2026-10-25', '03:30')
+		});
+		expect((pause.from - autumn.start) / MINUTE).toBe(3 * 60);
+	});
+
+	it('is in a pause while the timer’s start is ahead, and nothing runs', () => {
+		const inPause = timer(at('2026-11-25', '12:22'));
+		expect(isPaused(inPause, at('2026-11-25', '12:00'))).toBe(true);
+		expect(runningEntry(inPause, at('2026-11-25', '12:00'))).toBeNull();
+		expect(isPaused(inPause, at('2026-11-25', '12:21'))).toBe(false);
+		// A timer just started, seen before the minute's tick, runs.
+		expect(isPaused(inPause, at('2026-11-25', '12:22') - 30_000)).toBe(false);
+		expect(runningEntry(inPause, at('2026-11-25', '12:30'))?.time).toEqual({
+			kind: 'interval',
+			start: at('2026-11-25', '12:22'),
+			end: at('2026-11-25', '12:30')
+		});
+		expect(runningEntry(null, now)).toBeNull();
+	});
+
+	it('finds the interval the pause was split from', () => {
+		const inPause = timer(at('2026-11-25', '12:22'));
+		const split = { ...work('2026-11-25', '08:15', '11:52'), id: 'timer-x' };
+		const entries = [work('2026-11-25', '07:00', '08:00'), split];
+		expect(entryBefore(inPause, entries)).toBe(split);
+		expect(entryBefore(inPause, [])).toBeNull();
+	});
+
+	it('never blocks the stop of a timer in a pause, which writes no interval', () => {
+		const reports = [report('2026-W48', 'sent', [0, 0, 0, 0, 0, 0, 0])];
+		const inPause = timer(at('2026-11-25', '12:22'));
+		expect(stopBlockedOffline(inPause, at('2026-11-25', '12:00'), reports, false)).toBe(false);
 	});
 });

@@ -75,6 +75,56 @@ describe('StartVy', () => {
 		expect(screen.getByText('1 h 42')).toBeTruthy();
 	});
 
+	it('offers Lunch and Ärende while the timer runs (issue 95)', async () => {
+		const user = userEvent.setup();
+		const onPauseTimer = vi.fn();
+		render(<StartVy {...props({ timer: running, onPauseTimer })} />);
+		await user.click(screen.getByRole('button', { name: 'Ärende' }));
+		expect(onPauseTimer).toHaveBeenCalledWith('errand');
+		await user.click(screen.getByRole('button', { name: 'Lunch' }));
+		expect(onPauseTimer).toHaveBeenLastCalledWith('lunch');
+	});
+
+	it('offers no pause without a running timer', () => {
+		render(<StartVy {...props()} />);
+		expect(screen.queryByRole('button', { name: 'Lunch' })).toBeNull();
+	});
+
+	it('shows the pause the timer is in, with the time before it, and comes back (issue 95)', async () => {
+		const user = userEvent.setup();
+		const onResume = vi.fn();
+		const onChange = vi.fn();
+		const inPause: Timer = { ...running, start: at('2026-11-25', '12:22') };
+		const pause = { until: inPause.start, shown: '3 h 37', arc: null, onResume, onChange };
+		const { rerender } = render(
+			<StartVy
+				{...props({
+					timer: inPause,
+					now: at('2026-11-25', '12:00'),
+					pause: { ...pause, online: true }
+				})}
+			/>
+		);
+		expect(screen.getByText('Paus till 12:22')).toBeTruthy();
+		expect(screen.getByText('3 h 37')).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'Lunch' })).toBeNull();
+		await user.click(screen.getByRole('button', { name: 'Tillbaka nu' }));
+		expect(onResume).toHaveBeenCalled();
+		await user.click(screen.getByRole('button', { name: 'Ändra pausen' }));
+		expect(onChange).toHaveBeenCalled();
+
+		rerender(
+			<StartVy
+				{...props({
+					timer: inPause,
+					now: at('2026-11-25', '12:00'),
+					pause: { ...pause, online: false }
+				})}
+			/>
+		);
+		expect(screen.getByRole('button', { name: 'Tillbaka nu' }).hasAttribute('disabled')).toBe(true);
+	});
+
 	it('lists the codes per assignment and chooses another', async () => {
 		const user = userEvent.setup();
 		const onChoose = vi.fn();

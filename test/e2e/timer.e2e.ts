@@ -216,3 +216,51 @@ test('offline the timer cannot be stopped into a sent week', async ({ page, cont
 	await expect.poll(async () => (await entriesOnServer(request, user)).length).toBe(1);
 	await expect.poll(async () => (await stored(request, user, 'changeLog')).length).toBe(1);
 });
+
+test('a lunch on the running timer splits it, shows on both devices and comes back (issue 95)', async ({
+	page,
+	browser,
+	request
+}) => {
+	const user = uid('lunch');
+	await seedAssignment(request, user, ['Utveckling']);
+	const seeded = Date.now() - 30 * 60_000;
+	await seed(request, user, 'state/timer', {
+		assignmentId: 'a1',
+		subject: { kind: 'code', codeId: 'c1' },
+		start: new Date(seeded),
+		schemaVersion: 1,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	});
+	await signIn(page, user);
+	await waitOnline(page);
+	const device = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+	const other = await device.newPage();
+	await signIn(other, user);
+	await expect(other.getByText(`${clockOf(seeded)}–`)).toBeVisible();
+
+	await page.getByRole('button', { name: 'Lunch', exact: true }).click();
+	const sheet = page.getByRole('dialog', { name: 'Lunch' });
+	await sheet.getByRole('button', { name: /^Lunch \d\d:\d\d–\d\d:\d\d$/ }).click();
+	await expect(sheet).toBeHidden();
+
+	await expect(page.getByText(/^Paus till \d\d:\d\d$/)).toBeVisible();
+	await expect(other.getByText(/^Paus till \d\d:\d\d$/)).toBeVisible({ timeout: 5_000 });
+	await expect(page.getByText('Pågår')).toBeHidden();
+	const [entry] = await entriesOnServer(request, user);
+	expect(entry!.id).toBe(`timer-${seeded}`);
+	expect(span(entry!).start).toBe(seeded);
+	const day = dateOf(span(entry!).end);
+	expect((await stored(request, user, 'pauses')).map((d) => d.id)).toEqual([day]);
+	const [paused] = await stored(request, user, 'state');
+	expect(millis(paused!.fields.start) - span(entry!).end).toBe(30 * 60_000);
+
+	await page.getByRole('button', { name: 'Tillbaka nu' }).click();
+	await expect(page.getByText('Pågår')).toBeVisible();
+	await expect(other.getByText('Pågår')).toBeVisible({ timeout: 5_000 });
+	await stopButton(page).click();
+	await expect(startButton(page)).toBeVisible();
+	await expect.poll(async () => (await entriesOnServer(request, user)).length).toBe(2);
+	await device.close();
+});

@@ -281,6 +281,11 @@ body {
 	--kh-accent: var(--spar);
 }
 
+/* A pause the timer is in (issue 95): thin, in the track's darker edge colour. */
+.hjul__ring .paus {
+	--kh-accent: var(--kh-outline);
+}
+
 .hjul__ring .prick {
 	fill: var(--kh-accent);
 	stroke: var(--kh-background);

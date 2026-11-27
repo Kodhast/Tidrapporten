@@ -237,6 +237,10 @@ interface Device {
   enheter som stoppar samma timer ger ett intervall och inte två.
 - **Paus** är en markering per dag (`pauses/{datum}`): finns den är alla luckor den dagen pauser
   och varnar inte. Ingen markering för enskilda luckor.
+- **En paus på timern** (lunch eller ärende, issue 95) delar timern: intervallet skrivs fram till
+  pausens början, `state/timer` får pausens slut som ny start och dagen markeras som paus, i samma
+  batch. Under pausen ligger timerns start alltså framåt i tiden; då kan den flyttas inom tiden
+  framåt och tas bort utan intervall. Pausens sort sparas inte.
 
 ### Frånvaro
 

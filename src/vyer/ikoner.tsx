@@ -71,3 +71,24 @@ export const CheckIcon = () => (
 		<path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
 	</svg>
 );
+
+/** Lunch on the running timer (issue 95). */
+export const LunchIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z" />
+	</svg>
+);
+
+/** An errand on the running timer (issue 95). */
+export const ErrandIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6-2c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm6 16H6V8h2v2c0 .55.45 1 1 1s1-.45 1-1V8h4v2c0 .55.45 1 1 1s1-.45 1-1V8h2v12z" />
+	</svg>
+);
+
+/** The timer in a pause (issue 95). */
+export const PauseIcon = () => (
+	<svg viewBox="0 0 24 24" aria-hidden="true">
+		<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+	</svg>
+);

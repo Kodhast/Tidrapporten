@@ -2,6 +2,7 @@
 // transaction, entries with a log entry when their week is sent, and the timer.
 import {
 	collection,
+	deleteDoc,
 	doc,
 	runTransaction,
 	serverTimestamp,
@@ -12,7 +13,8 @@ import {
 	type Firestore
 } from 'firebase/firestore';
 import { entryChange, reportChange } from '../domain/lasning.ts';
-import { timerEnd, timerEntry } from '../domain/timer.ts';
+import { dateOf } from '../domain/tid.ts';
+import { timerEnd, timerEntry, type Pause } from '../domain/timer.ts';
 import type {
 	ChangeAction,
 	Entry,
@@ -247,6 +249,40 @@ export const stopTimer = async (
 };
 
 /**
+ * Stops a timer in a pause (issue 95): the interval before the pause is already written, so the
+ * timer is only emptied. The rules allow it only while the stored start is still ahead, so a
+ * timer another device has taken out of the pause is not removed without its entry. A stop
+ * queued offline can still remove a later pause from another device; the time before that
+ * pause is written by then.
+ */
+export const stopPausedTimer = (db: Firestore, uid: Id): Promise<void> =>
+	deleteDoc(userDoc(db, uid, timerPath));
+
+/**
+ * Puts a pause on the running timer (issue 95), in one batch: the entry so far ends where the
+ * pause begins, the timer starts again with the same code where it ends (which may be ahead), and
+ * the day is marked as paused, so that the gap does not warn (ADR 0012: one mark per day). A mark
+ * that is there already is left as it is (`marked`): the rules keep its createdAt. The caller has
+ * checked that the pause begins at least a minute after the timer's start.
+ */
+export const pauseTimer = async (
+	db: Firestore,
+	uid: Id,
+	timer: Timer,
+	pause: Pause,
+	reports: readonly Report[] = [],
+	marked = false
+): Promise<Timer> => {
+	const batch = writeBatch(db);
+	addTimerEntry(db, uid, batch, timer, pause.from, reports);
+	const next: Timer = { ...timer, start: pause.until };
+	batch.update(userDoc(db, uid, timerPath), { ...timerCodec.toData(next), ...updateMeta() });
+	if (!marked) batch.set(userDoc(db, uid, userPath('pauses', dateOf(pause.from))), createMeta());
+	await batch.commit();
+	return next;
+};
+
+/**
  * Changes the running timer's code: the entry so far is written and the timer goes on with the
  * new code from the entry's end, in one batch, so that the two intervals meet. Within the first
  * minute there is nothing to write yet (an entry is at least a minute), so the code changes in
@@ -278,10 +314,10 @@ export const switchTimer = async (
 export class TimerChangedError extends Error {}
 
 /**
- * Moves the running timer's start (issue 78). A transaction, so it needs the network: it reads the
- * timer first and refuses when another device has stopped it or changed it meanwhile,
- * rather than overwriting what that device did. The rules allow the move only to a time between
- * a day ago and now.
+ * Moves the running timer's start (issue 78), and in a pause the pause's end (issue 95). A
+ * transaction, so it needs the network: it reads the timer first and refuses when another device
+ * has stopped it or changed it meanwhile, rather than overwriting what that device did. The rules
+ * allow the move only to a time between a day ago and now, or ahead when the timer is in a pause.
  */
 export const moveTimerStart = (db: Firestore, uid: Id, timer: Timer, start: UtcMillis) =>
 	runTransaction(db, async (transaction) => {
