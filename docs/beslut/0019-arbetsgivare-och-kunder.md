@@ -1,6 +1,6 @@
 # 0019. Arbetsgivare och kunder över uppdragen
 
-- **Status:** Beslutat
+- **Status:** Beslutat; anställningens omfattning i 0021
 - **Datum:** 2026-11-26
 
 ## Sammanhang
