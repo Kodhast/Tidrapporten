@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { dayName, minutesLabel, type DayRow } from '../../domain/dag.ts';
 import type { CodeColour } from '../../domain/hjul.ts';
 import type { Span } from '../../domain/intervall.ts';
+import { billingLabel, type Billing } from '../../domain/debitering.ts';
 import { flexLabel, isFlexNegative, type Overview } from '../../domain/oversikt.ts';
 import { isoWeekOf } from '../../domain/tid.ts';
 import {
@@ -21,6 +22,7 @@ import { ExpandIcon, OfflineIcon, WarningIcon, WorkIcon } from '../ikoner';
 import { DagRader } from '../dag/DagRader';
 import { Sidhuvud } from '../konto';
 import { href } from '../rutter.ts';
+import { DebiteringArk } from './DebiteringArk';
 import { FlexArk } from './FlexArk';
 import { GlomdTimer, type GlomdTimerProps } from './GlomdTimer';
 import { Hjul, type HjulArc } from './Hjul';
@@ -50,6 +52,8 @@ export interface StartVyProps {
 	banner?: ReactNode;
 	/** Flex, the week, today's time and the unsent reports; null until everything has come. */
 	overview?: Overview | null;
+	/** This week's and month's billing rate (issue 23); null until the codes have come. */
+	billing?: Billing | null;
 	/** Today's intervals and gaps, newest first, and their arcs on the wheel. */
 	day?: StartDay | null;
 	/** The colour of the code the chip shows. */
@@ -90,6 +94,7 @@ export function StartVy({
 	forgotten,
 	banner,
 	overview = null,
+	billing = null,
 	day = null,
 	chipColour = null,
 	onPause = () => {},
@@ -99,6 +104,8 @@ export function StartVy({
 }: StartVyProps) {
 	const [choosing, setChoosing] = useState(false);
 	const [showingFlex, setShowingFlex] = useState(false);
+	const [showingBilling, setShowingBilling] = useState(false);
+	const billed = billing && billing.perAssignment.length > 0 ? billing : null;
 	const current = timer ? timerChoice(timer) : next;
 	const names = timer ? timerNames : current && choiceNames(groups, current);
 	return (
@@ -106,14 +113,22 @@ export function StartVy({
 			<Sidhuvud title="Idag" subtitle={daySubtitle(today)} bouncing={loading} />
 			<div className="innehall">
 				{/* The header's end is the account's (issue 66), so the flex is the content's first row. */}
-				{overview && overview.perAssignment.length > 0 && (
+				{((overview && overview.perAssignment.length > 0) || billed) && (
 					<div className="flexrad">
-						<Pill
-							tone={isFlexNegative(overview.total) ? 'ton-varning' : 'ton-ok'}
-							onPress={() => setShowingFlex(true)}
-						>
-							{`Flex ${flexLabel(overview.total)}`}
-						</Pill>
+						{overview && overview.perAssignment.length > 0 && (
+							<Pill
+								tone={isFlexNegative(overview.total) ? 'ton-varning' : 'ton-ok'}
+								onPress={() => setShowingFlex(true)}
+							>
+								{`Flex ${flexLabel(overview.total)}`}
+							</Pill>
+						)}
+						{/* Neutral: the app has no target rate (issue 23). */}
+						{billed && (
+							<Pill onPress={() => setShowingBilling(true)}>
+								{`Debiterat ${billingLabel(billed.week)}`}
+							</Pill>
+						)}
 					</div>
 				)}
 				{!online && (
@@ -224,6 +239,14 @@ export function StartVy({
 			/>
 			{overview && (
 				<FlexArk isOpen={showingFlex} onOpenChange={setShowingFlex} overview={overview} />
+			)}
+			{billed && (
+				<DebiteringArk
+					isOpen={showingBilling}
+					onOpenChange={setShowingBilling}
+					billing={billed}
+					today={today}
+				/>
 			)}
 			{sheet}
 			{timer && forgotten && (

@@ -5,6 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dayRows } from '../../domain/dag.ts';
+import type { Billing } from '../../domain/debitering.ts';
 import type { Overview } from '../../domain/oversikt.ts';
 import { assignment, at, code, work } from '../../domain/testdata.ts';
 import { timerCodeGroups } from '../../domain/timer.ts';
@@ -165,6 +166,52 @@ describe('the overview', () => {
 		expect(within(sheet).queryByText(/Veckan 0 min/)).toBeNull();
 		await user.click(within(sheet).getByRole('button', { name: 'Stäng' }));
 		expect(screen.queryByRole('dialog', { name: 'Flex' })).toBeNull();
+	});
+
+	it('shows the week’s billing rate beside the flex and per assignment in a sheet (issue 23)', async () => {
+		const user = userEvent.setup();
+		const billing: Billing = {
+			week: { billable: 1590, worked: 1800 },
+			month: { billable: 5760, worked: 6720 },
+			perAssignment: [
+				{
+					assignment: a1,
+					week: { billable: 1590, worked: 1800 },
+					month: { billable: 5520, worked: 6480 }
+				},
+				{ assignment: a2, week: { billable: 0, worked: 0 }, month: { billable: 240, worked: 240 } }
+			]
+		};
+		render(<StartVy {...props({ overview: overview(390, 0), billing })} />);
+		const pill = screen.getByRole('button', { name: 'Debiterat 88 %' });
+		expect(pill.className).not.toMatch(/ton-/);
+		expect(pill.closest('.flexrad')).toBe(
+			screen.getByRole('button', { name: 'Flex +6,5 h' }).closest('.flexrad')
+		);
+		await user.click(pill);
+		const sheet = screen.getByRole('dialog', { name: 'Debitering' });
+		expect(within(sheet).getByText('vecka 48')).toBeTruthy();
+		expect(within(sheet).getByText('86 %')).toBeTruthy();
+		expect(
+			within(sheet).getByText('Veckan 26 h 30 min av 30 h · november 92 h av 108 h')
+		).toBeTruthy();
+		expect(within(sheet).getByText('Veckan ingen tid · november 4 h av 4 h')).toBeTruthy();
+		expect(within(sheet).getByText('–')).toBeTruthy();
+		await user.click(within(sheet).getByRole('button', { name: 'Stäng' }));
+		expect(screen.queryByRole('dialog', { name: 'Debitering' })).toBeNull();
+	});
+
+	it('leaves out the billing rate without worked time', () => {
+		const none = { billable: 0, worked: 0 };
+		render(
+			<StartVy
+				{...props({
+					overview: overview(390, 0),
+					billing: { week: none, month: none, perAssignment: [] }
+				})}
+			/>
+		);
+		expect(screen.queryByRole('button', { name: /Debiterat/ })).toBeNull();
 	});
 
 	it('warns of a negative flex and the reports not sent', () => {

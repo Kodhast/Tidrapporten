@@ -42,6 +42,9 @@ const MONTHS = [
 	'december'
 ];
 
+/** `2026-11` → `november`. */
+export const monthName = (month: string): string => MONTHS[Number(month.slice(5, 7)) - 1] ?? month;
+
 const amount = (value: number, currency: string) =>
 	`${Math.round(value)} ${currency === 'SEK' ? 'kr' : currency}`;
 
@@ -56,11 +59,10 @@ export interface BudgetNotice {
  */
 export function budgetNotice(status: BudgetStatus | null, now: UtcMillis): BudgetNotice | null {
 	if (!status || status.percent < WARNING_PERCENT || status.month !== monthOf(now)) return null;
-	const monthName = MONTHS[Number(status.month.slice(5, 7)) - 1] ?? status.month;
 	return {
 		title: `Molnbudgeten är till ${Math.floor(status.percent)} % använd`,
 		detail:
 			`${amount(status.cost, status.currency)} av ${amount(status.budget, status.currency)} ` +
-			`i ${monthName}. Inget stoppas i drift, men se över användningen.`
+			`i ${monthName(status.month)}. Inget stoppas i drift, men se över användningen.`
 	};
 }

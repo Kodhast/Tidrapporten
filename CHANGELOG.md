@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.7.0
+
+- Debiteringsgraden syns bredvid flexen på startsidan: tiden på debiterbara tidkoder delat med
+  all arbetad tid, för veckan. Tryck på den för veckan och månaden per uppdrag. Frånvaro räknas
+  inte.
+
 ## 1.6.0
 
 - Starttiden på en timer som går kan ändras: tryck på raden som pågår på startsidan. Förvalet är
