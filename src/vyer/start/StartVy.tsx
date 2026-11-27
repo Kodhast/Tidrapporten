@@ -56,6 +56,8 @@ export interface StartVyProps {
 	chipColour?: CodeColour | null;
 	onPause?: (paused: boolean) => void;
 	onFill?: (gap: Span) => void;
+	/** A press on the running timer's row: the dialog that moves its start (issue 78). */
+	onMoveStart?: () => void;
 	/** The interval sheet for a gap that is filled, when open. */
 	sheet?: ReactNode;
 }
@@ -92,6 +94,7 @@ export function StartVy({
 	chipColour = null,
 	onPause = () => {},
 	onFill = () => {},
+	onMoveStart,
 	sheet
 }: StartVyProps) {
 	const [choosing, setChoosing] = useState(false);
@@ -183,7 +186,11 @@ export function StartVy({
 								accent={day.accent}
 								paused={day.paused}
 								runningId={day.runningId}
-								open={() => ({ href: href({ view: 'dag', date: today }) })}
+								open={(entry) =>
+									entry.id === day.runningId && onMoveStart
+										? { onPress: onMoveStart }
+										: { href: href({ view: 'dag', date: today }) }
+								}
 								onFill={onFill}
 								onPause={onPause}
 							/>

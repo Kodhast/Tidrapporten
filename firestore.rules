@@ -42,7 +42,8 @@ rules_version = '2';
 // devices/{id}: fcmToken string 1–4096, label string ≤ 100
 // state/timer: assignmentId, subject, start timestamp between 2020-01-01 and a day from now.
 //   Deleted when the timer stops, and its start moved on a change of code, only together with
-//   the entry `timer-<start>` it becomes.
+//   the entry `timer-<start>` it becomes. The owner may also move the start, keeping the code, to
+//   a time from a day ago up to now (issue 78).
 // system/budget (outside users/): percent, cost, budget, currency, month 'YYYY-MM',
 //   schemaVersion, updatedAt; written only by the budget function, read by the signed-in user.
 // state/settings: noTimerBy, timerRunningAt, reportReminderFridayAt: clock|null,
@@ -316,6 +317,18 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/users/$(uid)/changeLog/$(data().lastChangeId)).data;
     }
 
+    // The owner moves the running timer's start (issue 78): same code, a start from a day ago up
+    // to now. A code change from a device that had not seen another device's change still needs
+    // the old timer's entry, so it is refused as before. Not onto the start of an entry another
+    // timer became: the stop would then find an entry and let a stale device's stop through.
+    function isMovedStart() {
+      return data().assignmentId == resource.data.assignmentId
+        && data().subject == resource.data.subject
+        && data().start <= request.time
+        && data().start >= request.time - duration.value(1, 'd')
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/entries/$('timer-' + string(data().start.toMillis())));
+    }
+
     // The entry the stored timer becomes when it stops: `timer-<start in milliseconds>`.
     function hasTimerEntryAfter(uid) {
       return existsAfter(/databases/$(database)/documents/users/$(uid)/entries/$('timer-' + string(resource.data.start.toMillis())));
@@ -486,7 +499,7 @@ service cloud.firestore {
         allow delete: if isOwner(uid) && hasTimerEntryAfter(uid);
         allow create: if isOwner(uid) && isValidMeta() && isValidTimer();
         allow update: if isOwner(uid) && isValidMeta() && isValidTimer()
-          && (data().start == resource.data.start || hasTimerEntryAfter(uid));
+          && (data().start == resource.data.start || hasTimerEntryAfter(uid) || isMovedStart());
       }
 
       match /state/settings {

@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { dateOf, isoWeekOf } from '../../src/domain/tid.ts';
+import { clockOf, dateOf, isoWeekOf } from '../../src/domain/tid.ts';
 import { seed, seedAssignment, signIn, stored, uid, type StoredDoc } from './hjalp.ts';
 
 // The timer against the emulators (issue 18): start, stop, a change of code, the sync between
@@ -120,6 +120,41 @@ test('a start on one device shows on the other', async ({ page, browser, request
 	await expect(stopButton(other)).toBeVisible({ timeout: 5_000 });
 	await stopButton(other).click();
 	await expect(startButton(page)).toBeVisible({ timeout: 5_000 });
+	await device.close();
+});
+
+// Issue 78: a later start than the seeded one, so that it is never after now, also over midnight.
+test('the start of a running timer moves on both devices', async ({ page, browser, request }) => {
+	const user = uid('starttid');
+	await seedAssignment(request, user, ['Utveckling']);
+	const seeded = Date.now() - 10 * 60_000;
+	await seed(request, user, 'state/timer', {
+		assignmentId: 'a1',
+		subject: { kind: 'code', codeId: 'c1' },
+		start: new Date(seeded),
+		schemaVersion: 1,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	});
+	await signIn(page, user);
+	await waitOnline(page);
+	const device = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+	const other = await device.newPage();
+	await signIn(other, user);
+	await expect(other.getByText(`${clockOf(seeded)}–`)).toBeVisible();
+
+	const moved = clockOf(seeded + 5 * 60_000);
+	await page.getByRole('button', { name: new RegExp(`^${clockOf(seeded)}–`) }).click();
+	const dialog = page.getByRole('alertdialog', { name: 'Ändra starttid' });
+	await dialog.getByLabel('Starttid').fill(moved);
+	await dialog.getByRole('button', { name: `Spara ${moved}` }).click();
+	await expect(dialog).toBeHidden();
+
+	await expect(page.getByText(`${moved}–`)).toBeVisible();
+	await expect(other.getByText(`${moved}–`)).toBeVisible({ timeout: 5_000 });
+	const [timer] = await stored(request, user, 'state');
+	expect(clockOf(millis(timer!.fields.start))).toBe(moved);
+	expect(await entriesOnServer(request, user)).toHaveLength(0);
 	await device.close();
 });
 

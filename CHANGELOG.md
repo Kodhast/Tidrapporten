@@ -5,6 +5,8 @@ Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör �
 
 ## 1.6.0
 
+- Starttiden på en timer som går kan ändras: tryck på raden som pågår på startsidan. Förvalet är
+  slutet på senaste intervallet, så att luckan fylls. Kräver nät.
 - Ett uppdrag kan få ett slutdatum, och ändrad omfattning eller arbetsdag kan gälla från en dag du
   väljer, också bakåt i tiden.
 - En tidkod kan byta namn: tryck på koden i uppdraget.
