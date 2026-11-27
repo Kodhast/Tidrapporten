@@ -249,6 +249,21 @@ describe('deletePart (issue 80)', () => {
 		expect(await deletions()).toMatchObject([{ path: 'assignments/a1/receivers/r2' }]);
 	});
 
+	it('says in the log where the flex goes when the first receiver is deleted', async () => {
+		await parts();
+		expect(await deletePart(ME, { kind: 'receiver', id: 'r2', assignmentId: 'a1' })).toBe(1);
+		expect(await deletePart(ME, { kind: 'receiver', id: 'r1', assignmentId: 'a1' })).toBe(1);
+		await parts();
+		expect(await deletePart(ME, { kind: 'receiver', id: 'r1', assignmentId: 'a1' })).toBe(1);
+		expect((await deletions()).map((d) => [d.path, d.reason])).toEqual(
+			expect.arrayContaining([
+				['assignments/a1/receivers/r2', ''],
+				['assignments/a1/receivers/r1', ''],
+				['assignments/a1/receivers/r1', 'Första mottagaren raderad: flexen räknas nu mot Kund A.']
+			])
+		);
+	});
+
 	it('refuses what does not exist, and touches no one else', async () => {
 		await parts();
 		await expect(deletePart(ME, { kind: 'customer', id: 'saknas' })).rejects.toThrow(
