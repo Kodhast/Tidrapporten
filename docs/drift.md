@@ -330,3 +330,31 @@ sak för den inloggade, men lägger bara tillbaka det som saknas och skriver ald
 (funktionen `aterstall` ovan). `test/e2e/export.e2e.ts` exporterar, återställer
 till en ny användare och jämför varje dokument mot emulatorerna i varje PR. Vad som ska med när datan ändras:
 skill `datasakerhet`.
+
+## Claudes tjänstekonto
+
+Claude läser och rättar riktig data med `tools/db/db.ts` (issue 27, beslut 0009, skill `db-access`).
+Kontot `tidrapporten-claude` bor i driftprojektet och har bara **Cloud Datastore User** i båda
+projekten, så att Claude-miljön har en nyckel. Det är skilt från inloggningens, backupens och
+funktionernas konton. Skapas en gång i Cloud Shell av projektens ägare:
+
+    SA=tidrapporten-claude@device-streaming-5b35f7b8.iam.gserviceaccount.com
+    gcloud iam service-accounts create tidrapporten-claude --project=device-streaming-5b35f7b8 \
+      --display-name="Claude läser och rättar data"
+    for p in dagboken-497114 device-streaming-5b35f7b8; do
+      gcloud projects add-iam-policy-binding $p --member=serviceAccount:$SA \
+        --role=roles/datastore.user --condition=None
+    done
+    gcloud iam service-accounts keys create tidrapporten-claude.json --iam-account=$SA
+    base64 -w0 tidrapporten-claude.json; echo
+
+Lägg den långa raden som miljövariabeln `TIDRAPPORTEN_CLAUDE_KEY` i Claude-miljöns inställningar
+(rå JSON går också), och ta sedan bort filen: `shred -u tidrapporten-claude.json`. Nyckeln
+klistras aldrig in i en chatt.
+
+Prova i en ny session: `node tools/db/db.ts stats` (test) ska lista användaren och antalen.
+
+Nyckeln ger läsning och skrivning av all data i båda projekten. Läcker den: radera den
+(`gcloud iam service-accounts keys list --iam-account=$SA` och `… keys delete <id>`) och gör en
+ny. Varje rättning står i ändringsloggen med `by: 'claude'`, och verktyget tar en JSON-backup
+före varje skrivning.

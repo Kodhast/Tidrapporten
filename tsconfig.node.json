@@ -29,6 +29,7 @@
 		"vitest.emulator.config.ts",
 		"vite.functions.config.ts",
 		"playwright.config.ts",
-		"test"
+		"test",
+		"tools"
 	]
 }

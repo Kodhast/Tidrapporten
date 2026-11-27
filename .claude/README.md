@@ -15,6 +15,7 @@ skill, agent och koppling kommer in står i issue 8 under "Skills, agenter och k
 | `mockup`                      | Före ny eller ändrad GUI                       | Egen, efter VeckansMat                           |
 | `tidsregler`                  | Beräkningar i `src/domain/`: tid, norm, flex   | Egen, som `fondmatematik` i Fonder               |
 | `datasakerhet`                | Fält eller samling i Firestore, exporten       | Egen, som `data-safety-backup` i Android-repona  |
+| `db-access`                   | Läsa och rätta riktig data med `tools/db`      | Egen, som `db-access` i Android-repona           |
 | `vercel-react-best-practices` | Skriva och granska React-kod                   | Vercel, oförändrad                               |
 | `firebase-basics`             | Firebase CLI, projekt och `firebase use`       | Google, oförändrad                               |
 | `firebase-auth-basics`        | Firebase Authentication och inloggning         | Google, oförändrad                               |
@@ -31,10 +32,11 @@ Firestore-reglerna skrivs och granskas med pluginens `android:firestore-rules-cr
 
 ## Agenter
 
-| Agent                    | När                                              | Modell | Källa                  |
-| ------------------------ | ------------------------------------------------ | ------ | ---------------------- |
-| `tidrapporten-granskare` | Före varje PR: diffen mot reglerna, ändrar inget | Opus   | Egen, efter VeckansMat |
-| `tidrapporten-ci-doktor` | Rött CI: läser loggarna, föreslår en fix         | Sonnet | Egen, efter VeckansMat |
+| Agent                       | När                                              | Modell | Källa                  |
+| --------------------------- | ------------------------------------------------ | ------ | ---------------------- |
+| `tidrapporten-granskare`    | Före varje PR: diffen mot reglerna, ändrar inget | Opus   | Egen, efter VeckansMat |
+| `tidrapporten-ci-doktor`    | Rött CI: läser loggarna, föreslår en fix         | Sonnet | Egen, efter VeckansMat |
+| `tidrapporten-db-inspektor` | Frågor om riktig data, bara läsning              | Sonnet | Egen, som i Dagboken   |
 
 ## Hooks
 
@@ -65,7 +67,8 @@ Projekttrådar startar ovanför repot och läser då inte `.claude/settings.json
 
 - **Skills och agenter** hittar Claude Code själv i `.claude/`. Skillsen heter `<namn>`, eller
   `Tidrapporten:<namn>` när ett annat repo i tråden har en skill med samma namn (VeckansMat har
-  `refine-issue`, `implement-issue`, `mockup`, `release` och `adr`). Agenter får aldrig prefix,
+  `refine-issue`, `implement-issue`, `mockup`, `release` och `adr`; ReseApoteket och Dagboken
+  har `db-access`). Agenter får aldrig prefix,
   så en agent som finns i flera repon heter `<repo>-<namn>` (regeln i claude-android, #37):
   `tidrapporten-granskare` och `tidrapporten-ci-doktor`. Med bara `granskare` laddades
   VeckansMats agent i en tråd med båda repona.
