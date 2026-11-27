@@ -79,7 +79,7 @@ export function App({
 						<p className="kh-text-body">
 							{route.view === 'dag'
 								? 'Logga in för att se dagen.'
-								: route.view === 'vecka' || route.view === 'rapport'
+								: route.view === 'vecka' || route.view === 'rapport' || route.view === 'underlag'
 									? 'Logga in för att se veckan.'
 									: 'Logga in för att se inställningarna.'}
 						</p>

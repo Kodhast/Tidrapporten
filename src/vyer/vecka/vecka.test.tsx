@@ -7,12 +7,14 @@ import userEvent from '@testing-library/user-event';
 import type { Firestore } from 'firebase/firestore';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { absenceTypes, assignment, at, code, receiver, work } from '../../domain/testdata.ts';
-import type { Entry, Report } from '../../domain/types.ts';
+import type { ChangeLogEntry, Entry, Report } from '../../domain/types.ts';
+import { UnderlagRutt } from './UnderlagRutt';
 import { RapportRutt, VeckaRutt } from './VeckaRutt';
 
 const feeds = vi.hoisted(() => ({
 	entries: (() => {}) as (entries: Entry[]) => void,
 	reports: (() => {}) as (reports: Report[]) => void,
+	log: (() => {}) as (log: ChangeLogEntry[]) => void,
 	collections: new Map<string, (values: unknown[]) => void>()
 }));
 
@@ -26,6 +28,10 @@ vi.mock('../../data/dag.ts', () => ({
 const writes = vi.hoisted(() => ({
 	sendReport: vi.fn(),
 	unlockReport: vi.fn(),
+	watchWeekChangeLog: (...args: unknown[]) => {
+		feeds.log = args[3] as (log: ChangeLogEntry[]) => void;
+		return () => {};
+	},
 	watchWeekReports: (...args: unknown[]) => {
 		feeds.reports = args[3] as (reports: Report[]) => void;
 		return () => {};
@@ -278,5 +284,68 @@ describe('RapportRutt', () => {
 		feed();
 		await user.click(screen.getByRole('button', { name: 'Markera som skickad' }));
 		expect(await screen.findByText('Det gick inte att skicka')).toBeTruthy();
+	});
+});
+
+describe('UnderlagRutt', () => {
+	it('shows actual against reported, the days and the week’s changes, and prints', async () => {
+		const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+		render(<UnderlagRutt db={{} as Firestore} uid="testperson-1" week={WEEK} />);
+		feed([sentToCustomer]);
+		// The entry's change as stored: Timestamps for the times, as Firestore gives them.
+		const stamp = (iso: string) => ({ toMillis: () => Date.parse(iso) });
+		const stored = (end: string) => ({
+			assignmentId: 'a1',
+			subject: { kind: 'code', codeId: 'c1' },
+			time: { kind: 'interval', start: stamp('2026-11-16T07:00:00Z'), end: stamp(end) },
+			note: ''
+		});
+		act(() =>
+			feeds.log([
+				{
+					id: 'l2',
+					at: Date.UTC(2026, 10, 23, 7, 40),
+					path: 'entries/e1',
+					action: 'update',
+					week: WEEK,
+					before: stored('2026-11-16T15:00:00Z'),
+					after: stored('2026-11-16T15:30:00Z'),
+					reason: 'Glömde mötet',
+					by: 'app'
+				},
+				{
+					id: 'l1',
+					at: Date.UTC(2026, 10, 20, 15, 5),
+					path: `reports/a1_r2_${WEEK}`,
+					action: 'send',
+					week: WEEK,
+					before: null,
+					after: null,
+					reason: '',
+					by: 'app'
+				}
+			])
+		);
+
+		expect(screen.getByText('Uppdrag A · Arbetsgivaren')).toBeTruthy();
+		expect(screen.getByText(/Faktisk 16,5 h · inte skickad/)).toBeTruthy();
+		// 14:30 reported − 16:30 actual.
+		expect(
+			screen.getByText('Faktisk 16,5 h · rapporterad 14,5 h · skickad fre 20 nov')
+		).toBeTruthy();
+		expect(screen.getByText('−2,0 h')).toBeTruthy();
+		expect(screen.getByText('Måndag 16 november · 8 h 30 min')).toBeTruthy();
+		expect(screen.getAllByText('Uppdrag A · Utveckling')).toHaveLength(2);
+		const changes = screen.getAllByText(/Rapport skickad|Tid ändrad/).map((e) => e.textContent);
+		expect(changes).toEqual([
+			'fre 20 nov 16:05 · Rapport skickad',
+			'mån 23 nov 08:40 · Tid ändrad'
+		]);
+		expect(
+			screen.getByText('mån 16 nov 08:00–16:00 → 08:00–16:30 · Skäl: Glömde mötet')
+		).toBeTruthy();
+
+		await userEvent.click(screen.getByRole('button', { name: 'Skriv ut' }));
+		expect(print).toHaveBeenCalledOnce();
 	});
 });

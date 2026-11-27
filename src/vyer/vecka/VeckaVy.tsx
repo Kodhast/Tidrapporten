@@ -1,7 +1,7 @@
 // The week (mockup "Vecka", issue 20): the week picker, the week's actual time, norm and flex, and
 // per assignment its receivers in the chain's order with each report's state. Gets plain values;
 // VeckaRutt connects it to Firestore.
-import { Notice, PeriodPicker, Pill, Row } from '@kodhast/web-ui-react';
+import { buttonClass, Notice, PeriodPicker, Pill, Row } from '@kodhast/web-ui-react';
 import { plural } from '../../domain/installningar.ts';
 import { flexLabel } from '../../domain/oversikt.ts';
 import type { IsoWeek } from '../../domain/types.ts';
@@ -119,6 +119,13 @@ export function VeckaVy({ week, label, view, failed, onWeek }: VeckaVyProps) {
 						)}
 					</section>
 				))}
+				{view && (
+					<div>
+						<a className={buttonClass({ variant: 'text' })} href={href({ view: 'underlag', week })}>
+							Underlag för veckan
+						</a>
+					</div>
+				)}
 			</div>
 		</>
 	);

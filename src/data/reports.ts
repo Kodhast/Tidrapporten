@@ -2,7 +2,7 @@
 // saveReport, which runs as a transaction (so it fails offline instead of being queued) and logs
 // every locked change (ADR 0012).
 import { collection, getDoc, onSnapshot, query, where, type Firestore } from 'firebase/firestore';
-import type { Id, IsoWeek, Report } from '../domain/types.ts';
+import type { ChangeLogEntry, Id, IsoWeek, Report } from '../domain/types.ts';
 import { changeLogCodec, reportCodec } from './dokument.ts';
 import { saveReport, userDoc, userPath } from './skrivning.ts';
 
@@ -17,6 +17,20 @@ export const watchWeekReports = (
 	onSnapshot(
 		query(collection(db, 'users', uid, 'reports'), where('week', '==', week)),
 		(snapshot) => onChange(snapshot.docs.map((d) => reportCodec.fromData(d.id, d.data()))),
+		onError
+	);
+
+/** Follows the change log's entries for the week (issue 25), in no particular order. */
+export const watchWeekChangeLog = (
+	db: Firestore,
+	uid: Id,
+	week: IsoWeek,
+	onChange: (log: ChangeLogEntry[]) => void,
+	onError?: () => void
+) =>
+	onSnapshot(
+		query(collection(db, 'users', uid, 'changeLog'), where('week', '==', week)),
+		(snapshot) => onChange(snapshot.docs.map((d) => changeLogCodec.fromData(d.id, d.data()))),
 		onError
 	);
 
