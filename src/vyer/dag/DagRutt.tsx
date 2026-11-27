@@ -125,7 +125,7 @@ export function DagRutt({ db, uid, date, online }: DagRuttProps) {
 
 	// The standard day as intervals, with their ids set when they are added.
 	const suggested =
-		loading || freeDays === null
+		loading || freeDays === null || pause?.date !== date
 			? []
 			: standardDaySuggestion({
 					date,
