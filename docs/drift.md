@@ -77,9 +77,10 @@ Vem som får logga in avgör `ANVANDARE`, inte Access.
 
 **Namn och Google-bild** (issue 66): `/inloggning` frågar teamets `/cdn-cgi/access/get-identity` med
 JWT:n som kaka och skickar namn och bild till appen, som sparar dem på Firebase-profilen. Bilden
-finns bara om `picture` är tillagt som OIDC-anspråk på Google-inloggningen: Zero Trust → Settings →
-Authentication → Login methods → Google → _OIDC Claims_ → lägg till `picture`. Saknas den visar
-avataren initialerna. Driftloggens `inloggning` säger `"bild": true` eller `false`, aldrig adressen.
+finns bara om `picture` är tillagt som OIDC-anspråk på Google-inloggningen: Zero Trust → Integrations →
+Identity providers → Google → _OIDC Claims_ → lägg till `picture` (gjort 2026-11-27). Därefter krävs
+en utloggning på `https://kodhast.cloudflareaccess.com/cdn-cgi/access/logout` för en ny token. Saknas
+den visar avataren initialerna. Driftloggens `inloggning` säger `"bild": true` eller `false`, aldrig adressen.
 
 **Webbnyckeln** i testprojektet tillåter `https://*.tidrapporten.pages.dev/*` utöver
 `*.kodhast.com` och localhost.
