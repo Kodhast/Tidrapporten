@@ -228,7 +228,8 @@ export const parseStart = (text: string, timer: Timer, now: UtcMillis): StartRes
 /**
  * The latest interval that ended at or before the timer's start on the timer's day: the one the
  * gap before the timer follows, and in a pause (issue 95) the one the timer was split from, which
- * ends where the pause began. Null when there is none.
+ * ends where the pause began. Null when there is none, as for a pause that ends after midnight:
+ * the change of the pause then begins at the pause's end.
  */
 export const entryBefore = (timer: Timer, entries: readonly Entry[]): Entry | null => {
 	const day = dateOf(timer.start);

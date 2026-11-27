@@ -146,7 +146,8 @@ export function reminderNotice(
 				action: 'Starta timern'
 			};
 		case 'timerRunning': {
-			if (!data.timer) return null;
+			// A timer in a pause (issue 95) starts again by itself; it is not forgotten.
+			if (!data.timer || data.timer.start > data.now) return null;
 			const start = data.timer.start;
 			const when =
 				dateOf(start) === today

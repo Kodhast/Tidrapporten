@@ -233,7 +233,7 @@ export function StartVy({
 						</Hjul>
 						{pause && (
 							<div className="knapprad centrerad">
-								<Button variant="primary" isDisabled={!pause.online} onPress={pause.onResume}>
+								<Button isDisabled={!pause.online} onPress={pause.onResume}>
 									Tillbaka nu
 								</Button>
 								<Button variant="text" isDisabled={!pause.online} onPress={pause.onChange}>

@@ -324,7 +324,8 @@ service cloud.firestore {
     // the old timer's entry, so it is refused as before. Not onto the start of an entry another
     // timer became: the stop would then find an entry and let a stale device's stop through.
     // In a pause (issue 95) the stored start is the pause's end, still ahead, and may move to
-    // another time ahead (up to a day, as isValidTimer says).
+    // any time from a day ago (as isValidTimer says). The rules do not know where the pause
+    // began, so a start before it, over the entry already written, is refused only by the app.
     function isMovedStart() {
       return data().assignmentId == resource.data.assignmentId
         && data().subject == resource.data.subject
@@ -503,7 +504,9 @@ service cloud.firestore {
       // deletes it and a change of code moves its start. So a stop or change queued offline on
       // one device cannot delete or overwrite a timer another device started meanwhile. A change
       // of code within the first minute keeps the start and needs no entry. A timer in a pause has
-      // written its entry when the pause began, so it is stopped without one (issue 95).
+      // written its entry when the pause began, so it is stopped without one (issue 95). A stop
+    // queued offline during one pause can remove a later pause another device put on: the time
+    // up to that pause is written, and only the timer after it is lost, as at any stop.
       match /state/timer {
         allow read: if isOwner(uid);
         allow delete: if isOwner(uid) && (hasTimerEntryAfter(uid) || isPausedTimer());

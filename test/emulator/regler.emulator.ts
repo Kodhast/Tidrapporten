@@ -1061,6 +1061,22 @@ describe('the data layer’s writes pass the rules', () => {
 		const logs = await getDocs(collection(db, 'users', OWNER, 'changeLog'));
 		expect(logs.docs.map((d) => d.data().path)).toEqual([`entries/${entry.id}`]);
 	});
+
+	it('pauseTimer logs the entry before the pause in a sent week (issue 95)', async () => {
+		const db = owner();
+		const saved = await saveReport(db, OWNER, id, sent());
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: Date.UTC(2026, 10, 25, 7)
+		};
+		await create(db, 'state/timer', timerCodec.toData(timer));
+		const pause = { from: Date.UTC(2026, 10, 25, 11), until: Date.UTC(2026, 10, 25, 11, 30) };
+		await pauseTimer(db, OWNER, timer, pause, [saved!]);
+		const logs = await getDocs(collection(db, 'users', OWNER, 'changeLog'));
+		expect(logs.docs.map((d) => d.data().path)).toEqual([`entries/timer-${timer.start}`]);
+		expect(logs.docs[0]?.data().week).toBe('2026-W48');
+	});
 });
 
 describe('the settings’ writes pass the rules (issue 17)', () => {

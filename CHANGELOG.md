@@ -3,7 +3,7 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
-## 1.12.0
+## 1.13.0
 
 - Lunch och Ärende under timern: pausen läggs ovanpå den pågående timern och räknas av, utan att
   timern stoppas. Förvalt är lunch 30 minuter och ärende 15, från nu eller en tidigare tid.

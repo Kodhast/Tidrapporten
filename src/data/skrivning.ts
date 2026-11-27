@@ -251,7 +251,9 @@ export const stopTimer = async (
 /**
  * Stops a timer in a pause (issue 95): the interval before the pause is already written, so the
  * timer is only emptied. The rules allow it only while the stored start is still ahead, so a
- * timer another device has taken out of the pause is not removed without its entry.
+ * timer another device has taken out of the pause is not removed without its entry. A stop
+ * queued offline can still remove a later pause from another device; the time before that
+ * pause is written by then.
  */
 export const stopPausedTimer = (db: Firestore, uid: Id): Promise<void> =>
 	deleteDoc(userDoc(db, uid, timerPath));

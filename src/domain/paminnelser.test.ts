@@ -148,6 +148,14 @@ describe('reminderNotice', () => {
 			)?.body
 		).toBe('Startad onsdag 25 november 22:10.');
 		expect(reminderNotice(check('timerRunning'), data({ now }), settings)).toBeNull();
+		// In a lunch until 19:30 the timer is not running.
+		expect(
+			reminderNotice(
+				check('timerRunning'),
+				data({ now, timer: timer('2026-11-26', '19:30') }),
+				settings
+			)
+		).toBeNull();
 	});
 
 	it('empty day: the latest workday, also Friday on a Monday', () => {

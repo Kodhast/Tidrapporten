@@ -171,7 +171,7 @@ export function useStart(
 
 	// In a pause (issue 95) the interval before it is written, so the stop only empties the timer.
 	const stopTimerAt = (running: Timer, end: UtcMillis, known: readonly Report[]) =>
-		isPaused(running, end) ? stopPausedTimer(db, uid) : stopTimer(db, uid, running, end, known);
+		running.start > end ? stopPausedTimer(db, uid) : stopTimer(db, uid, running, end, known);
 
 	const stopAt = (running: Timer, end: UtcMillis) => {
 		if (blocked(running, end)) return;
@@ -287,7 +287,7 @@ export function useStart(
 		}
 		if (action === 'stoppa' && timer && !isTimerForgotten(timer, at)) {
 			save = () =>
-				isPaused(timer, at) ? stopPausedTimer(db, uid) : stopTimer(db, uid, timer, at, known);
+				timer.start > at ? stopPausedTimer(db, uid) : stopTimer(db, uid, timer, at, known);
 		}
 		save?.().catch(() => setProblem('failed'));
 	}, [db, uid, shortcut, loading, timer, next, reports, online]);
