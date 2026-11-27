@@ -44,7 +44,7 @@ const receiverSubtitle = (r: ReceiverBasis): string =>
 		`Faktisk ${hoursLabel(r.actual)}`,
 		r.reported === null ? 'inte skickad' : `rapporterad ${hoursLabel(r.reported)}`,
 		...(r.sentAt === null ? [] : [`skickad ${sentLabel(r.sentAt)}`]),
-		...(r.reported !== null && r.sentAt === null ? ['upplåst'] : [])
+		...(r.unlocked ? ['upplåst'] : [])
 	].join(' · ');
 
 export function UnderlagVy(props: UnderlagVyProps) {

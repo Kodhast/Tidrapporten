@@ -21,6 +21,8 @@ export interface ReceiverBasis {
 	/** The minutes of a sent or unlocked report; null while it is not sent. */
 	reported: Minutes | null;
 	sentAt: UtcMillis | null;
+	/** Unlocked after it was sent: its lines may still change before it is sent again. */
+	unlocked: boolean;
 	/** Reported minus actual; null while the report is not sent. */
 	difference: Minutes | null;
 }
@@ -43,6 +45,7 @@ export const receiverBasis = (view: WeekView): ReceiverBasis[] =>
 					actual: a.actual,
 					reported,
 					sentAt: fixed ? (r.report!.snapshot?.sentAt ?? null) : null,
+					unlocked: r.report?.status === 'unlocked',
 					difference: reported === null ? null : reported - a.actual
 				};
 			})

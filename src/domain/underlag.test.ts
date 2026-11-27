@@ -63,6 +63,7 @@ describe('receiverBasis', () => {
 				actual: hm('24:40'),
 				reported: hm('24:00'),
 				sentAt: at('2026-11-20', '16:02'),
+				unlocked: false,
 				// 24:00 reported − 24:40 actual.
 				difference: -40
 			},
@@ -73,16 +74,32 @@ describe('receiverBasis', () => {
 				actual: hm('24:40'),
 				reported: null,
 				sentAt: null,
+				unlocked: false,
 				difference: null
 			}
 		]);
 	});
 
-	it('counts an unlocked report as reported, and leaves out a week without time', () => {
-		const unlocked = report(WEEK, 'unlocked', [600, 0, 0, 0, 0, 0, 0]);
+	it('counts an unlocked report as reported and says it is unlocked', () => {
+		// An unlocked report keeps the snapshot from when it was sent.
+		const unlocked = {
+			...report(WEEK, 'unlocked', [600, 0, 0, 0, 0, 0, 0]),
+			snapshot: {
+				sentAt: at('2026-11-20', '16:02'),
+				assignmentName: 'Uppdrag A',
+				receiverName: 'Arbetsgivaren',
+				codeNames: {},
+				actualMinutes: hm('24:40')
+			}
+		};
 		// 10:00 reported − 24:40 actual.
 		const [first] = receiverBasis(weekView(input({ reports: [unlocked] })));
-		expect(first).toMatchObject({ reported: hm('10:00'), sentAt: null, difference: -880 });
+		expect(first).toMatchObject({
+			reported: hm('10:00'),
+			sentAt: at('2026-11-20', '16:02'),
+			unlocked: true,
+			difference: -880
+		});
 		expect(receiverBasis(weekView(input({ entries: [] })))).toEqual([]);
 	});
 });
