@@ -8,10 +8,18 @@ import {
 	Notice,
 	SegmentedChoice,
 	SwitchRow,
-	TextField
+	TextField,
+	TimeField
 } from '@kodhast/web-ui-react';
 import { useState } from 'react';
-import { dayName, overlapping, parseSpan, spanLabel } from '../../domain/dag.ts';
+import {
+	ACTUAL_TIME_STEP,
+	dayName,
+	endWheelStart,
+	overlapping,
+	parseSpan,
+	spanLabel
+} from '../../domain/dag.ts';
 import type { Span } from '../../domain/intervall.ts';
 import { entryChange } from '../../domain/lasning.ts';
 import { clockOf, dateOf } from '../../domain/tid.ts';
@@ -163,18 +171,19 @@ export function IntervallArk(props: IntervallArkProps) {
 			)}
 			{!allDay && (
 				<div className="falt-par">
-					<TextField
+					<TimeField
 						label="Start"
-						inputMode="numeric"
+						step={ACTUAL_TIME_STEP}
 						value={form.start}
 						onChange={(v) => set('start', v)}
 						errorMessage={
 							fieldError('start') ?? (overlap ? `Överlappar ${spanLabel(overlap)}` : undefined)
 						}
 					/>
-					<TextField
+					<TimeField
 						label="Slut"
-						inputMode="numeric"
+						step={ACTUAL_TIME_STEP}
+						pickerStart={endWheelStart(form.start)}
 						value={form.end}
 						onChange={(v) => set('end', v)}
 						errorMessage={fieldError('end')}

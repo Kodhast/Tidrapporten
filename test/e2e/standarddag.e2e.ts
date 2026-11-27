@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { seedAssignment, signIn, stored, uid } from './hjalp.ts';
+import { pickTime, seedAssignment, signIn, stored, uid } from './hjalp.ts';
 
 // The standard day against the emulators (issue 24): it is set on the assignment and offered on
 // an empty workday, which gets its intervals with one press. Tuesday 24 November 2026 is an
@@ -17,8 +17,8 @@ test('a standard day is set on the assignment and added on an empty day', async 
 	const addSlot = async (start: string, end: string, code: string) => {
 		await page.getByRole('button', { name: 'Lägg till pass' }).click();
 		const sheet = page.getByRole('dialog', { name: 'Pass i standarddagen' });
-		await sheet.getByLabel('Start').fill(start);
-		await sheet.getByLabel('Slut').fill(end);
+		await pickTime(page, sheet, 'Start', start);
+		await pickTime(page, sheet, 'Slut', end);
 		await sheet.getByRole('button', { name: code }).click();
 		await sheet.getByRole('button', { name: 'Klar' }).click();
 		await expect(sheet).toBeHidden();

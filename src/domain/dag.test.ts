@@ -6,6 +6,7 @@ import {
 	firstOverlap,
 	minutesLabel,
 	overlapping,
+	endWheelStart,
 	parseClock,
 	parseSpan,
 	spanLabel
@@ -122,6 +123,14 @@ describe('labels', () => {
 
 	it('names the day without the year', () => {
 		expect(dayName(DAY)).toBe('Tisdag 24 november');
+	});
+});
+
+describe('endWheelStart', () => {
+	it('starts the end an hour after the start, round midnight, or at 16:00 without a start', () => {
+		expect(endWheelStart('09:00')).toBe('10:00');
+		expect(endWheelStart('23:30')).toBe('00:30');
+		expect(endWheelStart('')).toBe('16:00');
 	});
 });
 

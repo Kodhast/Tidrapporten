@@ -18,6 +18,7 @@ import { timerCodeGroups } from '../../domain/timer.ts';
 import type { Entry } from '../../domain/types.ts';
 import { DagVy, type DagVyProps } from './DagVy';
 import { IntervallArk, type IntervallArkProps } from './IntervallArk';
+import { pickTime } from '../tidshjul.test-helper.ts';
 
 beforeAll(() => {
 	// jsdom has <dialog> but not showModal() or close(), which the sheets use (web-ui-react 0002).
@@ -240,9 +241,7 @@ describe('IntervallArk', () => {
 		const onSave = vi.fn();
 		const entry = { ...work(DAY, '09:30', '10:15'), note: 'Anteckning' };
 		render(<IntervallArk {...sheet({ entry, onSave })} />);
-		const start = screen.getByLabelText('Start');
-		await userEvent.clear(start);
-		await userEvent.type(start, '0945');
+		await pickTime(userEvent.setup(), 'Start', '09:45');
 		await userEvent.click(screen.getByRole('radio', { name: 'Uppdrag B' }));
 		expect(screen.getByRole('button', { name: 'Förvaltning' }).getAttribute('aria-pressed')).toBe(
 			'true'
@@ -256,7 +255,7 @@ describe('IntervallArk', () => {
 		});
 	});
 
-	it('warns of an overlap but saves, and refuses a time that is not one', async () => {
+	it('warns of an overlap but saves', () => {
 		const other = work(DAY, '09:00', '10:00');
 		render(
 			<IntervallArk
@@ -266,11 +265,24 @@ describe('IntervallArk', () => {
 		expect(screen.getByText('Överlappar 09:00–10:00')).toBeTruthy();
 		const save = screen.getByRole('button', { name: 'Spara' }) as HTMLButtonElement;
 		expect(save.disabled).toBe(false);
-		const end = screen.getByLabelText('Slut');
-		await userEvent.clear(end);
-		await userEvent.type(end, '25');
-		expect(screen.getByText('Skriv en tid som 16:05')).toBeTruthy();
-		expect(save.disabled).toBe(true);
+	});
+
+	it('takes the times from the wheels, with no keyboard in the fields', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn();
+		render(
+			<IntervallArk
+				{...sheet({ span: { start: at(DAY, '09:30'), end: at(DAY, '10:15') }, onSave })}
+			/>
+		);
+		expect(screen.getByRole('textbox', { name: 'Slut' }).hasAttribute('readonly')).toBe(true);
+		await pickTime(user, 'Slut', '11:07');
+		await user.click(screen.getByRole('button', { name: 'Spara' }));
+		expect(onSave.mock.calls[0]![1].time).toEqual({
+			kind: 'interval',
+			start: at(DAY, '09:30'),
+			end: at(DAY, '11:07')
+		});
 	});
 
 	it('registers absence for the whole day', async () => {

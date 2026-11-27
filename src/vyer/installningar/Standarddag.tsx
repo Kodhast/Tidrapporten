@@ -1,8 +1,8 @@
 // The standard day of an assignment (mockup "Uppdrag – standarddagen", issue 24): its slots as
 // rows and a sheet for one slot. Changes go to the assignment's form and are saved with it.
-import { BottomSheet, Button, FilterChips, Row, TextField } from '@kodhast/web-ui-react';
+import { BottomSheet, Button, FilterChips, Row, TimeField } from '@kodhast/web-ui-react';
 import { useState } from 'react';
-import { CLOCK_ERROR, parseClock } from '../../domain/dag.ts';
+import { endWheelStart, parseClock, STANDARD_DAY_STEP } from '../../domain/dag.ts';
 import { slotProblem, sortedSlots } from '../../domain/standarddag.ts';
 import type { StandardDaySlot, TimeCode } from '../../domain/types.ts';
 
@@ -36,7 +36,6 @@ export function Standarddag({ slots, codes, onChange }: StandarddagProps) {
 	const slot = start && end && sheet?.codeId ? { start, end, codeId: sheet.codeId } : null;
 	const others = slots.filter((_, i) => i !== sheet?.index);
 	const problem = slot && slotProblem(slot, others);
-	const touched = (text: string | undefined) => text !== undefined && text.trim() !== '';
 
 	const apply = () => {
 		if (!slot || problem || !sheet) return;
@@ -99,25 +98,19 @@ export function Standarddag({ slots, codes, onChange }: StandarddagProps) {
 				{sheet && (
 					<>
 						<div className="falt-par">
-							<TextField
+							<TimeField
 								label="Start"
-								inputMode="numeric"
+								step={STANDARD_DAY_STEP}
 								value={sheet.start}
 								onChange={(v) => setSheet({ ...sheet, start: v })}
-								errorMessage={
-									touched(sheet.start) && !start
-										? CLOCK_ERROR
-										: problem
-											? PROBLEMS[problem]
-											: undefined
-								}
+								errorMessage={problem ? PROBLEMS[problem] : undefined}
 							/>
-							<TextField
+							<TimeField
 								label="Slut"
-								inputMode="numeric"
+								step={STANDARD_DAY_STEP}
+								pickerStart={endWheelStart(sheet.start)}
 								value={sheet.end}
 								onChange={(v) => setSheet({ ...sheet, end: v })}
-								errorMessage={touched(sheet.end) && !end ? CLOCK_ERROR : undefined}
 							/>
 						</div>
 						<section className="sektion">

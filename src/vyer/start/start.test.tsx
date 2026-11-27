@@ -11,6 +11,7 @@ import { assignment, at, code, work } from '../../domain/testdata.ts';
 import { timerCodeGroups } from '../../domain/timer.ts';
 import type { Timer } from '../../domain/types.ts';
 import { StartVy, type StartDay, type StartVyProps } from './StartVy';
+import { turnWheels } from '../tidshjul.test-helper.ts';
 
 beforeAll(() => {
 	// jsdom has <dialog> but not showModal() or close(), which the sheets use (web-ui-react 0002).
@@ -307,17 +308,24 @@ describe('the forgotten timer', () => {
 		expect(
 			within(dialog).getByText('Den startades 08:05 i Uppdrag A · Utveckling. När slutade du?')
 		).toBeTruthy();
-		expect((within(dialog).getByLabelText('Sluttid') as HTMLInputElement).value).toBe('16:05');
+		expect(
+			within(dialog)
+				.getByRole('spinbutton', { name: 'Sluttid, timme' })
+				.getAttribute('aria-valuetext')
+		).toBe('16');
+		expect(
+			within(dialog)
+				.getByRole('spinbutton', { name: 'Sluttid, minut' })
+				.getAttribute('aria-valuetext')
+		).toBe('05');
 		expect(within(dialog).getByText('Förval: starten plus en arbetsdag (8 h)')).toBeTruthy();
 	});
 
-	it('stops at the time typed', async () => {
+	it('stops at the time turned to', async () => {
 		const user = userEvent.setup();
 		const onStop = vi.fn();
 		render(<StartVy {...forgotten(onStop)} />);
-		const field = screen.getByLabelText('Sluttid');
-		await user.clear(field);
-		await user.type(field, '17:30');
+		await turnWheels(user, '17:30', { hourName: 'Sluttid, timme', minuteName: 'Sluttid, minut' });
 		await user.click(screen.getByRole('button', { name: 'Stoppa 17:30' }));
 		expect(onStop).toHaveBeenCalledWith(at('2026-11-25', '17:30'));
 	});
@@ -325,9 +333,7 @@ describe('the forgotten timer', () => {
 	it('cannot stop at a time that cannot be', async () => {
 		const user = userEvent.setup();
 		render(<StartVy {...forgotten()} />);
-		const field = screen.getByLabelText('Sluttid');
-		await user.clear(field);
-		await user.type(field, '20:00');
+		await turnWheels(user, '20:00', { hourName: 'Sluttid, timme', minuteName: 'Sluttid, minut' });
 		expect(screen.getByText('Sluttiden kan inte vara senare än nu')).toBeTruthy();
 		expect((screen.getByRole('button', { name: 'Stoppa' }) as HTMLButtonElement).disabled).toBe(
 			true

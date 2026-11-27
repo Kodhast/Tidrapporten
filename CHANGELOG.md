@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.11.0
+
+- Alla klockslag väljs med rullhjul för timme och minut i stället för att skrivas: intervallen i
+  dagvyn, timerns starttid, sluttiden för en glömd timer, standarddagens pass och påminnelserna.
+  Faktisk tid går minut för minut, standarddagen i kvartar och påminnelserna i steg om fem
+  minuter.
+
 ## 1.10.0
 
 - Underlag för en vecka: faktisk mot rapporterad tid per mottagare med skillnaden, intervallen

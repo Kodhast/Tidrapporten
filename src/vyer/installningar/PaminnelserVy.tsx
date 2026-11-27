@@ -9,11 +9,12 @@ import {
 	SwitchRow,
 	Switch,
 	TextField,
+	TimeField,
 	TopBar
 } from '@kodhast/web-ui-react';
 import { useState } from 'react';
 import { DEFAULT_SETTINGS } from '../../data/dokument.ts';
-import { CLOCK_ERROR, parseClock } from '../../domain/dag.ts';
+import { CLOCK_ERROR, parseClock, REMINDER_STEP } from '../../domain/dag.ts';
 import { formatHours, parseHours, plural } from '../../domain/installningar.ts';
 import type { Device, Settings } from '../../domain/types.ts';
 import type { EnableResult } from '../../firebase/notiser.ts';
@@ -34,8 +35,8 @@ export interface PaminnelserVyProps {
 	onTest: () => Promise<number>;
 }
 
-type TimeField = 'noTimerBy' | 'timerRunningAt' | 'reportReminderFridayAt';
-type Field = TimeField | 'flexWarning';
+type ClockField = 'noTimerBy' | 'timerRunningAt' | 'reportReminderFridayAt';
+type Field = ClockField | 'flexWarning';
 
 const TITLES: Record<Field, string> = {
 	noTimerBy: 'Ingen timer igång',
@@ -252,15 +253,24 @@ export function PaminnelserVy({
 				{sheet && (
 					<>
 						<SaveFailed failed={save.failed} />
-						<TextField
-							label={sheet.field === 'flexWarning' ? 'Gräns i timmar (±)' : 'Klockslag'}
-							inputMode={sheet.field === 'flexWarning' ? 'decimal' : 'numeric'}
-							value={sheet.text}
-							onChange={(text) => setSheet({ ...sheet, text })}
-							errorMessage={
-								parsed && 'error' in parsed && sheet.text.trim() !== '' ? parsed.error : undefined
-							}
-						/>
+						{sheet.field === 'flexWarning' ? (
+							<TextField
+								label="Gräns i timmar (±)"
+								inputMode="decimal"
+								value={sheet.text}
+								onChange={(text) => setSheet({ ...sheet, text })}
+								errorMessage={
+									parsed && 'error' in parsed && sheet.text.trim() !== '' ? parsed.error : undefined
+								}
+							/>
+						) : (
+							<TimeField
+								label="Klockslag"
+								step={REMINDER_STEP}
+								value={sheet.text}
+								onChange={(text) => setSheet({ ...sheet, text })}
+							/>
+						)}
 					</>
 				)}
 			</BottomSheet>

@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { EMULATOR_HOST, EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/firebase/config.ts';
 
 // What the e2e tests share: signing in against the emulators and made-up data written straight
@@ -105,3 +105,38 @@ export const seedAssignment = async (
 		});
 	}
 };
+
+/** Turns a time wheel (a spinbutton) to `value` with the arrow keys, the short way round (issue 93). */
+async function turnWheel(wheel: Locator, value: number) {
+	const max = Number(await wheel.getAttribute('aria-valuemax'));
+	const step = max === 23 ? 1 : 60 - max;
+	const count = max === 23 ? 24 : 60 / step;
+	const now = Number(await wheel.getAttribute('aria-valuenow')) / step;
+	const target = Math.round(value / step);
+	let delta = (((target - now) % count) + count) % count;
+	if (delta > count / 2) delta -= count;
+	await wheel.focus();
+	for (let i = 0; i < Math.abs(delta); i++) await wheel.press(delta > 0 ? 'ArrowDown' : 'ArrowUp');
+	await expect(wheel).toHaveAttribute('aria-valuenow', String(target * step));
+}
+
+/** Turns the wheels named `hourName` and `minuteName` in `scope` to "HH:MM". */
+export async function turnWheels(
+	scope: Locator,
+	time: string,
+	{ hourName = 'Timme', minuteName = 'Minut' } = {}
+) {
+	const [hour, minute] = time.split(':').map(Number) as [number, number];
+	await turnWheel(scope.getByRole('spinbutton', { name: hourName }), hour);
+	await turnWheel(scope.getByRole('spinbutton', { name: minuteName }), minute);
+}
+
+/** Opens the time field labelled `label` in `scope`, turns its wheels to "HH:MM" and presses OK. */
+export async function pickTime(page: Page, scope: Locator, label: string, time: string) {
+	await scope.getByRole('textbox', { name: label, exact: true }).click();
+	const dialog = page.getByRole('dialog', { name: label, exact: true });
+	await turnWheels(dialog, time);
+	await dialog.getByRole('button', { name: 'OK' }).click();
+	await expect(dialog).toBeHidden();
+	await expect(scope.getByRole('textbox', { name: label, exact: true })).toHaveValue(time);
+}

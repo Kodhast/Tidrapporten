@@ -1,10 +1,12 @@
 // The question when the timer has run more than ten hours (mockup "Timern över 10 h").
-import { ConfirmDialog, TextField } from '@kodhast/web-ui-react';
+import { ConfirmDialog, TimePicker } from '@kodhast/web-ui-react';
 import { useState } from 'react';
+import { ACTUAL_TIME_STEP } from '../../domain/dag.ts';
 import { formatHours } from '../../domain/installningar.ts';
 import { clockOf } from '../../domain/tid.ts';
 import { durationLabel, parseEnd } from '../../domain/timer.ts';
 import type { Minutes, Timer, UtcMillis } from '../../domain/types.ts';
+import { Stodtext } from './Stodtext.tsx';
 
 export interface GlomdTimerProps {
 	isOpen: boolean;
@@ -49,14 +51,16 @@ export function GlomdTimer({
 				if ('end' in result) onStop(result.end);
 			}}
 		>
-			<TextField
-				label="Sluttid"
+			<TimePicker
 				value={text}
 				onChange={setText}
-				inputMode="numeric"
-				description={`Förval: starten plus en arbetsdag (${formatHours(workday)} h)`}
-				errorMessage={error}
+				step={ACTUAL_TIME_STEP}
+				hourLabel="Sluttid, timme"
+				minuteLabel="Sluttid, minut"
 			/>
+			<Stodtext error={error}>
+				Förval: starten plus en arbetsdag ({formatHours(workday)} h)
+			</Stodtext>
 		</ConfirmDialog>
 	);
 }

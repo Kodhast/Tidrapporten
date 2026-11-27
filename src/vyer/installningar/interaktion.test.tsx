@@ -15,7 +15,7 @@ import { MottagareVy } from './MottagareVy';
 import { PaminnelserVy } from './PaminnelserVy';
 import { PartVy } from './PartVy';
 import { DEFAULT_SETTINGS } from '../../data/dokument.ts';
-import { CLOCK_ERROR } from '../../domain/dag.ts';
+import { pickTime } from '../tidshjul.test-helper.ts';
 import { UppdragVy } from './UppdragVy';
 
 beforeAll(() => {
@@ -277,15 +277,19 @@ describe('UppdragVy', () => {
 		await user.click(screen.getByRole('button', { name: 'Lägg till pass' }));
 		const klar = () => within(sheet()).getByRole('button', { name: 'Klar' }) as HTMLButtonElement;
 		expect(klar().disabled).toBe(true);
-		await user.type(within(sheet()).getByLabelText('Start'), '0800');
-		await user.type(within(sheet()).getByLabelText('Slut'), '13:00');
+		// The standard day goes in quarters (ADR 0013).
+		await user.click(within(sheet()).getByRole('textbox', { name: 'Start' }));
+		expect(screen.getByRole('spinbutton', { name: 'Minut' }).getAttribute('aria-valuemax')).toBe(
+			'45'
+		);
+		await user.click(screen.getByRole('button', { name: 'Avbryt' }));
+		await pickTime(user, 'Start', '08:00');
+		await pickTime(user, 'Slut', '13:00');
 		expect(within(sheet()).getByText('Överlappar ett annat pass')).toBeTruthy();
 		expect(klar().disabled).toBe(true);
-		await user.clear(within(sheet()).getByLabelText('Slut'));
-		await user.type(within(sheet()).getByLabelText('Slut'), '7.00');
+		await pickTime(user, 'Slut', '07:00');
 		expect(within(sheet()).getByText('Slutet ska vara efter starten')).toBeTruthy();
-		await user.clear(within(sheet()).getByLabelText('Slut'));
-		await user.type(within(sheet()).getByLabelText('Slut'), '12:00');
+		await pickTime(user, 'Slut', '12:00');
 		await user.click(klar());
 		expect(screen.getByText('08:00–12:00')).toBeTruthy();
 
@@ -683,20 +687,30 @@ describe('PaminnelserVy', () => {
 		expect(onSave).toHaveBeenLastCalledWith({ ...off, remindEmptyDay: true });
 	});
 
-	it('saves a changed time, and says CLOCK_ERROR for a wrong one', async () => {
+	it('saves a time from the wheels, in steps of five minutes', async () => {
 		const user = userEvent.setup();
 		const { onSave } = setup();
 		await user.click(screen.getByRole('button', { name: /^Ändra timern går sent/ }));
-		const field = within(sheet()).getByLabelText('Klockslag');
-		await user.clear(field);
-		await user.type(field, '25:99');
-		expect(within(sheet()).getByText(CLOCK_ERROR)).toBeTruthy();
-		expect((spara() as HTMLButtonElement).disabled).toBe(true);
-		await user.clear(field);
-		await user.type(field, '18.30');
+		expect(
+			within(sheet()).getByRole('textbox', { name: 'Klockslag' }).hasAttribute('readonly')
+		).toBe(true);
+		await user.click(within(sheet()).getByRole('textbox', { name: 'Klockslag' }));
+		const minute = screen.getByRole('spinbutton', { name: 'Minut' });
+		expect(minute.getAttribute('aria-valuemax')).toBe('55');
+		await user.click(screen.getByRole('button', { name: 'Avbryt' }));
+		await pickTime(user, 'Klockslag', '18:30');
 		await user.click(spara());
 		expect(onSave).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, timerRunningAt: '18:30' });
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+	});
+
+	it('shows a saved time between the steps as it is', async () => {
+		const user = userEvent.setup();
+		setup({ settings: { ...DEFAULT_SETTINGS, timerRunningAt: '19:37' } });
+		await user.click(screen.getByRole('button', { name: /^Ändra timern går sent/ }));
+		expect(
+			(within(sheet()).getByRole('textbox', { name: 'Klockslag' }) as HTMLInputElement).value
+		).toBe('19:37');
 	});
 
 	it('saves a changed flex limit in minutes', async () => {

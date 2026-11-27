@@ -1,12 +1,13 @@
 // The dialog that moves the running timer's start (issue 78, mockup "Ändra timerns starttid"). The
-// same kind of dialog as the forgotten-timer question: a clock time, checked as it is typed.
-import { ConfirmDialog, Notice, TextField } from '@kodhast/web-ui-react';
+// same kind of dialog as the forgotten-timer question: the time wheels (issue 93), checked as they turn.
+import { ConfirmDialog, Notice, TimePicker } from '@kodhast/web-ui-react';
 import { useState } from 'react';
-import { overlapping, spanLabel } from '../../domain/dag.ts';
+import { ACTUAL_TIME_STEP, overlapping, spanLabel } from '../../domain/dag.ts';
 import { clockOf } from '../../domain/tid.ts';
 import { elapsedLabel, parseStart } from '../../domain/timer.ts';
 import type { Entry, Timer, UtcMillis } from '../../domain/types.ts';
 import { OfflineIcon, WarningIcon } from '../ikoner';
+import { Stodtext } from './Stodtext.tsx';
 
 const MINUTE = 60_000;
 
@@ -67,16 +68,16 @@ export function AndraStart({
 				if ('start' in result) onSave(result.start);
 			}}
 		>
-			<TextField
-				label="Starttid"
+			<TimePicker
 				value={text}
 				onChange={setText}
-				inputMode="numeric"
-				description={
-					'start' in result ? `Timern visar då ${elapsedLabel(result.start, now)}` : undefined
-				}
-				errorMessage={error}
+				step={ACTUAL_TIME_STEP}
+				hourLabel="Starttid, timme"
+				minuteLabel="Starttid, minut"
 			/>
+			<Stodtext error={error}>
+				{'start' in result && `Timern visar då ${elapsedLabel(result.start, now)}`}
+			</Stodtext>
 			{overlap && (
 				<Notice
 					tone="ton-varning"

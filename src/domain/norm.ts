@@ -12,7 +12,7 @@ export const isWithinAssignment = (assignment: Assignment, date: IsoDate): boole
 export const termsOn = (assignment: Assignment, date: IsoDate): AssignmentTerms | undefined =>
 	assignment.terms.findLast((terms) => terms.from <= date);
 
-const QUARTER: Minutes = 15;
+export const QUARTER: Minutes = 15;
 
 /** To the nearest quarter of an hour, the smallest step the owner reports in; half rounds up. */
 export const roundToQuarter = (minutes: Minutes): Minutes =>

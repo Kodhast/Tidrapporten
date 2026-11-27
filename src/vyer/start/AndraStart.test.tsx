@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { at, work } from '../../domain/testdata.ts';
 import type { Timer } from '../../domain/types.ts';
+import { turnWheels } from '../tidshjul.test-helper.ts';
 import { AndraStart, type AndraStartProps } from './AndraStart';
 
 beforeAll(() => {
@@ -38,7 +39,10 @@ const props = (overrides: Partial<AndraStartProps> = {}): AndraStartProps => ({
 	...overrides
 });
 
-const field = () => screen.getByLabelText('Starttid');
+const wheel = (name: 'timme' | 'minut') =>
+	screen.getByRole('spinbutton', { name: `Starttid, ${name}` });
+const turnTo = (user: ReturnType<typeof userEvent.setup>, time: string) =>
+	turnWheels(user, time, { hourName: 'Starttid, timme', minuteName: 'Starttid, minut' });
 
 describe('AndraStart', () => {
 	it('asks for the start with the suggestion and what the timer will show', () => {
@@ -47,7 +51,8 @@ describe('AndraStart', () => {
 		expect(
 			within(dialog).getByText('Timern går i Uppdrag A · Utveckling sedan 12:30. När började du?')
 		).toBeTruthy();
-		expect((field() as HTMLInputElement).value).toBe('11:45');
+		expect(wheel('timme').getAttribute('aria-valuetext')).toBe('11');
+		expect(wheel('minut').getAttribute('aria-valuetext')).toBe('45');
 		expect(within(dialog).getByText('Timern visar då 2 h 27')).toBeTruthy();
 		expect(within(dialog).queryByText(/Överlappar/)).toBeNull();
 	});
@@ -66,12 +71,11 @@ describe('AndraStart', () => {
 		expect(onSave).toHaveBeenCalledWith(end);
 	});
 
-	it('saves the time typed', async () => {
+	it('saves the time turned to', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn();
 		render(<AndraStart {...props({ onSave })} />);
-		await user.clear(field());
-		await user.type(field(), '1215');
+		await turnTo(user, '12:15');
 		await user.click(screen.getByRole('button', { name: 'Spara 12:15' }));
 		expect(onSave).toHaveBeenCalledWith(at('2026-11-25', '12:15'));
 	});
@@ -79,8 +83,7 @@ describe('AndraStart', () => {
 	it('warns of an overlap but lets it be saved', async () => {
 		const user = userEvent.setup();
 		render(<AndraStart {...props()} />);
-		await user.clear(field());
-		await user.type(field(), '10:30');
+		await turnTo(user, '10:30');
 		expect(screen.getByText('Överlappar 09:00–11:45')).toBeTruthy();
 		expect(
 			(screen.getByRole('button', { name: 'Spara 10:30' }) as HTMLButtonElement).disabled
@@ -90,8 +93,7 @@ describe('AndraStart', () => {
 	it('cannot save a start later than now', async () => {
 		const user = userEvent.setup();
 		render(<AndraStart {...props()} />);
-		await user.clear(field());
-		await user.type(field(), '14:30');
+		await turnTo(user, '14:30');
 		expect(screen.getByText('Starttiden kan inte vara senare än nu')).toBeTruthy();
 		expect((screen.getByRole('button', { name: 'Spara' }) as HTMLButtonElement).disabled).toBe(
 			true
@@ -103,8 +105,7 @@ describe('AndraStart', () => {
 		const taken = at('2026-11-25', '10:00');
 		const earlier = { ...work('2026-11-25', '10:00', '11:00'), id: `timer-${taken}` };
 		render(<AndraStart {...props({ entries: [earlier] })} />);
-		await user.clear(field());
-		await user.type(field(), '10:00');
+		await turnTo(user, '10:00');
 		expect(screen.getByText('Ett annat intervall från timern börjar på samma tid')).toBeTruthy();
 	});
 
