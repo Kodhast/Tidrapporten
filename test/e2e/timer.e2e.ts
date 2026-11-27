@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { clockOf, dateOf, isoWeekOf } from '../../src/domain/tid.ts';
-import { seed, seedAssignment, signIn, stored, uid, type StoredDoc } from './hjalp.ts';
+import { seed, seedAssignment, signIn, stored, turnWheels, uid, type StoredDoc } from './hjalp.ts';
 
 // The timer against the emulators (issue 18): start, stop, a change of code, the sync between
 // two tabs and offline. Made-up assignments and codes, written straight into the emulator.
@@ -146,7 +146,7 @@ test('the start of a running timer moves on both devices', async ({ page, browse
 	const moved = clockOf(seeded + 5 * 60_000);
 	await page.getByRole('button', { name: new RegExp(`^${clockOf(seeded)}–`) }).click();
 	const dialog = page.getByRole('alertdialog', { name: 'Ändra starttid' });
-	await dialog.getByLabel('Starttid').fill(moved);
+	await turnWheels(dialog, moved, { hourName: 'Starttid, timme', minuteName: 'Starttid, minut' });
 	await dialog.getByRole('button', { name: `Spara ${moved}` }).click();
 	await expect(dialog).toBeHidden();
 

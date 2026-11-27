@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { atLocalTime } from '../../src/domain/tid.ts';
-import { seed, seedAssignment, signIn, stored, uid } from './hjalp.ts';
+import { pickTime, seed, seedAssignment, signIn, stored, uid } from './hjalp.ts';
 
 // The day view against the emulators (issue 29): an interval is corrected, a gap becomes a pause,
 // an overlap warns, and a correction in a sent week needs a reason and is logged. A fixed day in
@@ -52,7 +52,7 @@ test('an interval is corrected and a gap marked as a pause', async ({ page, requ
 	await expect(page.getByText('Lucka 11:45–12:30')).toBeVisible();
 	await page.getByRole('button', { name: /08:00–11:45/ }).click();
 	const sheet = page.getByRole('dialog', { name: 'Ändra intervall' });
-	await sheet.getByLabel('Slut').fill('12:00');
+	await pickTime(page, sheet, 'Slut', '12:00');
 	await sheet.getByRole('button', { name: 'Spara' }).click();
 	await expect(sheet).toBeHidden();
 	await expect(page.getByRole('button', { name: /08:00–12:00/ })).toBeVisible();
@@ -75,8 +75,8 @@ test('two overlapping intervals warn but are saved', async ({ page, request }) =
 
 	await page.getByRole('button', { name: 'Lägg till intervall' }).click();
 	const sheet = page.getByRole('dialog', { name: 'Nytt intervall' });
-	await sheet.getByLabel('Start').fill('09:30');
-	await sheet.getByLabel('Slut').fill('10:15');
+	await pickTime(page, sheet, 'Start', '09:30');
+	await pickTime(page, sheet, 'Slut', '10:15');
 	await expect(sheet.getByText('Överlappar 09:00–10:00')).toBeVisible();
 	await sheet.getByRole('button', { name: 'Spara' }).click();
 
@@ -106,7 +106,7 @@ test('a correction in a sent week needs a reason and is logged', async ({ page, 
 	await page.getByRole('button', { name: /08:00–16:00/ }).click();
 	const sheet = page.getByRole('dialog', { name: 'Ändra intervall' });
 	await expect(sheet.getByText('Veckan är skickad')).toBeVisible();
-	await sheet.getByLabel('Slut').fill('16:30');
+	await pickTime(page, sheet, 'Slut', '16:30');
 	const save = sheet.getByRole('button', { name: 'Spara' });
 	await expect(save).toBeDisabled();
 	await sheet.getByLabel('Skäl').fill('Glömde stoppa timern');
@@ -146,7 +146,7 @@ test('an interval from the evening before shows on its second day and keeps its 
 
 	await page.getByRole('button', { name: /22:00–01:30/ }).click();
 	const sheet = page.getByRole('dialog', { name: 'Ändra intervall' });
-	await sheet.getByLabel('Slut').fill('02:00');
+	await pickTime(page, sheet, 'Slut', '02:00');
 	await sheet.getByRole('button', { name: 'Spara' }).click();
 	await expect(page.getByRole('button', { name: /22:00–02:00/ })).toBeVisible();
 	await expect.poll(() => endOnServer(request, user, 'e1')).toBe(atLocalTime(DAY, '02:00'));

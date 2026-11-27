@@ -2,7 +2,8 @@
 // intervals overlap, the day's sum per assignment, and the clock times typed in the interval sheet.
 import { clipToDay, gapsOnDay, overlaps, splitByDay, type Span } from './intervall.ts';
 import { longDate } from './installningar.ts';
-import { addDays, atLocalTime, clockOf } from './tid.ts';
+import { QUARTER } from './norm.ts';
+import { addDays, atLocalTime, clockOf, clockToMinutes, minutesToClock } from './tid.ts';
 import type {
 	AbsenceType,
 	Assignment,
@@ -121,6 +122,22 @@ export const parseClock = (text: string): ClockTime | null => {
 };
 
 export const CLOCK_ERROR = 'Skriv en tid som 16:05';
+
+/** The minute wheel's step for actual time: to the minute, since actual time is kept exactly (issue 93). */
+export const ACTUAL_TIME_STEP = 1;
+/** The minute wheel's step for the standard day's slots: quarters, as the reports (ADR 0013). */
+export const STANDARD_DAY_STEP = QUARTER;
+/** The minute wheel's step for the reminders' clock times (Mats, issue 93). */
+export const REMINDER_STEP = 5;
+
+/**
+ * Where the end's wheels start: an hour after the start, so that OK without a turn is no 24-hour interval and no
+ * slot that ends at its start; 16:00 while there is no start (issue 93).
+ */
+export const endWheelStart = (startText: string): ClockTime => {
+	const start = parseClock(startText);
+	return start ? minutesToClock((clockToMinutes(start) + 60) % (24 * 60)) : '16:00';
+};
 
 export type SpanResult = { span: Span } | { error: { field: 'start' | 'end'; message: string } };
 

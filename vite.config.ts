@@ -72,6 +72,7 @@ export default defineConfig({
 				'src/sw.ts',
 				'src/**/*.test.{ts,tsx}',
 				'src/domain/testdata.ts',
+				'src/vyer/tidshjul.test-helper.ts',
 				'src/data/fixturer.ts'
 			],
 			thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 }
