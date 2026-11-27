@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.12.0
+
+- På datorn går tidshjulen att dra med musen: ta tag med vänster knapp och dra, och släpp med fart
+  så glider hjulet vidare som med fingret. Ett klick på talet ovanför eller under väljer det som
+  förut.
+
 ## 1.11.0
 
 - Alla klockslag väljs med rullhjul för timme och minut i stället för att skrivas: intervallen i
