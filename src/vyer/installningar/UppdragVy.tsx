@@ -4,8 +4,6 @@ import {
 	BottomSheet,
 	Button,
 	buttonClass,
-	ConfirmDialog,
-	Notice,
 	Row,
 	SwitchRow,
 	TextField,
@@ -35,8 +33,7 @@ import type {
 } from '../../domain/types.ts';
 import type { CodeChange } from '../../data/installningar.ts';
 import { href } from '../rutter.ts';
-import { WarningIcon } from '../ikoner';
-import { ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
+import { ArchiveDelete, ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
 
 export const SUGGESTION_LABELS = {
 	fillNorm: 'Fyll mot normen',
@@ -62,6 +59,8 @@ export interface UppdragVyProps {
 	) => Promise<void>;
 	/** Deletes the assignment and all of it; gives the reason when it may not be deleted. */
 	onDelete: (id: Id) => Promise<string | null>;
+	/** Deletes a saved code that nothing uses (issue 80); gives the reason when it may not. */
+	onDeleteCode: (id: Id) => Promise<string | null>;
 }
 
 const sameForm = (a: AssignmentForm, b: AssignmentForm) =>
@@ -77,11 +76,9 @@ export function UppdragVy({
 	today,
 	online,
 	onSave,
-	onDelete
+	onDelete,
+	onDeleteCode
 }: UppdragVyProps) {
-	const removing = useSave();
-	const [askDelete, setAskDelete] = useState(false);
-	const [refused, setRefused] = useState<string | null>(null);
 	// Archived ones are not offered, except the one already chosen.
 	const offered = <T extends { id: string; archived: boolean; order: number }>(
 		items: readonly T[],
@@ -111,7 +108,10 @@ export function UppdragVy({
 	const read = readAssignmentForm(form, !assignment || assignment.employerId !== null);
 	const changedCodes: CodeChange[] = codeList.flatMap((after) => {
 		const before = codes.find((c) => c.id === after.id) ?? null;
-		return before && before.name === after.name && before.billable === after.billable
+		return before &&
+			before.name === after.name &&
+			before.billable === after.billable &&
+			before.archived === after.archived
 			? []
 			: [{ before, after }];
 	});
@@ -167,15 +167,28 @@ export function UppdragVy({
 		setCodeSheet(null);
 	};
 	const sheetCode = codeList.find((c) => c.id === codeSheet?.id);
+	// Only a saved code can be archived or deleted; a new one is just not added.
+	const savedCode = codes.find((c) => c.id === codeSheet?.id);
+	const archiveCode = (id: Id) => {
+		setCodeList((list) => list.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c)));
+		setCodeSheet(null);
+	};
+	const deleteCode = async (id: Id) => {
+		const refused = await onDeleteCode(id);
+		if (refused === null) {
+			setCodeList((list) => list.filter((c) => c.id !== id));
+			setCodeSheet(null);
+		}
+		return refused;
+	};
 	const codeSheetDirty =
 		codeSheet !== null &&
 		(!sheetCode ||
 			sheetCode.name !== codeSheet.name.trim() ||
 			sheetCode.billable !== codeSheet.billable);
 
-	const sortedReceivers = [...receivers]
-		.filter((r) => !r.archived)
-		.sort((a, b) => a.position - b.position);
+	// Archived ones too, so that they can be restored; the first still counts for flex.
+	const sortedReceivers = [...receivers].sort((a, b) => a.position - b.position);
 
 	return (
 		<>
@@ -296,7 +309,11 @@ export function UppdragVy({
 								<Row
 									key={c.id}
 									title={c.name}
-									subtitle={c.billable ? 'Debiterbar' : 'Inte debiterbar'}
+									subtitle={[
+										...(c.archived ? ['Arkiverad'] : []),
+										c.billable ? 'Debiterbar' : 'Inte debiterbar'
+									].join(' · ')}
+									inactive={c.archived}
 									navigates
 									onPress={() => setCodeSheet({ id: c.id, name: c.name, billable: c.billable })}
 								/>
@@ -339,6 +356,7 @@ export function UppdragVy({
 									{sortedReceivers.map((r, i) => {
 										const missing = unmappedCodes(codes, r).length;
 										const parts: string[] = [SUGGESTION_LABELS[r.suggestionMode]];
+										if (r.archived) parts.unshift('Arkiverad');
 										if (i === 0) parts.push('flexen räknas härifrån');
 										if (missing > 0) parts.push(plural(missing, 'omappad', 'omappade'));
 										else parts.push(plural(r.codes.length, 'kod', 'koder'));
@@ -352,6 +370,7 @@ export function UppdragVy({
 												})}
 												title={`${i + 1} · ${r.name}`}
 												subtitle={parts.join(' · ')}
+												inactive={r.archived}
 												navigates
 											/>
 										);
@@ -372,61 +391,22 @@ export function UppdragVy({
 
 				{assignment && (
 					<section className="sektion">
-						<p className="kh-text-item-subtitle dampad">
-							{assignment.archived
-								? 'Arkiverat: uppdraget går inte att välja för ny tid.'
-								: 'Ett arkiverat uppdrag går inte att välja för ny tid. Tiden och rapporterna finns kvar.'}
-						</p>
-						<div>
-							<Button
-								variant={assignment.archived ? 'tonal' : 'destructiveText'}
-								isDisabled={!online || save.pending}
-								onPress={() =>
-									void save.run(() =>
-										onSave(assignment, { ...assignment, archived: !assignment.archived }, [], [])
-									)
-								}
-							>
-								{assignment.archived ? 'Återställ uppdraget' : 'Arkivera uppdraget'}
-							</Button>
-						</div>
-						{refused && (
-							<Notice
-								tone="ton-fel"
-								icon={<WarningIcon />}
-								title="Uppdraget kan inte raderas"
-								detail={refused}
-							/>
-						)}
-						{removing.failed && (
-							<Notice
-								tone="ton-fel"
-								icon={<WarningIcon />}
-								title="Det gick inte att radera"
-								detail="Kontrollera anslutningen och försök igen."
-							/>
-						)}
-						<div>
-							<Button
-								variant="destructiveText"
-								isDisabled={!online || save.pending}
-								isPending={removing.pending}
-								onPress={() => setAskDelete(true)}
-							>
-								Radera uppdraget
-							</Button>
-						</div>
-						<ConfirmDialog
-							isOpen={askDelete}
-							onOpenChange={setAskDelete}
-							destructive
-							title="Radera uppdraget?"
-							text="Uppdraget raderas med sina tidkoder, mottagare, tider och rapportutkast. Det går inte att ångra. Ett uppdrag med skickade veckor kan bara arkiveras."
-							confirmLabel="Radera"
-							onConfirm={() => {
-								setRefused(null);
-								void removing.run(async () => setRefused(await onDelete(assignment.id)));
-							}}
+						<ArchiveDelete
+							noun="uppdraget"
+							archived={assignment.archived}
+							hint={
+								assignment.archived
+									? 'Arkiverat: uppdraget går inte att välja för ny tid.'
+									: 'Ett arkiverat uppdrag går inte att välja för ny tid. Tiden och rapporterna finns kvar.'
+							}
+							confirmText="Uppdraget raderas med sina tidkoder, mottagare, tider och rapportutkast. Det går inte att ångra. Ett uppdrag med skickade veckor kan bara arkiveras."
+							enabled={online && !save.pending}
+							onArchive={() =>
+								void save.run(() =>
+									onSave(assignment, { ...assignment, archived: !assignment.archived }, [], [])
+								)
+							}
+							onDelete={() => onDelete(assignment.id)}
 						/>
 					</section>
 				)}
@@ -463,6 +443,21 @@ export function UppdragVy({
 							<p className="kh-text-item-subtitle dampad">
 								Sparas med uppdraget. Mottagarnas koder ändras inte.
 							</p>
+						)}
+						{savedCode && sheetCode && (
+							<ArchiveDelete
+								noun="tidkoden"
+								archived={sheetCode.archived}
+								hint={
+									sheetCode.archived
+										? 'Arkiverad: koden går inte att välja för ny tid.'
+										: 'En arkiverad kod går inte att välja för ny tid. Tiden som har den finns kvar.'
+								}
+								confirmText="Tidkoden raderas och tas bort ur mottagarnas koppling. Det går inte att ångra. En kod med tid kan bara arkiveras."
+								enabled={online && !save.pending}
+								onArchive={() => archiveCode(savedCode.id)}
+								onDelete={() => deleteCode(savedCode.id)}
+							/>
 						)}
 					</>
 				)}

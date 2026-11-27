@@ -49,7 +49,8 @@ describe('UppdragVy', () => {
 		nextOrder: 2,
 		today: '2026-11-26',
 		online: true,
-		onDelete: vi.fn()
+		onDelete: vi.fn(),
+		onDeleteCode: vi.fn()
 	};
 
 	it('saves a new assignment with its codes, under the only employer, with both receivers', async () => {
@@ -246,7 +247,16 @@ describe('PartVy', () => {
 	it('saves a new employer with its suggestion for the report', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);
-		render(<PartVy kind="employer" value={null} nextOrder={3} online onSave={onSave} />);
+		render(
+			<PartVy
+				kind="employer"
+				value={null}
+				nextOrder={3}
+				online
+				onSave={onSave}
+				onDelete={vi.fn()}
+			/>
+		);
 		await user.type(screen.getByLabelText('Arbetsgivare'), '  Exempelkonsult AB ');
 		await user.click(screen.getByRole('radio', { name: 'Faktisk tid' }));
 		await user.click(spara());
@@ -263,7 +273,9 @@ describe('PartVy', () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);
 		const k = customer();
-		render(<PartVy kind="customer" value={k} nextOrder={3} online onSave={onSave} />);
+		render(
+			<PartVy kind="customer" value={k} nextOrder={3} online onSave={onSave} onDelete={vi.fn()} />
+		);
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 		await user.clear(screen.getByLabelText('Kund'));
 		await user.type(screen.getByLabelText('Kund'), 'Kund C');
@@ -289,6 +301,7 @@ const kund: Receiver = {
 
 describe('MottagareVy', () => {
 	const base = {
+		onDelete: vi.fn(),
 		assignmentId: 'a1',
 		codes,
 		absenceTypes: DEFAULT_ABSENCE_TYPES,
@@ -339,6 +352,7 @@ describe('MottagareVy', () => {
 
 describe('FranvaroVy', () => {
 	const base = {
+		onDeleteAbsenceType: vi.fn(),
 		absenceTypes: DEFAULT_ABSENCE_TYPES,
 		freeDays: [{ date: '2027-05-07', free: true, name: 'Klämdag' }],
 		today: '2026-11-26',
@@ -673,5 +687,199 @@ describe('PaminnelserVy', () => {
 		await user.click(screen.getByRole('button', { name: 'Skicka en provnotis' }));
 		expect(onTest).toHaveBeenCalledOnce();
 		expect(await screen.findByText('Skickad till 1 enhet')).toBeTruthy();
+	});
+});
+
+describe('archiving and deleting what was added (#80)', () => {
+	const confirmDelete = async (user: ReturnType<typeof userEvent.setup>, noun: string) => {
+		await user.click(screen.getByRole('button', { name: `Radera ${noun}` }));
+		const dialog = await screen.findByRole('alertdialog', { name: `Radera ${noun}?` });
+		await user.click(within(dialog).getByRole('button', { name: 'Radera' }));
+	};
+
+	it('archives and restores an employer, and shows why one with assignments is not deleted', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const onDelete = vi.fn().mockResolvedValue('Arbetsgivaren har uppdrag. Arkivera i stället.');
+		const g = employer();
+		const { rerender } = render(
+			<PartVy kind="employer" value={g} nextOrder={1} online onSave={onSave} onDelete={onDelete} />
+		);
+		await user.click(screen.getByRole('button', { name: 'Arkivera arbetsgivaren' }));
+		expect(onSave).toHaveBeenCalledWith(g, { ...g, archived: true });
+		await confirmDelete(user, 'arbetsgivaren');
+		expect(onDelete).toHaveBeenCalledWith('g1');
+		expect(await screen.findByText('Arbetsgivaren har uppdrag. Arkivera i stället.')).toBeTruthy();
+		expect(screen.getByText('Arbetsgivaren kan inte raderas')).toBeTruthy();
+
+		const archived = { ...g, archived: true };
+		rerender(
+			<PartVy
+				kind="employer"
+				value={archived}
+				nextOrder={1}
+				online
+				onSave={onSave}
+				onDelete={onDelete}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: 'Återställ arbetsgivaren' }));
+		expect(onSave).toHaveBeenLastCalledWith(archived, g);
+	});
+
+	it('offers neither for a new customer', () => {
+		render(
+			<PartVy
+				kind="customer"
+				value={null}
+				nextOrder={1}
+				online
+				onSave={vi.fn()}
+				onDelete={vi.fn()}
+			/>
+		);
+		expect(screen.queryByRole('button', { name: 'Radera kunden' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Arkivera kunden' })).toBeNull();
+	});
+
+	const assignmentProps = {
+		receivers: [],
+		employers: [employer()],
+		customers: [customer()],
+		nextOrder: 2,
+		today: '2026-11-26',
+		online: true,
+		onDelete: vi.fn()
+	};
+
+	it('archives a code with the assignment, and deletes an unused one at once', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const onDeleteCode = vi
+			.fn()
+			.mockResolvedValueOnce('Tidkoden används. Arkivera i stället.')
+			.mockResolvedValue(null);
+		render(
+			<UppdragVy
+				{...assignmentProps}
+				assignment={assignment()}
+				codes={codes}
+				onSave={onSave}
+				onDeleteCode={onDeleteCode}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: /^Utveckling/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Arkivera tidkoden' }));
+		expect(screen.getByRole('button', { name: /^Utveckling/ }).textContent).toContain('Arkiverad');
+		await user.click(spara());
+		expect(onSave.mock.calls[0]![2]).toEqual([
+			{ before: codes[0], after: { ...codes[0], archived: true } }
+		]);
+
+		await user.click(screen.getByRole('button', { name: /^Intern tid/ }));
+		await confirmDelete(user, 'tidkoden');
+		expect(await screen.findByText('Tidkoden används. Arkivera i stället.')).toBeTruthy();
+		await confirmDelete(user, 'tidkoden');
+		await waitFor(() => expect(screen.queryByRole('button', { name: /^Intern tid/ })).toBeNull());
+		expect(onDeleteCode).toHaveBeenLastCalledWith('c2');
+	});
+
+	it('shows an archived receiver, so that it can be restored', () => {
+		const archived: Receiver = { ...kund, archived: true };
+		render(
+			<UppdragVy
+				{...assignmentProps}
+				assignment={assignment()}
+				codes={codes}
+				receivers={[archived]}
+				onSave={vi.fn()}
+				onDeleteCode={vi.fn()}
+			/>
+		);
+		expect(screen.getByRole('link', { name: /Kund A/ }).textContent).toContain('Arkiverad');
+	});
+
+	const receiverProps = {
+		assignmentId: 'a1',
+		codes,
+		absenceTypes: DEFAULT_ABSENCE_TYPES,
+		online: true
+	};
+
+	it('archives a receiver as stored, and deletes one without sent weeks', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const onDelete = vi.fn().mockResolvedValue(null);
+		render(
+			<MottagareVy
+				{...receiverProps}
+				receiver={kund}
+				receivers={[kund]}
+				onSave={onSave}
+				onDelete={onDelete}
+			/>
+		);
+		await user.clear(screen.getByLabelText('Namn'));
+		await user.type(screen.getByLabelText('Namn'), 'Osparat namn');
+		await user.click(screen.getByRole('button', { name: 'Arkivera mottagaren' }));
+		expect(onSave).toHaveBeenCalledWith(kund, { ...kund, archived: true });
+		await confirmDelete(user, 'mottagaren');
+		expect(onDelete).toHaveBeenCalledWith('r1');
+	});
+
+	it('renames and removes one of the receiver’s own codes, and the mapping to it goes', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		render(
+			<MottagareVy
+				{...receiverProps}
+				receiver={kund}
+				receivers={[kund]}
+				onSave={onSave}
+				onDelete={vi.fn()}
+			/>
+		);
+		await user.click(screen.getByText('1001 Utveckling'));
+		expect(within(sheet()).getByText('Ändra kod')).toBeTruthy();
+		await user.clear(within(sheet()).getByLabelText('Kod och namn'));
+		await user.type(within(sheet()).getByLabelText('Kod och namn'), '1001 Systemutveckling');
+		await user.click(within(sheet()).getByRole('button', { name: 'Klar' }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		await user.click(screen.getByText('1002 Möten'));
+		await user.click(within(sheet()).getByRole('button', { name: 'Ta bort koden' }));
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(kund, {
+			...kund,
+			codes: [{ id: 'k1', name: '1001 Systemutveckling' }],
+			mapping: { c1: 'k1' }
+		});
+	});
+
+	it('archives an absence type from its sheet, and deletes an unused one', async () => {
+		const user = userEvent.setup();
+		const onSaveAbsenceType = vi.fn().mockResolvedValue(undefined);
+		const onDeleteAbsenceType = vi.fn().mockResolvedValue(null);
+		render(
+			<FranvaroVy
+				absenceTypes={DEFAULT_ABSENCE_TYPES}
+				freeDays={[]}
+				today="2026-11-26"
+				online
+				onSaveAbsenceType={onSaveAbsenceType}
+				onSaveFreeDay={vi.fn()}
+				onDeleteAbsenceType={onDeleteAbsenceType}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: /^Bänktid/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Arkivera frånvarotypen' }));
+		expect(onSaveAbsenceType).toHaveBeenCalledWith(DEFAULT_ABSENCE_TYPES[3], {
+			...DEFAULT_ABSENCE_TYPES[3],
+			archived: true
+		});
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		await user.click(screen.getByRole('button', { name: /^Komptid/ }));
+		await confirmDelete(user, 'frånvarotypen');
+		expect(onDeleteAbsenceType).toHaveBeenCalledWith('komptid');
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 	});
 });

@@ -30,7 +30,7 @@ import type {
 } from '../../domain/types.ts';
 import { DropdownIcon, WarningIcon } from '../ikoner';
 import { href } from '../rutter.ts';
-import { OfflineNotice, SaveFailed, useSave } from './delar';
+import { ArchiveDelete, OfflineNotice, SaveFailed, useSave } from './delar';
 import { SUGGESTION_LABELS } from './UppdragVy';
 
 export interface MottagareVyProps {
@@ -42,6 +42,8 @@ export interface MottagareVyProps {
 	absenceTypes: readonly AbsenceType[];
 	online: boolean;
 	onSave: (before: Receiver | null, after: Receiver) => Promise<void>;
+	/** Deletes the receiver; gives the reason when it may not (it has sent weeks). */
+	onDelete: (id: Id) => Promise<string | null>;
 }
 
 interface Choosing {
@@ -58,14 +60,15 @@ export function MottagareVy({
 	codes,
 	absenceTypes,
 	online,
-	onSave
+	onSave,
+	onDelete
 }: MottagareVyProps) {
 	const [name, setName] = useState(receiver?.name ?? '');
 	const [mode, setMode] = useState<SuggestionMode>(receiver?.suggestionMode ?? 'fillNorm');
 	const [ownCodes, setOwnCodes] = useState<ReceiverCode[]>(receiver?.codes ?? []);
 	const [mapping, setMapping] = useState<Record<Id, Id>>(receiver?.mapping ?? {});
-	const [adding, setAdding] = useState(false);
-	const [newCode, setNewCode] = useState('');
+	// The sheet for one of the receiver's codes: a new one (id null) or one in the list.
+	const [codeSheet, setCodeSheet] = useState<{ id: Id | null; name: string } | null>(null);
 	const [choosing, setChoosing] = useState<Choosing | null>(null);
 	const save = useSave();
 
@@ -103,11 +106,23 @@ export function MottagareVy({
 	const submit = () =>
 		void save.run(() => onSave(receiver, { ...after, id: receiver?.id ?? newId() }));
 
-	const addCode = () => {
-		setOwnCodes((list) => [...list, { id: newId(), name: newCode.trim() }]);
-		setNewCode('');
-		setAdding(false);
+	const applyCode = () => {
+		if (!codeSheet) return;
+		const { id } = codeSheet;
+		const name = codeSheet.name.trim();
+		setOwnCodes((list) =>
+			id === null
+				? [...list, { id: newId(), name }]
+				: list.map((c) => (c.id === id ? { ...c, name } : c))
+		);
+		setCodeSheet(null);
 	};
+	// The mapping to it goes when saved (cleanMapping); sent weeks keep its name in their snapshot.
+	const removeCode = (id: Id) => {
+		setOwnCodes((list) => list.filter((c) => c.id !== id));
+		setCodeSheet(null);
+	};
+	const sheetCode = ownCodes.find((c) => c.id === codeSheet?.id);
 
 	const choose = (target: Id | null) => {
 		if (!choosing) return;
@@ -185,12 +200,16 @@ export function MottagareVy({
 							aria-label={`${owner} koder`}
 							items={ownCodes.map((c) => ({ id: c.id, title: c.name, textValue: c.name }))}
 							onReorder={(ids) => setOwnCodes(ids.map((id) => ownCodes.find((c) => c.id === id)!))}
+							onAction={(id) => {
+								const c = ownCodes.find((x) => x.id === id);
+								if (c) setCodeSheet({ id: c.id, name: c.name });
+							}}
 						/>
 					) : (
 						<p className="kh-text-item-subtitle dampad">Inga koder än.</p>
 					)}
 					<div>
-						<Button variant="text" onPress={() => setAdding(true)}>
+						<Button variant="text" onPress={() => setCodeSheet({ id: null, name: '' })}>
 							Lägg till kod
 						</Button>
 					</div>
@@ -226,25 +245,68 @@ export function MottagareVy({
 						{activeAbsence.map((t) => mappingRow(t.id, t.name, true))}
 					</div>
 				</section>
+				{receiver && (
+					<section className="sektion">
+						<ArchiveDelete
+							noun="mottagaren"
+							archived={receiver.archived}
+							hint={
+								receiver.archived
+									? 'Arkiverad: mottagaren får inga nya veckorapporter.'
+									: 'En arkiverad mottagare får inga nya veckorapporter. Skickade veckor finns kvar.'
+							}
+							confirmText="Mottagaren raderas med sina rapportutkast. Var den först i kedjan räknas flexen mot nästa. Det går inte att ångra. En mottagare med skickade veckor kan bara arkiveras."
+							enabled={online && !save.pending}
+							onArchive={() =>
+								void save.run(() => onSave(receiver, { ...receiver, archived: !receiver.archived }))
+							}
+							onDelete={() => onDelete(receiver.id)}
+						/>
+					</section>
+				)}
 			</div>
 
 			<BottomSheet
-				title="Ny kod"
+				title={codeSheet?.id ? 'Ändra kod' : 'Ny kod'}
 				subtitle={`Som den heter hos ${shownName}`}
-				isOpen={adding}
-				onOpenChange={setAdding}
+				isOpen={codeSheet !== null}
+				onOpenChange={(open) => !open && setCodeSheet(null)}
 				footer={
 					<Button
 						variant="primary"
 						block
-						isDisabled={nameError(newCode) !== null}
-						onPress={addCode}
+						isDisabled={
+							!codeSheet ||
+							nameError(codeSheet.name) !== null ||
+							sheetCode?.name === codeSheet.name.trim()
+						}
+						onPress={applyCode}
 					>
-						Lägg till
+						{codeSheet?.id ? 'Klar' : 'Lägg till'}
 					</Button>
 				}
 			>
-				<TextField label="Kod och namn" value={newCode} onChange={setNewCode} />
+				{codeSheet && (
+					<>
+						<TextField
+							label="Kod och namn"
+							value={codeSheet.name}
+							onChange={(name) => setCodeSheet({ ...codeSheet, name })}
+						/>
+						{sheetCode && (
+							<>
+								<p className="kh-text-item-subtitle dampad">
+									Sparas med mottagaren. Skickade veckor behåller namnet de skickades med.
+								</p>
+								<div>
+									<Button variant="destructiveText" onPress={() => removeCode(sheetCode.id)}>
+										Ta bort koden
+									</Button>
+								</div>
+							</>
+						)}
+					</>
+				)}
 			</BottomSheet>
 
 			<BottomSheet

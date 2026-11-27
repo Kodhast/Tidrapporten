@@ -32,7 +32,7 @@ import {
 	type Codec
 } from '../../data/dokument.ts';
 import { readAll } from '../../data/export.ts';
-import { deleteAssignment, emptyAccount } from '../../data/radering.ts';
+import { deleteAssignment, deletePart, emptyAccount } from '../../data/radering.ts';
 import { exportFile, exportFileName } from '../../data/exportformat.ts';
 import { nextNumber } from '../../domain/installningar.ts';
 import { termsOn } from '../../domain/norm.ts';
@@ -160,6 +160,7 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					online={online}
 					onSaveAbsenceType={(before, after) => saveAbsenceType(db, uid, before, after)}
 					onSaveFreeDay={(before, after) => saveFreeDay(db, uid, before, after)}
+					onDeleteAbsenceType={(id) => deletePart(functions, { kind: 'absenceType', id })}
 				/>
 			);
 		case 'uppdrag': {
@@ -187,6 +188,9 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 						if (refused === null) replaceRoute({ view: 'installningar' });
 						return refused;
 					}}
+					onDeleteCode={(id) =>
+						deletePart(functions, { kind: 'code', id, assignmentId: route.id ?? '' })
+					}
 				/>
 			);
 		}
@@ -205,6 +209,11 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 						await saveEmployer(db, uid, before, after);
 						if (!before) replaceRoute({ view: 'arbetsgivare', id: after.id });
 					}}
+					onDelete={async (id) => {
+						const refused = await deletePart(functions, { kind: 'employer', id });
+						if (refused === null) replaceRoute({ view: 'installningar' });
+						return refused;
+					}}
 				/>
 			);
 		}
@@ -222,6 +231,11 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					onSave={async (before, after) => {
 						await saveCustomer(db, uid, before, after);
 						if (!before) replaceRoute({ view: 'kund', id: after.id });
+					}}
+					onDelete={async (id) => {
+						const refused = await deletePart(functions, { kind: 'customer', id });
+						if (refused === null) replaceRoute({ view: 'installningar' });
+						return refused;
 					}}
 				/>
 			);
@@ -245,6 +259,15 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 						if (!before) {
 							replaceRoute({ view: 'mottagare', assignmentId: after.assignmentId, id: after.id });
 						}
+					}}
+					onDelete={async (id) => {
+						const refused = await deletePart(functions, {
+							kind: 'receiver',
+							id,
+							assignmentId: route.assignmentId
+						});
+						if (refused === null) replaceRoute({ view: 'uppdrag', id: route.assignmentId });
+						return refused;
 					}}
 				/>
 			);

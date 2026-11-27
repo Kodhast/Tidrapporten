@@ -13,7 +13,7 @@ import { RefusedFile, restoreMissing, type RestoreEffects } from './aterstall.ts
 import { handleBudget, type BudgetEffects } from './budget.ts';
 import { reminderEffects } from './paminnelser-effekter.ts';
 import { runReminders, sendTest } from './paminnelser.ts';
-import { deleteAssignment, emptyAccount, RefusedDelete } from './radering.ts';
+import { deleteAssignment, deletePart, emptyAccount, readPart, RefusedDelete } from './radering.ts';
 
 initializeApp();
 
@@ -191,6 +191,30 @@ export const raderaUppdrag = onCall(
 				throw new HttpsError('failed-precondition', error.message);
 			logger.error('raderaUppdrag: misslyckades', { uid, assignmentId: id });
 			throw new HttpsError('internal', 'Uppdraget gick inte att radera.');
+		}
+	}
+);
+
+/**
+ * Deletes an employer, customer, absence type, time code or receiver of the signed-in user when
+ * nothing uses it (issue 80); otherwise the reason, and the app offers to archive it.
+ */
+export const raderaDel = onCall(
+	{ region: REGION, maxInstances: 1, serviceAccount: 'tidrapporten-radering@' },
+	async (request) => {
+		const uid = request.auth?.uid;
+		if (!uid) throw new HttpsError('unauthenticated', 'Logga in först.');
+		const part = readPart(request.data);
+		if (!part) throw new HttpsError('invalid-argument', 'Det finns inget sådant att radera.');
+		try {
+			const count = await deletePart(uid, part);
+			logger.info('raderaDel', { uid, kind: part.kind, id: part.id, dokument: count });
+			return { deleted: count };
+		} catch (error) {
+			if (error instanceof RefusedDelete)
+				throw new HttpsError('failed-precondition', error.message);
+			logger.error('raderaDel: misslyckades', { uid, kind: part.kind, id: part.id });
+			throw new HttpsError('internal', 'Det gick inte att radera.');
 		}
 	}
 );
