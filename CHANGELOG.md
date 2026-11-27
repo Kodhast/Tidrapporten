@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.9.0
+
+- Standarddag: ställ in passen för en vanlig dag på uppdraget. En arbetsdag utan tid föreslår
+  standarddagen i dagvyn, och Lägg in skapar intervallen med ett tryck.
+
 ## 1.8.0
 
 - På en dator eller annan bred skärm ligger appen i ett kort med skugga mitt i fönstret i stället

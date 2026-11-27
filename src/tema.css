@@ -454,3 +454,17 @@ body {
 	inline-size: 72px;
 	block-size: 72px;
 }
+
+/* The standard day suggested in the day view (issue 24). */
+.forslag {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.forslag-fot {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+}

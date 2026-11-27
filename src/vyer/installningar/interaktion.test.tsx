@@ -262,6 +262,45 @@ describe('UppdragVy', () => {
 		render(<UppdragVy {...base} assignment={null} onSave={vi.fn()} />);
 		expect(screen.queryByRole('button', { name: 'Radera uppdraget' })).toBeNull();
 	});
+
+	it('adds, changes and removes standard-day slots, and saves them with the assignment', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const saved = assignment({
+			name: 'Uppdrag A',
+			employerId: 'g1',
+			standardDay: [{ start: '12:45', end: '16:45', codeId: 'c2' }]
+		});
+		render(<UppdragVy {...base} codes={codes} assignment={saved} onSave={onSave} />);
+		expect(screen.getByText('12:45–16:45')).toBeTruthy();
+
+		await user.click(screen.getByRole('button', { name: 'Lägg till pass' }));
+		const klar = () => within(sheet()).getByRole('button', { name: 'Klar' }) as HTMLButtonElement;
+		expect(klar().disabled).toBe(true);
+		await user.type(within(sheet()).getByLabelText('Start'), '0800');
+		await user.type(within(sheet()).getByLabelText('Slut'), '13:00');
+		expect(within(sheet()).getByText('Överlappar ett annat pass')).toBeTruthy();
+		expect(klar().disabled).toBe(true);
+		await user.clear(within(sheet()).getByLabelText('Slut'));
+		await user.type(within(sheet()).getByLabelText('Slut'), '7.00');
+		expect(within(sheet()).getByText('Slutet ska vara efter starten')).toBeTruthy();
+		await user.clear(within(sheet()).getByLabelText('Slut'));
+		await user.type(within(sheet()).getByLabelText('Slut'), '12:00');
+		await user.click(klar());
+		expect(screen.getByText('08:00–12:00')).toBeTruthy();
+
+		// The afternoon slot moves to Utveckling, then goes.
+		await user.click(screen.getByRole('button', { name: /12:45–16:45/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Utveckling' }));
+		await user.click(klar());
+		await user.click(screen.getByRole('button', { name: /12:45–16:45/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Ta bort' }));
+		expect(screen.queryByText('12:45–16:45')).toBeNull();
+
+		await user.click(spara());
+		const [, after] = onSave.mock.calls[0]!;
+		expect(after.standardDay).toEqual([{ start: '08:00', end: '12:00', codeId: 'c1' }]);
+	});
 });
 
 describe('PartVy', () => {

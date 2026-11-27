@@ -158,6 +158,25 @@ export const saveEntry = async (
 };
 
 /**
+ * Creates several entries in one batch, as the standard day does (issue 24). The caller offers
+ * this only outside sent weeks, so nothing is logged.
+ */
+export const addEntries = async (
+	db: Firestore,
+	uid: Id,
+	entries: readonly Entry[]
+): Promise<void> => {
+	const batch = writeBatch(db);
+	for (const entry of entries) {
+		batch.set(userDoc(db, uid, userPath('entries', entry.id)), {
+			...entryCodec.toData(entry),
+			...createMeta()
+		});
+	}
+	await batch.commit();
+};
+
+/**
  * The id of the entry a stopped timer becomes. Two devices stopping the same timer give the same
  * id; the second write is refused by the rules (it would change createdAt), so one entry remains
  * and the second device gets permission-denied.
