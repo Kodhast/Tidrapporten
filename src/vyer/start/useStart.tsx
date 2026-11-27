@@ -22,6 +22,7 @@ import {
 } from '../../data/skrivning.ts';
 import { watchEntries, watchReports, watchTimer } from '../../data/timer.ts';
 import { dayRows, entryName, isOnDay } from '../../domain/dag.ts';
+import { billing } from '../../domain/debitering.ts';
 import { absenceCountings } from '../../domain/flex.ts';
 import { freeDaysByDate } from '../../domain/helgdagar.ts';
 import { codeColour, wheelArc } from '../../domain/hjul.ts';
@@ -222,6 +223,11 @@ export function useStart(
 			timer: timer ?? null,
 			now
 		});
+	// The billing rate (issue 23) needs the codes, which have come when the page is no longer loading.
+	const billed =
+		!loading && entries !== null
+			? billing({ assignments, codes, entries, timer: timer ?? null, now })
+			: null;
 	const colourOf = (entry: Pick<Entry, 'assignmentId' | 'subject'>) => codeColour(entry, codes);
 	const todays = withTimer.filter((e) => isOnDay(e, today));
 	const day: StartDay | null = loading
@@ -298,6 +304,7 @@ export function useStart(
 				onChoose={choose}
 				banner={banner}
 				overview={summary || null}
+				billing={billed}
 				day={day}
 				chipColour={chipColour}
 				onPause={(on) => write(() => setPause(db, uid, today, on))}
