@@ -19,7 +19,8 @@
 		"test:e2e": "npm run build:functions && firebase emulators:exec --only auth,firestore,functions --project demo-tidrapporten \"playwright test\"",
 		"test:rules": "firebase emulators:exec --only auth,firestore --project demo-tidrapporten \"vitest --run --config vitest.emulator.config.ts\"",
 		"build:functions": "vite build --config vite.functions.config.ts",
-		"verify": "npm run check && npm run lint && npm run test"
+		"verify": "npm run check && npm run lint && npm run test",
+		"db": "node tools/db/db.ts"
 	},
 	"dependencies": {
 		"@kodhast/web-ui": "github:Kodhast/web-ui#v3.2.1",
