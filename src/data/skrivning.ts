@@ -260,7 +260,7 @@ export class TimerChangedError extends Error {}
 
 /**
  * Moves the running timer's start (issue 78). A transaction, so it needs the network: it reads the
- * timer first and refuses when another device has stopped it or changed its start meanwhile,
+ * timer first and refuses when another device has stopped it or changed it meanwhile,
  * rather than overwriting what that device did. The rules allow the move only to a time between
  * a day ago and now.
  */
@@ -268,7 +268,12 @@ export const moveTimerStart = (db: Firestore, uid: Id, timer: Timer, start: UtcM
 	runTransaction(db, async (transaction) => {
 		const ref = userDoc(db, uid, timerPath);
 		const stored = await transaction.get(ref);
-		if (!stored.exists() || timerCodec.fromData(stored.id, stored.data()).start !== timer.start) {
+		const current = stored.exists() ? timerCodec.fromData(stored.id, stored.data()) : null;
+		const same =
+			current?.start === timer.start &&
+			current.assignmentId === timer.assignmentId &&
+			JSON.stringify(current.subject) === JSON.stringify(timer.subject);
+		if (!same) {
 			throw new TimerChangedError('The timer changed on another device');
 		}
 		transaction.update(ref, { ...timerCodec.toData({ ...timer, start }), ...updateMeta() });

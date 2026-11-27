@@ -98,6 +98,16 @@ describe('AndraStart', () => {
 		);
 	});
 
+	it('cannot save onto the start of another interval from the timer', async () => {
+		const user = userEvent.setup();
+		const taken = at('2026-11-25', '10:00');
+		const earlier = { ...work('2026-11-25', '10:00', '11:00'), id: `timer-${taken}` };
+		render(<AndraStart {...props({ entries: [earlier] })} />);
+		await user.clear(field());
+		await user.type(field(), '10:00');
+		expect(screen.getByText('Ett annat intervall från timern börjar på samma tid')).toBeTruthy();
+	});
+
 	it('cannot save without the network', () => {
 		render(<AndraStart {...props({ online: false })} />);
 		expect(screen.getByText('Ingen uppkoppling')).toBeTruthy();

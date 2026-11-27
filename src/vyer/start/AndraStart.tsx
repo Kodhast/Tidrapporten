@@ -43,7 +43,14 @@ export function AndraStart({
 		'start' in typed && typed.start === Math.floor(suggestion / MINUTE) * MINUTE
 			? { start: suggestion }
 			: typed;
-	const error = 'error' in result ? result.error : undefined;
+	// The rules refuse a start that another timer's entry already is named by (`timer-<start>`).
+	const taken = 'start' in result && entries.some((e) => e.id === `timer-${result.start}`);
+	const error =
+		'error' in result
+			? result.error
+			: taken
+				? 'Ett annat intervall från timern börjar på samma tid'
+				: undefined;
 	const overlap =
 		'start' in result && overlapping(entries, { start: result.start, end: now }, null);
 	return (

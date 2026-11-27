@@ -921,6 +921,20 @@ describe('the data layer’s writes pass the rules', () => {
 		// Not into the future, and not more than a day back.
 		await denied(moveTimerStart(db, OWNER, moved, now + 60 * 60_000));
 		await denied(moveTimerStart(db, OWNER, moved, now - 25 * 3_600_000));
+		// A device that had not seen the move cannot stop the timer with its old start.
+		await denied(stopTimer(db, OWNER, timer, now));
+		// Not onto the start of an entry another timer became.
+		const other = now - 3 * 3_600_000;
+		await create(
+			db,
+			`entries/timer-${other}`,
+			entryCodec.toData({
+				...work('2026-11-25', '08:00', '09:00'),
+				id: `timer-${other}`,
+				time: { kind: 'interval', start: other, end: other + 60_000 }
+			})
+		);
+		await denied(moveTimerStart(db, OWNER, moved, other));
 		// A plain write that moves the start and changes the code still needs the old entry.
 		await denied(
 			updateDoc(at(db, 'state/timer'), {

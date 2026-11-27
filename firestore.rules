@@ -319,12 +319,14 @@ service cloud.firestore {
 
     // The owner moves the running timer's start (issue 78): same code, a start from a day ago up
     // to now. A code change from a device that had not seen another device's change still needs
-    // the old timer's entry, so it is refused as before.
+    // the old timer's entry, so it is refused as before. Not onto the start of an entry another
+    // timer became: the stop would then find an entry and let a stale device's stop through.
     function isMovedStart() {
       return data().assignmentId == resource.data.assignmentId
         && data().subject == resource.data.subject
         && data().start <= request.time
-        && data().start >= request.time - duration.value(1, 'd');
+        && data().start >= request.time - duration.value(1, 'd')
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/entries/$('timer-' + string(data().start.toMillis())));
     }
 
     // The entry the stored timer becomes when it stops: `timer-<start in milliseconds>`.
