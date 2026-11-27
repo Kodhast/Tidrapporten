@@ -116,14 +116,16 @@ export const aterstall = onCall(
 /**
  * The reminders (issue 22), every 15 minutes. Runs in drift (release.yml) as
  * tidrapporten-paminnelser: Cloud Datastore User and Firebase Cloud Messaging API Admin in drift,
- * nothing more (docs/drift.md).
+ * nothing more (docs/drift.md). The address is written out in full: the Firebase CLI expands the
+ * short form 'name@' for the function but not for the Cloud Scheduler job, which then refuses it
+ * (HTTP 400 at the release of 1.5.2). The CLI sets GCLOUD_PROJECT when it reads the functions.
  */
 export const paminnelser = onSchedule(
 	{
 		schedule: 'every 15 minutes',
 		timeZone: 'Europe/Stockholm',
 		region: REGION,
-		serviceAccount: 'tidrapporten-paminnelser@',
+		serviceAccount: `tidrapporten-paminnelser@${process.env.GCLOUD_PROJECT}.iam.gserviceaccount.com`,
 		maxInstances: 1,
 		retryCount: 0
 	},

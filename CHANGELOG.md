@@ -3,6 +3,10 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.5.3
+
+- Påminnelserna går att driftsätta: releasen av 1.5.2 stoppades av schemat för dem.
+
 ## 1.5.2
 
 - Notiserna kan slås på i Inställningar → Påminnelser: nycklarna för Web Push finns nu i test och
