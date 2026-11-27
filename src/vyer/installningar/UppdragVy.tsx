@@ -98,9 +98,12 @@ export function UppdragVy({
 	const [form, setForm] = useState(initialForm);
 	const sortedCodes = [...codes].sort((a, b) => a.order - b.order);
 	const [codeList, setCodeList] = useState<TimeCode[]>(sortedCodes);
-	const [adding, setAdding] = useState(false);
-	const [newName, setNewName] = useState('');
-	const [newBillable, setNewBillable] = useState(true);
+	// The code sheet: a new code (id null) or one in the list being changed.
+	const [codeSheet, setCodeSheet] = useState<{
+		id: Id | null;
+		name: string;
+		billable: boolean;
+	} | null>(null);
 	const [customerReceives, setCustomerReceives] = useState(true);
 	const save = useSave();
 
@@ -142,22 +145,33 @@ export function UppdragVy({
 		void save.run(() => onSave(assignment, after, withParent, firstReceivers));
 	};
 
-	const addCode = () => {
-		setCodeList((list) => [
-			...list,
-			{
-				id: newId(),
-				assignmentId: assignment?.id ?? '',
-				name: newName.trim(),
-				billable: newBillable,
-				archived: false,
-				order: nextNumber(list.map((c) => c.order))
-			}
-		]);
-		setAdding(false);
-		setNewName('');
-		setNewBillable(true);
+	const applyCode = () => {
+		if (!codeSheet) return;
+		const { id, billable } = codeSheet;
+		const name = codeSheet.name.trim();
+		setCodeList((list) =>
+			id === null
+				? [
+						...list,
+						{
+							id: newId(),
+							assignmentId: assignment?.id ?? '',
+							name,
+							billable,
+							archived: false,
+							order: nextNumber(list.map((c) => c.order))
+						}
+					]
+				: list.map((c) => (c.id === id ? { ...c, name, billable } : c))
+		);
+		setCodeSheet(null);
 	};
+	const sheetCode = codeList.find((c) => c.id === codeSheet?.id);
+	const codeSheetDirty =
+		codeSheet !== null &&
+		(!sheetCode ||
+			sheetCode.name !== codeSheet.name.trim() ||
+			sheetCode.billable !== codeSheet.billable);
 
 	const sortedReceivers = [...receivers]
 		.filter((r) => !r.archived)
@@ -209,6 +223,16 @@ export function UppdragVy({
 							errorMessage={error('workday')}
 						/>
 					</div>
+					{assignment && (
+						<TextField
+							label="Omfattning och arbetsdag gäller från"
+							type="date"
+							value={form.termsFrom ?? ''}
+							onChange={set('termsFrom')}
+							description="Dagarna före behåller sin norm. Ett tidigare datum rättar dem bakåt."
+							errorMessage={read.errors?.termsFrom}
+						/>
+					)}
 					{employerOptions.length > 0 ? (
 						<ChoiceRow
 							label="Arbetsgivare"
@@ -239,6 +263,16 @@ export function UppdragVy({
 						description="Flexen räknas från den dagen"
 						errorMessage={error('startDate')}
 					/>
+					{assignment && (
+						<TextField
+							label="Slutdatum"
+							type="date"
+							value={form.endDate ?? ''}
+							onChange={set('endDate')}
+							description="Tomt: uppdraget löper tills vidare"
+							errorMessage={error('endDate')}
+						/>
+					)}
 					<TextField
 						label="Ingående flexsaldo"
 						suffix="h"
@@ -249,8 +283,7 @@ export function UppdragVy({
 					/>
 					{assignment && read.values && dirty && (
 						<p className="kh-text-item-subtitle dampad">
-							Ändrad omfattning eller arbetsdag gäller från i dag. Ändringar som påverkar flexen
-							skrivs i ändringsloggen.
+							Ändringar som påverkar flexen skrivs i ändringsloggen.
 						</p>
 					)}
 				</section>
@@ -260,20 +293,21 @@ export function UppdragVy({
 					{codeList.length > 0 && (
 						<div className="kh-card radlista">
 							{codeList.map((c) => (
-								<SwitchRow
+								<Row
 									key={c.id}
 									title={c.name}
 									subtitle={c.billable ? 'Debiterbar' : 'Inte debiterbar'}
-									isSelected={c.billable}
-									onChange={(billable) =>
-										setCodeList((list) => list.map((x) => (x.id === c.id ? { ...x, billable } : x)))
-									}
+									navigates
+									onPress={() => setCodeSheet({ id: c.id, name: c.name, billable: c.billable })}
 								/>
 							))}
 						</div>
 					)}
 					<div>
-						<Button variant="text" onPress={() => setAdding(true)}>
+						<Button
+							variant="text"
+							onPress={() => setCodeSheet({ id: null, name: '', billable: true })}
+						>
 							Lägg till tidkod
 						</Button>
 					</div>
@@ -399,22 +433,39 @@ export function UppdragVy({
 			</div>
 
 			<BottomSheet
-				title="Ny tidkod"
-				isOpen={adding}
-				onOpenChange={setAdding}
+				title={codeSheet?.id ? 'Ändra tidkod' : 'Ny tidkod'}
+				isOpen={codeSheet !== null}
+				onOpenChange={(open) => !open && setCodeSheet(null)}
 				footer={
 					<Button
 						variant="primary"
 						block
-						isDisabled={nameError(newName) !== null}
-						onPress={addCode}
+						isDisabled={!codeSheet || nameError(codeSheet.name) !== null || !codeSheetDirty}
+						onPress={applyCode}
 					>
-						Lägg till
+						{codeSheet?.id ? 'Klar' : 'Lägg till'}
 					</Button>
 				}
 			>
-				<TextField label="Namn" value={newName} onChange={setNewName} />
-				<SwitchRow title="Debiterbar" isSelected={newBillable} onChange={setNewBillable} />
+				{codeSheet && (
+					<>
+						<TextField
+							label="Namn"
+							value={codeSheet.name}
+							onChange={(name) => setCodeSheet({ ...codeSheet, name })}
+						/>
+						<SwitchRow
+							title="Debiterbar"
+							isSelected={codeSheet.billable}
+							onChange={(billable) => setCodeSheet({ ...codeSheet, billable })}
+						/>
+						{codeSheet.id && (
+							<p className="kh-text-item-subtitle dampad">
+								Sparas med uppdraget. Mottagarnas koder ändras inte.
+							</p>
+						)}
+					</>
+				)}
 			</BottomSheet>
 		</>
 	);

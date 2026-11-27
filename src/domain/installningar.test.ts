@@ -184,6 +184,35 @@ describe('readAssignmentForm', () => {
 	});
 });
 
+describe('readAssignmentForm: the end and the day changed terms apply from (#79)', () => {
+	it('reads an end, and an empty end as until further notice', () => {
+		expect(readAssignmentForm({ ...valid, endDate: '2027-06-30' }).values?.endDate).toBe(
+			'2027-06-30'
+		);
+		expect(readAssignmentForm({ ...valid, endDate: '' }).values?.endDate).toBeNull();
+	});
+
+	it('leaves the end out when the form has none, so that it is kept', () => {
+		expect(readAssignmentForm(valid).values).not.toHaveProperty('endDate');
+	});
+
+	it('allows the end on the start day but not before it', () => {
+		expect(readAssignmentForm({ ...valid, endDate: '2026-11-02' }).errors).toBeNull();
+		expect(readAssignmentForm({ ...valid, endDate: '2026-11-01' }).errors).toEqual({
+			endDate: 'Tidigast startdatum'
+		});
+	});
+
+	it('needs a date for the day changed terms apply from', () => {
+		expect(readAssignmentForm({ ...valid, termsFrom: '2026-10-05' }).values?.termsFrom).toBe(
+			'2026-10-05'
+		);
+		expect(readAssignmentForm({ ...valid, termsFrom: '' }).errors).toEqual({
+			termsFrom: 'Välj ett datum'
+		});
+	});
+});
+
 describe('readAssignmentForm: the employer (ADR 0019)', () => {
 	it('requires an employer for a new assignment', () => {
 		expect(readAssignmentForm({ ...valid, employerId: '' }, true).errors).toEqual({
@@ -267,7 +296,9 @@ describe('assignmentForm', () => {
 			openingFlex: '0',
 			startDate: '2026-11-26',
 			employerId: '',
-			customerId: ''
+			customerId: '',
+			endDate: '',
+			termsFrom: '2026-11-26'
 		});
 		expect(assignmentForm(null, '2026-11-26', 'g1').employerId).toBe('g1');
 	});
@@ -286,6 +317,14 @@ describe('assignmentForm', () => {
 			openingFlex: '-1,5'
 		});
 		expect(assignmentForm(a, '2026-06-01')).toMatchObject({ scope: '100', workday: '8' });
+	});
+
+	it('shows the end, empty when it runs until further notice, and changes from today', () => {
+		expect(assignmentForm(assignment({ endDate: '2027-06-30' }), '2026-11-26')).toMatchObject({
+			endDate: '2027-06-30',
+			termsFrom: '2026-11-26'
+		});
+		expect(assignmentForm(assignment({ endDate: null }), '2026-11-26').endDate).toBe('');
 	});
 
 	it('shows the first terms before the assignment starts', () => {
@@ -365,6 +404,50 @@ describe('termsAfter: a changed scope applies from today (ADR 0012)', () => {
 	});
 });
 
+describe('termsAfter: from a day the owner chooses (#79)', () => {
+	const start = [{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 }];
+
+	it('applies a corrected scope from a day in the past, keeping the days before', () => {
+		// 100 % since 1 January; it was really 80 % from 5 October.
+		expect(termsAfter(start, values({ scopePercent: 80 }), '2026-10-05')).toEqual([
+			...start,
+			{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+		]);
+	});
+
+	it('replaces later terms from that day on', () => {
+		const terms = [...start, { from: '2026-11-02', scopePercent: 50, workdayMinutes: 480 }];
+		expect(termsAfter(terms, values({ scopePercent: 80 }), '2026-10-05')).toEqual([
+			...start,
+			{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+		]);
+	});
+
+	it('applies from a day in the future and keeps today’s terms until then', () => {
+		expect(termsAfter(start, values({ workdayMinutes: 450 }), '2027-01-04')).toEqual([
+			...start,
+			{ from: '2027-01-04', scopePercent: 100, workdayMinutes: 450 }
+		]);
+	});
+
+	it('changes the first terms when the day is the start or before it', () => {
+		expect(termsAfter(start, values({ scopePercent: 60 }), '2025-12-01')).toEqual([
+			{ from: '2026-01-01', scopePercent: 60, workdayMinutes: 480 }
+		]);
+	});
+
+	it('holds the day at the end of an ended assignment', () => {
+		expect(
+			termsAfter(start, values({ scopePercent: 60, endDate: '2026-06-30' }), '2026-11-26')
+		).toEqual([...start, { from: '2026-06-30', scopePercent: 60, workdayMinutes: 480 }]);
+	});
+
+	it('changes nothing when the terms on that day are the same', () => {
+		const terms = [...start, { from: '2026-11-02', scopePercent: 50, workdayMinutes: 480 }];
+		expect(termsAfter(terms, values({ scopePercent: 50 }), '2026-11-16')).toEqual(terms);
+	});
+});
+
 describe('assignmentAfter and the log', () => {
 	it('makes a new assignment with the given id and order', () => {
 		expect(
@@ -395,6 +478,32 @@ describe('assignmentAfter and the log', () => {
 		const after = assignmentAfter(before, values({ name: 'Nytt namn' }), '2026-11-26', 'x', 9);
 		expect(after).toEqual({ ...before, name: 'Nytt namn' });
 		expect(assignmentChangeIsLogged(before, after)).toBe(false);
+	});
+
+	it('sets and clears the end, and applies changed terms from termsFrom (#79)', () => {
+		const before = assignment({ endDate: null });
+		const ended = assignmentAfter(
+			before,
+			values({ endDate: '2027-06-30', scopePercent: 80, termsFrom: '2026-10-05' }),
+			'2026-11-26',
+			'x',
+			9
+		);
+		expect(ended.endDate).toBe('2027-06-30');
+		expect(ended.terms.at(-1)).toEqual({
+			from: '2026-10-05',
+			scopePercent: 80,
+			workdayMinutes: 480
+		});
+		expect(assignmentChangeIsLogged(before, ended)).toBe(true);
+		const open = assignmentAfter(
+			ended,
+			values({ endDate: null, scopePercent: 80 }),
+			'2026-11-26',
+			'x',
+			9
+		);
+		expect(open.endDate).toBeNull();
 	});
 
 	it.each([
