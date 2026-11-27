@@ -6,8 +6,10 @@ import {
 	durationLabel,
 	elapsedLabel,
 	parseEnd,
+	parseStart,
 	startChoice,
 	stopBlockedOffline,
+	suggestStart,
 	timerCodeGroups,
 	timerEntry
 } from './timer.ts';
@@ -225,5 +227,66 @@ describe('parseEnd', () => {
 		const result = parseEnd('10:00', timer(autumn), at('2026-10-25', '20:00'));
 		expect(result).toEqual({ end: at('2026-10-25', '10:00') });
 		expect(((result as { end: number }).end - autumn) / MINUTE).toBe(10 * 60);
+	});
+});
+
+describe('parseStart', () => {
+	const now = at('2026-11-25', '12:40');
+	const running = timer(at('2026-11-25', '12:30'));
+
+	it('reads a clock time today, earlier or later than the old start', () => {
+		for (const text of ['11:45', '11.45', '1145', ' 11:45 ']) {
+			expect(parseStart(text, running, now)).toEqual({ start: at('2026-11-25', '11:45') });
+		}
+		expect(parseStart('12:35', running, now)).toEqual({ start: at('2026-11-25', '12:35') });
+		expect(parseStart('12:40', running, now)).toEqual({ start: now });
+	});
+
+	it('refuses what is not a time', () => {
+		for (const text of ['', '25:00', 'tolv']) {
+			expect(parseStart(text, running, now)).toEqual({ error: 'Skriv en tid som 16:05' });
+		}
+	});
+
+	it('refuses a start later than now on a timer from today', () => {
+		expect(parseStart('14:10', running, now)).toEqual({
+			error: 'Starttiden kan inte vara senare än nu'
+		});
+	});
+
+	it('reads a later clock time as yesterday for a timer over midnight', () => {
+		const late = timer(at('2026-11-24', '22:05'));
+		const morning = at('2026-11-25', '00:10');
+		expect(parseStart('21:30', late, morning)).toEqual({ start: at('2026-11-24', '21:30') });
+		expect(parseStart('00:05', late, morning)).toEqual({ start: at('2026-11-25', '00:05') });
+	});
+
+	it('counts the real hours on the day summer time ends', () => {
+		// 25 October 2026 has 25 hours: from 01:00 to 10:00 is ten hours.
+		const autumn = timer(at('2026-10-25', '10:00'));
+		const result = parseStart('01:00', autumn, at('2026-10-25', '10:30'));
+		expect(result).toEqual({ start: at('2026-10-25', '01:00') });
+		expect((at('2026-10-25', '10:00') - (result as { start: number }).start) / MINUTE).toBe(
+			10 * 60
+		);
+	});
+});
+
+describe('suggestStart', () => {
+	const running = timer(at('2026-11-25', '12:30'));
+
+	it('suggests the end of the latest interval before the timer, to fill the gap', () => {
+		const entries = [
+			work('2026-11-25', '08:12', '09:00'),
+			work('2026-11-25', '09:00', '11:45'),
+			work('2026-11-24', '13:00', '17:00')
+		];
+		expect(suggestStart(running, entries)).toBe(at('2026-11-25', '11:45'));
+	});
+
+	it('keeps the start when no interval ended before it that day', () => {
+		expect(suggestStart(running, [])).toBe(running.start);
+		expect(suggestStart(running, [work('2026-11-24', '13:00', '17:00')])).toBe(running.start);
+		expect(suggestStart(running, [work('2026-11-25', '12:00', '13:00')])).toBe(running.start);
 	});
 });

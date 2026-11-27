@@ -192,6 +192,22 @@ describe('the overview', () => {
 		expect(screen.getByText('Pågår')).toBeTruthy();
 	});
 
+	it('opens the start dialog from the running row when it can (issue 78)', async () => {
+		const user = userEvent.setup();
+		const onMoveStart = vi.fn();
+		render(
+			<StartVy {...props({ timer: running, overview: overview(0, 0), day: day(), onMoveStart })} />
+		);
+		const row = screen.getByRole('button', { name: /09:00–/ });
+		await user.click(row);
+		expect(onMoveStart).toHaveBeenCalledOnce();
+		// The other rows still link to the day.
+		expect(screen.getAllByRole('link').map((l) => l.textContent)).toEqual([
+			expect.stringContaining('08:12–09:00'),
+			'Visa dagen'
+		]);
+	});
+
 	it('marks a gap as a pause and fills it', async () => {
 		const user = userEvent.setup();
 		const onPause = vi.fn();

@@ -13,7 +13,13 @@ import {
 	freeDaysPath,
 	watchCollection
 } from '../../data/installningar.ts';
-import { saveEntry, startTimer, stopTimer, switchTimer } from '../../data/skrivning.ts';
+import {
+	moveTimerStart,
+	saveEntry,
+	startTimer,
+	stopTimer,
+	switchTimer
+} from '../../data/skrivning.ts';
 import { watchEntries, watchReports, watchTimer } from '../../data/timer.ts';
 import { dayRows, entryName, isOnDay } from '../../domain/dag.ts';
 import { absenceCountings } from '../../domain/flex.ts';
@@ -27,6 +33,7 @@ import {
 	choiceNames,
 	startChoice,
 	stopBlockedOffline,
+	suggestStart,
 	timerCodeGroups,
 	timerEntry,
 	type CodeChoice
@@ -47,6 +54,7 @@ import { IntervallArk } from '../dag/IntervallArk';
 import type { HjulArc } from './Hjul';
 import type { PendingShortcut } from '../genvagar';
 import { PlayIcon, StopIcon } from '../ikoner';
+import { AndraStart } from './AndraStart';
 import { StartVy, type StartDay, type TimerProblem } from './StartVy';
 
 const MINUTE = 60_000;
@@ -80,6 +88,8 @@ export function useStart(
 	const [pause, setPaused] = useState<{ date: string; paused: boolean } | null>(null);
 	// A gap that is being filled in the interval sheet, as in the day view.
 	const [filling, setFilling] = useState<{ gap: Span; newId: Id } | null>(null);
+	// The running timer whose start is being moved in the dialog (issue 78).
+	const [moving, setMoving] = useState<UtcMillis | null>(null);
 	const [picked, setPicked] = useState<CodeChoice | null>(null);
 	const [problem, setProblem] = useState<TimerProblem>(null);
 	// The timer whose ten-hour question was answered "Jag jobbar fortfarande", until the app is
@@ -292,34 +302,48 @@ export function useStart(
 				chipColour={chipColour}
 				onPause={(on) => write(() => setPause(db, uid, today, on))}
 				onFill={(gap) => setFilling({ gap, newId: newEntryId(db, uid) })}
+				onMoveStart={() => timer && setMoving(timer.start)}
 				sheet={
-					filling && (
-						<IntervallArk
-							key={filling.newId}
-							isOpen
-							onOpenChange={(isOpen) => !isOpen && setFilling(null)}
-							date={today}
-							entry={null}
-							newId={filling.newId}
-							span={filling.gap}
-							// The code of the interval before the gap, as the day view does.
-							choice={startChoice(
-								groups,
-								(entries ?? []).filter(
-									(e) => e.time.kind === 'interval' && e.time.end <= filling.gap.start
-								)
-							)}
-							groups={groups}
-							absenceTypes={(absenceTypes ?? [])
-								.filter((t) => !t.archived)
-								.sort((a, b) => a.order - b.order)}
-							entries={todays}
-							reports={reports ?? []}
+					timer && moving === timer.start ? (
+						<AndraStart
+							timer={timer}
+							now={now}
+							name={names ? [names.assignment, names.code].filter(Boolean).join(' · ') : ''}
+							suggestion={suggestStart(timer, entries ?? [])}
+							entries={todays.filter((e) => e.id !== runningEntry?.id)}
 							online={online}
-							onSave={(before, after, reason) =>
-								write(() => saveEntry(db, uid, before, after, reports ?? [], reason))
-							}
+							onSave={(start) => write(() => moveTimerStart(db, uid, timer, start))}
+							onClose={() => setMoving(null)}
 						/>
+					) : (
+						filling && (
+							<IntervallArk
+								key={filling.newId}
+								isOpen
+								onOpenChange={(isOpen) => !isOpen && setFilling(null)}
+								date={today}
+								entry={null}
+								newId={filling.newId}
+								span={filling.gap}
+								// The code of the interval before the gap, as the day view does.
+								choice={startChoice(
+									groups,
+									(entries ?? []).filter(
+										(e) => e.time.kind === 'interval' && e.time.end <= filling.gap.start
+									)
+								)}
+								groups={groups}
+								absenceTypes={(absenceTypes ?? [])
+									.filter((t) => !t.archived)
+									.sort((a, b) => a.order - b.order)}
+								entries={todays}
+								reports={reports ?? []}
+								online={online}
+								onSave={(before, after, reason) =>
+									write(() => saveEntry(db, uid, before, after, reports ?? [], reason))
+								}
+							/>
+						)
 					)
 				}
 				forgotten={

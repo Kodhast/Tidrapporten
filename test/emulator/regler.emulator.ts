@@ -52,7 +52,9 @@ import {
 	saveReport,
 	startTimer,
 	stopTimer,
-	switchTimer
+	switchTimer,
+	moveTimerStart,
+	TimerChangedError
 } from '../../src/data/skrivning.ts';
 import { startDocuments } from '../../src/domain/komigang.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
@@ -895,6 +897,37 @@ describe('the data layer’s writes pass the rules', () => {
 			next
 		);
 		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
+	});
+
+	it('moveTimerStart moves the start of the running timer, from a day ago up to now', async () => {
+		const db = owner();
+		const now = Date.now();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: now - 30 * 60_000
+		};
+		await startTimer(db, OWNER, timer);
+		const earlier = now - 75 * 60_000;
+		await moveTimerStart(db, OWNER, timer, earlier);
+		const stored = timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!);
+		expect(stored).toEqual({ ...timer, start: earlier });
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(0);
+		// A device that had not seen the move cannot move the old start again.
+		await expect(moveTimerStart(db, OWNER, timer, now - 60 * 60_000)).rejects.toBeInstanceOf(
+			TimerChangedError
+		);
+		const moved = { ...timer, start: earlier };
+		// Not into the future, and not more than a day back.
+		await denied(moveTimerStart(db, OWNER, moved, now + 60 * 60_000));
+		await denied(moveTimerStart(db, OWNER, moved, now - 25 * 3_600_000));
+		// A plain write that moves the start and changes the code still needs the old entry.
+		await denied(
+			updateDoc(at(db, 'state/timer'), {
+				...timerCodec.toData({ ...moved, subject: { kind: 'code', codeId: 'c2' }, start: now }),
+				...updateMeta()
+			})
+		);
 	});
 
 	it('saveEntry refuses to change an entry’s id', async () => {

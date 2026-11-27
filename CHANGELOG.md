@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.6.0
+
+- Starttiden på en timer som går kan ändras: tryck på raden som pågår på startsidan. Förvalet är
+  slutet på senaste intervallet, så att luckan fylls. Kräver nät.
+
 ## 1.5.3
 
 - Påminnelserna går att driftsätta: releasen av 1.5.2 stoppades av schemat för dem.

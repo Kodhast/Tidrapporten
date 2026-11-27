@@ -155,3 +155,36 @@ export const parseEnd = (text: string, timer: Timer, now: UtcMillis): EndResult 
 	if (end > now) return { error: 'Sluttiden kan inte vara senare än nu' };
 	return { end };
 };
+
+export type StartResult = { start: UtcMillis } | { error: string };
+
+/**
+ * The new start of the running timer from what the owner typed (issue 78): a clock time on today's
+ * date, or on yesterday's when that would be later than now and the timer began before today (a
+ * timer over midnight). It cannot be later than now; a typed time later than now on a timer from
+ * today is an error rather than yesterday, which would surprise.
+ */
+export const parseStart = (text: string, timer: Timer, now: UtcMillis): StartResult => {
+	const clock = parseClock(text);
+	if (!clock) return { error: CLOCK_ERROR };
+	const today = dateOf(now);
+	let start = atLocalTime(today, clock);
+	if (start > now && dateOf(timer.start) < today) start = atLocalTime(addDays(today, -1), clock);
+	if (start > now) return { error: 'Starttiden kan inte vara senare än nu' };
+	return { start };
+};
+
+/**
+ * The start the dialog suggests: the end of the latest interval that ended at or before the
+ * timer's start on the timer's day, which fills the gap since then; else the timer's own start.
+ */
+export const suggestStart = (timer: Timer, entries: readonly Entry[]): UtcMillis => {
+	const day = dateOf(timer.start);
+	let suggestion: UtcMillis | null = null;
+	for (const entry of entries) {
+		if (entry.time.kind !== 'interval' || entry.time.end > timer.start) continue;
+		if (dateOf(entry.time.end) !== day) continue;
+		if (suggestion === null || entry.time.end > suggestion) suggestion = entry.time.end;
+	}
+	return suggestion ?? timer.start;
+};
