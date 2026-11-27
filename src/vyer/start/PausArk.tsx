@@ -8,8 +8,10 @@ import { clockOf } from '../../domain/tid.ts';
 import {
 	DEFAULT_PAUSE,
 	PAUSE_LENGTHS,
+	PAUSE_END_ERROR,
 	PAUSE_NAMES,
 	parsePause,
+	pauseMinutes,
 	type Pause,
 	type PauseKind
 } from '../../domain/timer.ts';
@@ -22,11 +24,13 @@ const lengthLabel = (minutes: number) => (minutes === 60 ? '1 h' : `${minutes} m
 
 const storageKey = (kind: PauseKind) => `tidrapporten.paus.${kind}`;
 
+const isOffered = (minutes: number) => (PAUSE_LENGTHS as readonly number[]).includes(minutes);
+
 /** The length last chosen for the kind on this device; the default when none, or no storage. */
 export const lastLength = (kind: PauseKind): number => {
 	try {
 		const stored = Number(localStorage.getItem(storageKey(kind)));
-		return (PAUSE_LENGTHS as readonly number[]).includes(stored) ? stored : DEFAULT_PAUSE[kind];
+		return isOffered(stored) ? stored : DEFAULT_PAUSE[kind];
 	} catch {
 		return DEFAULT_PAUSE[kind];
 	}
@@ -39,12 +43,6 @@ const rememberLength = (kind: PauseKind, minutes: number) => {
 		// Without storage the default is chosen next time.
 	}
 };
-
-/** The offered length nearest to `minutes`, for a pause that is changed. */
-const nearestLength = (minutes: number): number =>
-	PAUSE_LENGTHS.reduce((best, length) =>
-		Math.abs(length - minutes) < Math.abs(best - minutes) ? length : best
-	);
 
 export interface PausArkProps {
 	/** A new lunch or errand on the running timer; null to change the pause the timer is in. */
@@ -74,7 +72,7 @@ export function PausArk({
 	const changing = kind === null;
 	const [start, setStart] = useState(() => clockOf(from ?? now));
 	const [minutes, setMinutes] = useState(() =>
-		kind ? lastLength(kind) : nearestLength(Math.round((timer.start - (from ?? now)) / MINUTE))
+		kind ? lastLength(kind) : Math.round((timer.start - (from ?? now)) / MINUTE)
 	);
 	const result =
 		changing && from !== null
@@ -82,6 +80,9 @@ export function PausArk({
 			: parsePause(start, minutes, timer, now);
 	const name = kind ? PAUSE_NAMES[kind] : 'Paus';
 	const blocked = changing && !online;
+	// Where the pause begins, also while the start's own field is wrong: the end follows it.
+	const begins = 'pause' in result ? result.pause.from : (from ?? now);
+	const endError = minutes < 1 ? PAUSE_END_ERROR : undefined;
 
 	return (
 		<BottomSheet
@@ -94,15 +95,15 @@ export function PausArk({
 					<span />
 					<Button
 						variant="primary"
-						isDisabled={'error' in result || blocked}
+						isDisabled={'error' in result || endError !== undefined || blocked}
 						onPress={() => {
-							if (!('pause' in result)) return;
-							if (kind) rememberLength(kind, minutes);
+							if (!('pause' in result) || endError) return;
+							if (kind && isOffered(minutes)) rememberLength(kind, minutes);
 							onSave(result.pause);
 							onClose();
 						}}
 					>
-						{'pause' in result
+						{'pause' in result && !endError
 							? `${name} ${clockOf(result.pause.from)}–${clockOf(result.pause.until)}`
 							: name}
 					</Button>
@@ -121,6 +122,14 @@ export function PausArk({
 					errorMessage={'error' in result ? result.error : undefined}
 				/>
 			)}
+			<TimeField
+				label="Slutar"
+				step={ACTUAL_TIME_STEP}
+				value={clockOf(begins + minutes * MINUTE)}
+				onChange={(end) => setMinutes(pauseMinutes(begins, end))}
+				description="Välj en längd nedan, eller ett eget klockslag."
+				errorMessage={endError}
+			/>
 			<section className="sektion">
 				<span className="kh-text-caption dampad" id="paus-langd">
 					LÄNGD

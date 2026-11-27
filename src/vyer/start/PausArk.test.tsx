@@ -88,6 +88,29 @@ describe('PausArk', () => {
 		});
 	});
 
+	it('takes a length of one’s own from the end’s wheels, and refuses an end before the start', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn();
+		render(<PausArk {...props({ kind: 'errand', onSave })} />);
+		await pickTime(user, 'Slutar', '12:40');
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio.getAttribute('aria-checked')).toBe('false');
+		}
+		await user.click(screen.getByRole('button', { name: 'Ärende 11:52–12:40' }));
+		expect(onSave).toHaveBeenCalledWith({
+			from: at('2026-11-25', '11:52'),
+			until: at('2026-11-25', '12:40')
+		});
+		// A length that is not offered is not remembered.
+		expect(lastLength('errand')).toBe(15);
+
+		cleanup();
+		render(<PausArk {...props()} />);
+		await pickTime(user, 'Slutar', '11:30');
+		expect(screen.getByText('Pausen måste sluta efter att den börjat')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Lunch' }).hasAttribute('disabled')).toBe(true);
+	});
+
 	it('refuses a start before the timer’s first minute', async () => {
 		const user = userEvent.setup();
 		render(<PausArk {...props()} />);
