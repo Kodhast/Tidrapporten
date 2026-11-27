@@ -482,6 +482,14 @@ describe('Export', () => {
 		expect(onEmpty).toHaveBeenCalledTimes(2);
 	});
 
+	it('puts the emptying in its own danger zone', () => {
+		render(<Export online onExport={vi.fn()} onRestore={noRestore} onEmpty={vi.fn()} />);
+		const zone = screen.getByRole('group', { name: 'Farozon' });
+		expect(zone.className).toBe('farozon');
+		expect(within(zone).getByRole('button', { name: 'Töm kontot' })).toBeTruthy();
+		expect(within(zone).queryByRole('button', { name: 'Exportera all data' })).toBeNull();
+	});
+
 	it('does not empty offline', () => {
 		render(<Export online={false} onExport={vi.fn()} onRestore={noRestore} onEmpty={vi.fn()} />);
 		expect(screen.getByRole('button', { name: 'Töm kontot' }).hasAttribute('disabled')).toBe(true);

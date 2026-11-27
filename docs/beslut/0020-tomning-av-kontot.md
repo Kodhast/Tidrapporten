@@ -21,8 +21,10 @@ Firebase-användaren (onödigt: inloggningen går genom Access och ger samma uid
   det enda som får radera ändringsloggen.
 - Raderingen görs av en callable Cloud Function med Admin SDK (`recursiveDelete`), bara för den
   inloggades eget uid. Reglerna ändras inte: ingen klient får radera i loggen.
-- **Backup före:** appen laddar ner JSON-exporten först, och funktionen anropas bara när
-  nedladdningen är klar. Ägaren bekräftar i en dialog genom att skriva `TÖM`. I drift finns dessutom
+- **Backup före:** appen läser all data från servern och startar nedladdningen av JSON-exporten
+  först; funktionen anropas när nedladdningen har startat. Går läsningen inte raderas inget.
+  Webbläsaren säger inte när filen är sparad, så att vänta på det går inte (ägaren 2026-11-26).
+  Ägaren bekräftar i en dialog genom att skriva `TÖM`. I drift finns dessutom
   Firestores dagliga backup och PITR (0018).
 - Firebase-användaren och inloggningen ligger kvar. Efter tömningen är appen som vid första start,
   och det går att tömma igen hur många gånger som helst.

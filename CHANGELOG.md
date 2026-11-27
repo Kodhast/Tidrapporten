@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.5.1
+
+- Töm kontot står i en röd farozon längst ner under Data, med en text om att allt raderas, skickade
+  veckor och ändringsloggen också.
+
 ## 1.5.0
 
 - Töm kontot i Inställningar → Data: först laddas en kopia av all data ner, sedan raderas allt,
