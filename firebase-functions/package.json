@@ -5,7 +5,7 @@
 	"type": "module",
 	"main": "lib/index.js",
 	"engines": {
-		"node": "22"
+		"node": "24"
 	},
 	"dependencies": {
 		"@google-cloud/billing": "^6.2.0",

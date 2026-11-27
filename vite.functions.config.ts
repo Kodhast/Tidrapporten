@@ -17,7 +17,7 @@ export default defineConfig({
 		ssr: 'firebase-functions/src/index.ts',
 		outDir: 'firebase-functions/lib',
 		emptyOutDir: true,
-		target: 'node22',
+		target: 'node24',
 		rolldownOptions: { output: { format: 'es', entryFileNames: 'index.js' } }
 	}
 });
