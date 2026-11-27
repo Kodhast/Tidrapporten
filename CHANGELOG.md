@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.6.0
+
+- Ett uppdrag kan få ett slutdatum, och ändrad omfattning eller arbetsdag kan gälla från en dag du
+  väljer, också bakåt i tiden.
+- En tidkod kan byta namn: tryck på koden i uppdraget.
+
 ## 1.5.3
 
 - Påminnelserna går att driftsätta: releasen av 1.5.2 stoppades av schemat för dem.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { signIn, uid } from './hjalp.ts';
+import { seedAssignment, signIn, stored, uid } from './hjalp.ts';
 
 // The settings against the emulators (issue 17). Made-up names only; every test signs in as a
 // user of its own so that the tests do not see each other's data.
@@ -78,8 +78,8 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
 	await expect(page.getByLabel('Omfattning')).toHaveValue('80');
 	await expect(page.getByLabel('Ingående flexsaldo')).toHaveValue('+4,5');
-	await expect(page.getByRole('switch', { name: /Intern tid/ })).not.toBeChecked();
-	await expect(page.getByRole('switch', { name: /Utveckling/ })).toBeChecked();
+	await expect(page.getByRole('button', { name: /^Intern tid/ })).toContainText('Inte debiterbar');
+	await expect(page.getByRole('button', { name: /^Utveckling/ })).toContainText('Debiterbar');
 	await expect(page.getByRole('link', { name: /1 · Exempelkonsult AB/ })).toContainText(
 		'flexen räknas härifrån'
 	);
@@ -94,6 +94,48 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 	await expect(page.getByRole('heading', { level: 2, name: 'Exempelkonsult AB' })).toBeVisible();
 	await expect(page.getByRole('link', { name: /Exempeluppdraget/ })).toContainText('Kund A · 80 %');
 	await expect(page.getByRole('link', { name: /^Kund A/ })).toContainText('1 uppdrag');
+});
+
+test('an end, terms from a day in the past and a renamed code, logged (#79)', async ({
+	page,
+	request
+}) => {
+	const user = uid('andra-uppdrag');
+	await signIn(page, user);
+	await seedAssignment(request, user, ['Utveckling']);
+	await page.goto('/#/installningar/uppdrag/a1');
+	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
+
+	await page.getByLabel('Omfattning', { exact: true }).fill('80');
+	await page.getByLabel('Omfattning och arbetsdag gäller från').fill('2026-10-05');
+	await page.getByLabel('Slutdatum').fill('2027-06-30');
+	await page.getByRole('button', { name: /^Utveckling/ }).click();
+	const sheet = page.getByRole('dialog');
+	await sheet.getByLabel('Namn').fill('Systemutveckling');
+	await sheet.getByRole('button', { name: 'Klar' }).click();
+	await expect(sheet).toBeHidden();
+	await save(page).click();
+	// Disabled also while the write is on its way: wait until the server has it.
+	await expect
+		.poll(async () => (await stored(request, user, 'assignments'))[0]?.fields.endDate)
+		.toEqual({ stringValue: '2027-06-30' });
+
+	await page.reload();
+	await expect(page.getByLabel('Slutdatum')).toHaveValue('2027-06-30');
+	await expect(page.getByRole('button', { name: /^Systemutveckling/ })).toBeVisible();
+	const [a] = await stored(request, user, 'assignments');
+	const terms = (
+		a!.fields.terms as { arrayValue: { values: { mapValue: { fields: unknown } }[] } }
+	).arrayValue.values.map((t) => t.mapValue.fields);
+	expect(terms).toEqual([
+		expect.objectContaining({ from: { stringValue: '2026-01-01' } }),
+		expect.objectContaining({
+			from: { stringValue: '2026-10-05' },
+			scopePercent: { integerValue: '80' }
+		})
+	]);
+	const log = await stored(request, user, 'changeLog');
+	expect(log.map((e) => e.fields.path)).toContainEqual({ stringValue: 'assignments/a1' });
 });
 
 test('the default absence types are there at the first sign-in', async ({ page }) => {
