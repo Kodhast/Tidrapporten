@@ -29,15 +29,21 @@ if [ "${1:-}" = prova ]; then
     --format='value(name)' --sort-by=~snapshotTime --limit=1)
   [ -n "$backup" ] || { echo "Ingen backup i test än." >&2; exit 1; }
   echo "Återställer $backup till $restored …"
-  gcloud firestore databases restore --source-backup="$backup" \
-    --destination-database="$restored" --project="$test_project"
-  # The restore runs on after the command; wait until its operation is done (at most 10 minutes).
-  for _ in $(seq 60); do
-    running=$(gcloud firestore operations list --database="$restored" --project="$test_project" \
-      --filter='done!=true' --format='value(name)' 2>/dev/null || echo väntar)
-    [ -z "$running" ] && break
+  op=$(gcloud firestore databases restore --source-backup="$backup" \
+    --destination-database="$restored" --project="$test_project" --format='value(name)')
+  # The restore runs on after the command; wait until its own operation is done (at most 20
+  # minutes). Counting or deleting before that fails: the database answers FAILED_PRECONDITION.
+  done_=''
+  for _ in $(seq 120); do
+    done_=$(gcloud firestore operations describe "$op" --format='value(done)' 2>/dev/null || true)
+    [ "$done_" = True ] && break
     sleep 10
   done
+  if [ "$done_" != True ]; then
+    echo "Återställningen är inte klar efter 20 minuter; $restored finns kvar. Kör om prova senare," >&2
+    echo "eller radera den: gcloud firestore databases delete --database=$restored --project=$test_project" >&2
+    exit 1
+  fi
   ok=true
   for c in "${collections[@]}"; do
     a=$(count "$test_project" "$db" "$c")
