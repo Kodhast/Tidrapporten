@@ -214,6 +214,27 @@ describe('UppdragVy', () => {
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 	});
 
+	it('follows newer values from the server in what has not been touched (cache, then server)', async () => {
+		const user = userEvent.setup();
+		const props = { ...base, codes, onSave: vi.fn() };
+		const { rerender } = render(<UppdragVy {...props} assignment={assignment()} />);
+		rerender(
+			<UppdragVy
+				{...props}
+				assignment={assignment({ endDate: '2027-06-30' })}
+				codes={[{ ...codes[0]!, name: 'Systemutveckling' }, ...codes.slice(1)]}
+			/>
+		);
+		expect((screen.getByLabelText('Slutdatum') as HTMLInputElement).value).toBe('2027-06-30');
+		expect(screen.getByRole('button', { name: /^Systemutveckling/ })).toBeTruthy();
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+
+		await user.clear(screen.getByLabelText('Namn'));
+		await user.type(screen.getByLabelText('Namn'), 'Eget namn');
+		rerender(<UppdragVy {...props} assignment={assignment({ name: 'Från servern' })} />);
+		expect((screen.getByLabelText('Namn') as HTMLInputElement).value).toBe('Eget namn');
+	});
+
 	it('deletes after the confirmation, and shows why when it may not', async () => {
 		const user = userEvent.setup();
 		const onDelete = vi

@@ -95,6 +95,17 @@ export function UppdragVy({
 	const [form, setForm] = useState(initialForm);
 	const sortedCodes = [...codes].sort((a, b) => a.order - b.order);
 	const [codeList, setCodeList] = useState<TimeCode[]>(sortedCodes);
+	// What the form and the list started from. The first values can come from the local cache and
+	// the server's a moment later: what the user has not touched follows the newer values.
+	const [shown, setShown] = useState({ form: initialForm, codes: sortedCodes });
+	const formMoved = !sameForm(initialForm, shown.form);
+	const codesMoved = JSON.stringify(sortedCodes) !== JSON.stringify(shown.codes);
+	if (formMoved || codesMoved) {
+		if (formMoved && sameForm(form, shown.form)) setForm(initialForm);
+		if (codesMoved && JSON.stringify(codeList) === JSON.stringify(shown.codes))
+			setCodeList(sortedCodes);
+		setShown({ form: initialForm, codes: sortedCodes });
+	}
 	// The code sheet: a new code (id null) or one in the list being changed.
 	const [codeSheet, setCodeSheet] = useState<{
 		id: Id | null;
