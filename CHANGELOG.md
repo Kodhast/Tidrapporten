@@ -8,6 +8,9 @@ Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör �
 - Debiteringsgraden syns bredvid flexen på startsidan: tiden på debiterbara tidkoder delat med
   all arbetad tid, för veckan. Tryck på den för veckan och månaden per uppdrag. Frånvaro räknas
   inte.
+- Arbetsgivare, kunder, tidkoder, frånvarotyper och mottagare kan arkiveras och raderas. Det som
+  används (har tid, uppdrag eller skickade veckor) raderas inte; det arkiveras i stället.
+- Mottagarens egna koder kan byta namn och tas bort: tryck på koden.
 
 ## 1.6.0
 
@@ -16,9 +19,6 @@ Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör �
 - Ett uppdrag kan få ett slutdatum, och ändrad omfattning eller arbetsdag kan gälla från en dag du
   väljer, också bakåt i tiden.
 - En tidkod kan byta namn: tryck på koden i uppdraget.
-- Arbetsgivare, kunder, tidkoder, frånvarotyper och mottagare kan arkiveras och raderas. Det som
-  används (har tid, uppdrag eller skickade veckor) raderas inte; det arkiveras i stället.
-- Mottagarens egna koder kan byta namn och tas bort: tryck på koden.
 
 ## 1.5.3
 
