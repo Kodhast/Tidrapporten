@@ -78,7 +78,7 @@ test('an assignment is deleted with its time and logged; one with a sent week is
 
 	await remove('a2');
 	await expect(
-		page.getByText('Uppdraget har skickade veckor. Arkivera det i stället.')
+		page.getByText('Uppdraget har skickade veckor. Arkivera det i stället.', { exact: true })
 	).toBeVisible({ timeout: 15_000 });
 
 	await remove('a1');
@@ -116,7 +116,9 @@ test('a code with time is archived, an unused one deleted, both logged (#80)', a
 
 	await page.getByRole('button', { name: /^Utveckling/ }).click();
 	await remove();
-	await expect(sheet.getByText('Tidkoden används. Arkivera i stället.')).toBeVisible();
+	await expect(
+		sheet.getByText('Tidkoden används. Arkivera i stället.', { exact: true })
+	).toBeVisible();
 	await sheet.getByRole('button', { name: 'Arkivera tidkoden' }).click();
 	await page.getByRole('button', { name: 'Spara', exact: true }).click();
 	await expect

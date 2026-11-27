@@ -33,8 +33,9 @@ async function refusal(call: () => Promise<unknown>): Promise<string | null> {
 		await call();
 		return null;
 	} catch (error) {
+		// The reason travels in `details`: the message can get a status appended on the way, "[400]".
 		if (error instanceof FunctionsError && error.code === 'functions/failed-precondition')
-			return error.message;
+			return (error.details as { reason?: string } | undefined)?.reason ?? error.message;
 		throw error;
 	}
 }

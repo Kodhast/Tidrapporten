@@ -188,7 +188,7 @@ export const raderaUppdrag = onCall(
 			return { deleted: count };
 		} catch (error) {
 			if (error instanceof RefusedDelete)
-				throw new HttpsError('failed-precondition', error.message);
+				throw new HttpsError('failed-precondition', error.message, { reason: error.message });
 			logger.error('raderaUppdrag: misslyckades', { uid, assignmentId: id });
 			throw new HttpsError('internal', 'Uppdraget gick inte att radera.');
 		}
@@ -212,7 +212,7 @@ export const raderaDel = onCall(
 			return { deleted: count };
 		} catch (error) {
 			if (error instanceof RefusedDelete)
-				throw new HttpsError('failed-precondition', error.message);
+				throw new HttpsError('failed-precondition', error.message, { reason: error.message });
 			logger.error('raderaDel: misslyckades', { uid, kind: part.kind, id: part.id });
 			throw new HttpsError('internal', 'Det gick inte att radera.');
 		}
