@@ -4,7 +4,7 @@
 //   node tools/db/db.ts stats [--miljo test|drift]
 //   node tools/db/db.ts query <samling> [--where fält==värde] [--limit n] [--uid u]
 //   node tools/db/db.ts export [--ut fil] [--uid u]
-//   node tools/db/db.ts fix <ändring.json> --skal "…" [--skriv] [--drift] [--uid u]
+//   node tools/db/db.ts fix <ändring.json> --skal "…" [--skriv] [--drift] [--last] [--uid u]
 // Reads need the owner's ok; fix writes only with --skriv, and in drift only with --drift too.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -21,7 +21,7 @@ import {
 	type Target
 } from './lib.ts';
 
-const FLAGS = new Set(['skriv', 'drift']);
+const FLAGS = new Set(['skriv', 'drift', 'last']);
 const OPTIONS = new Set(['miljo', 'uid', 'where', 'limit', 'ut', 'skal', 'backup']);
 
 /** The command, its positional arguments, options and flags. Unknown ones are refused. */
@@ -55,7 +55,19 @@ export const writeAllowed = (target: Target, flags: Set<string>): boolean => {
 	return true;
 };
 
+const REPO = path.resolve(import.meta.dirname, '../..');
+
+/** Real data never goes into the repo, which is public: a file there is refused. */
+export const outsideRepo = (file: string): string => {
+	const resolved = path.resolve(file);
+	if (resolved === REPO || resolved.startsWith(`${REPO}${path.sep}`)) {
+		throw new Error(`Riktig data skrivs aldrig i repot: ${file}`);
+	}
+	return resolved;
+};
+
 const backupTo = (dir: string) => async (file: ExportFile) => {
+	dir = outsideRepo(dir);
 	await mkdir(dir, { recursive: true });
 	const name = path.join(dir, `tidrapporten-${file.exportedAt.replace(/[:.]/g, '-')}.json`);
 	await writeFile(name, JSON.stringify(file, null, '\t'));
@@ -81,7 +93,7 @@ const main = async (argv: string[]) => {
 	if (command === 'export') {
 		const file = await exportUser(db, uid, Date.now());
 		if (!options.ut) return print(file);
-		await writeFile(options.ut, JSON.stringify(file, null, '\t'));
+		await writeFile(outsideRepo(options.ut), JSON.stringify(file, null, '\t'));
 		return console.log(`${Object.keys(file.documents).length} dokument till ${options.ut}.`);
 	}
 	if (!rest[0]) throw new Error('Ange filen med ändringen.');
@@ -91,6 +103,7 @@ const main = async (argv: string[]) => {
 		change,
 		reason: options.skal ?? '',
 		write,
+		locked: flags.has('last'),
 		backup: backupTo(options.backup ?? path.join(homedir(), 'tidrapporten-backup'))
 	});
 	print(result);

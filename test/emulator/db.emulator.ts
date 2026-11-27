@@ -79,9 +79,15 @@ describe('fix', () => {
 			change: correction,
 			reason: 'Glömt kvart',
 			write: true,
+			locked: true,
 			backup
 		});
-		expect(result).toMatchObject({ action: 'update', week: '2026-W47', backup: 'minne-1' });
+		expect(result).toMatchObject({
+			action: 'update',
+			week: '2026-W47',
+			locked: ['reports/a1_r1_2026-W47'],
+			backup: 'minne-1'
+		});
 
 		// The backup is the state before the change, in a format the app can restore.
 		expect(files).toHaveLength(1);
@@ -138,6 +144,7 @@ describe('fix', () => {
 			},
 			reason: 'Fel status',
 			write: true,
+			locked: true,
 			backup
 		});
 		expect((await db().doc(`users/${ME}/reports/a1_r1_2026-W47`).get()).get('lastChangeId')).toBe(
@@ -166,9 +173,47 @@ describe('fix', () => {
 			return 'minne';
 		};
 		await expect(
-			fix(db(), { uid: ME, change: correction, reason: 'x', write: true, backup })
+			fix(db(), { uid: ME, change: correction, reason: 'x', write: true, locked: true, backup })
 		).rejects.toThrow('ändrades');
 		expect(await log()).toHaveLength(0);
+	});
+});
+
+describe('a locked week', () => {
+	it('is written only with --last, and an unsent week without it', async () => {
+		const { files, backup } = memoryBackup();
+		await expect(
+			fix(db(), { uid: ME, change: correction, reason: 'x', write: true, backup })
+		).rejects.toThrow('låst av reports/a1_r1_2026-W47');
+		expect(files).toHaveLength(0);
+
+		// Another assignment's sent report does not lock this one's week.
+		await db().doc(`users/${ME}/reports/a1_r1_2026-W47`).update({ assignmentId: 'a2' });
+		const result = await fix(db(), {
+			uid: ME,
+			change: correction,
+			reason: 'x',
+			write: true,
+			backup
+		});
+		expect(result.locked).toEqual([]);
+		expect(await log()).toHaveLength(1);
+	});
+
+	it('gives a draft report no lastChangeId', async () => {
+		const { backup } = memoryBackup();
+		await fix(db(), {
+			uid: ME,
+			change: {
+				path: 'reports/a1_r1_2026-W48',
+				set: { assignmentId: 'a1', week: '2026-W48', status: 'draft' }
+			},
+			reason: 'Nytt utkast',
+			write: true,
+			backup
+		});
+		const report = (await db().doc(`users/${ME}/reports/a1_r1_2026-W48`).get()).data()!;
+		expect(report).not.toHaveProperty('lastChangeId');
 	});
 });
 

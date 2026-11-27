@@ -225,10 +225,28 @@ export const weekOf = (path: string, data: DocumentData | null): string | null =
 	return null;
 };
 
+/** The sent reports of the week, for the assignment when the document names one. */
+const sentReports = async (
+	db: Firestore,
+	uid: string,
+	week: string | null,
+	assignmentId: unknown
+): Promise<string[]> => {
+	if (!week) return [];
+	const reports = await db.collection(`users/${uid}/reports`).where('week', '==', week).get();
+	return reports.docs
+		.filter((r) => r.get('status') === 'sent')
+		.filter((r) => typeof assignmentId !== 'string' || r.get('assignmentId') === assignmentId)
+		.map((r) => `reports/${r.id}`)
+		.sort();
+};
+
 export interface FixPlan {
 	path: string;
 	action: 'create' | 'update' | 'delete';
 	week: string | null;
+	/** Sent reports that lock the change's week; writing then takes `locked: true`. */
+	locked: string[];
 	before: JsonValue;
 	after: JsonValue;
 }
@@ -242,8 +260,10 @@ export interface FixResult extends FixPlan {
 /**
  * Shows a correction and, with `write`, makes it: the whole user is backed up through `backup`
  * first, then the change and a changeLog entry by 'claude' with the reason are written in one
- * transaction, which refuses if the document changed after it was read. A report gets the entry
- * as its lastChangeId, as when the app changes a locked week.
+ * transaction, which refuses if the document changed after it was read. A sent or unlocked report
+ * gets the entry as its lastChangeId, as when the app changes a locked week. A change in a week
+ * with a sent report (CLAUDE.md: a locked week changes only through a logged unlock) is written
+ * only with `locked`, which the owner gives for that change.
  */
 export const fix = async (
 	db: Firestore,
@@ -252,6 +272,7 @@ export const fix = async (
 		change: Change;
 		reason: string;
 		write: boolean;
+		locked?: boolean;
 		backup: (file: ExportFile) => Promise<string>;
 		now?: number;
 	}
@@ -269,18 +290,27 @@ export const fix = async (
 			? (fromJson(change.set, (s, ns) => new Timestamp(s, ns)) as DocumentData)
 			: null;
 	const logRef = user.collection('changeLog').doc();
-	const isReport = change.path.startsWith('reports/');
-	const after =
-		data && isReport ? { ...withoutMeta(data), lastChangeId: logRef.id } : withoutMeta(data);
 	const before = withoutMeta(snapshot.data());
+	const isLockedReport =
+		change.path.startsWith('reports/') &&
+		[before?.status, data?.status].some((s) => s === 'sent' || s === 'unlocked');
+	const after =
+		data && isLockedReport ? { ...withoutMeta(data), lastChangeId: logRef.id } : withoutMeta(data);
+	const week = weekOf(change.path, after) ?? weekOf(change.path, before);
 	const plan: FixPlan = {
 		path: change.path,
 		action,
-		week: weekOf(change.path, after) ?? weekOf(change.path, before),
+		week,
+		locked: await sentReports(db, uid, week, after?.assignmentId ?? before?.assignmentId),
 		before: before === null ? null : toJson(before),
 		after: after === null ? null : toJson(after)
 	};
 	if (!options.write) return { ...plan, backup: null, logId: null };
+	if (plan.locked.length > 0 && !options.locked) {
+		throw new Error(
+			`Veckan är låst av ${plan.locked.join(', ')}. Rätta bara med ägarens ok, och då med --last.`
+		);
+	}
 
 	const backup = await options.backup(await exportUser(db, uid, options.now ?? Date.now()));
 	await db.runTransaction(async (tx) => {

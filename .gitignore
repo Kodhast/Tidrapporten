@@ -30,3 +30,6 @@ vite.config.ts.timestamp-*
 
 # Wrangler (local Pages runs)
 .wrangler
+
+# Exports and backups of real data (tools/db), should one land here anyway
+tidrapporten-*.json

@@ -2,7 +2,9 @@
 // the key, the change file and the week of a log entry.
 import { Timestamp } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
-import { parseArgs, writeAllowed } from '../tools/db/db.ts';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { outsideRepo, parseArgs, writeAllowed } from '../tools/db/db.ts';
 import {
 	KEY_NAME,
 	openDatabase,
@@ -45,6 +47,15 @@ describe('writeAllowed', () => {
 		expect(() => writeAllowed('drift', new Set(['skriv']))).toThrow('--drift');
 		expect(writeAllowed('drift', new Set(['skriv', 'drift']))).toBe(true);
 		expect(writeAllowed('drift', new Set(['drift']))).toBe(false);
+	});
+});
+
+describe('outsideRepo', () => {
+	it('refuses a file in the repo, which is public', () => {
+		expect(() => outsideRepo('export.json')).toThrow('aldrig i repot');
+		expect(() => outsideRepo(path.resolve(import.meta.dirname, '..'))).toThrow('repot');
+		const outside = path.join(tmpdir(), 'export.json');
+		expect(outsideRepo(outside)).toBe(outside);
 	});
 });
 

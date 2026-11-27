@@ -27,7 +27,7 @@ i Claude-miljön. Besluten: [0009](../../../docs/beslut/0009-repo-ci-och-miljoer
     node tools/db/db.ts stats [--miljo test|drift]           # användare och antal per samling
     node tools/db/db.ts query <samling> [--where fält==värde] [--limit n]
     node tools/db/db.ts export [--ut fil]                    # appens exportformat
-    node tools/db/db.ts fix <ändring.json> --skal "…" [--skriv] [--drift] [--backup katalog]
+    node tools/db/db.ts fix <ändring.json> --skal "…" [--skriv] [--drift] [--last] [--backup katalog]
 
 `--miljo` är `test` som standard. `--uid` behövs bara om projektet har flera användare. Med
 `FIRESTORE_EMULATOR_HOST` satt går allt mot emulatorn och nyckeln läses inte.
@@ -37,13 +37,17 @@ i Claude-miljön. Besluten: [0009](../../../docs/beslut/0009-repo-ci-och-miljoer
 1. Läs det som ska rättas (`query`) och skriv ändringsfilen utanför repot, till exempel i
    scratchpad: `{ "path": "entries/<id>", "set": { …hela dokumentets nya data… } }` eller
    `{ "path": "…", "delete": true }`. Tider skrivs som i exporten: `{"$timestamp": "2026-11-16T07:00:00.000000000Z"}`.
-   `changeLog` och `state/reminders` går inte att rätta.
+   `changeLog` och `state/reminders` går inte att rätta. Export och backup vägrar sökvägar i repot.
 2. Kör `fix` utan `--skriv` och visa Mats före och efter.
 3. Efter hans ja: samma kommando med `--skriv` (och `--drift --miljo drift` i drift). Verktyget
    - tar en backup av hela användaren till `~/tidrapporten-backup/` (utanför repot) innan något skrivs,
    - skriver ändringen och en post i `changeLog` med `by: 'claude'`, skälet och veckan i samma
      transaktion, och vägrar om dokumentet ändrats under tiden,
-   - pekar en rapports `lastChangeId` på posten, som när appen ändrar en låst vecka.
+   - pekar en skickad eller upplåst rapports `lastChangeId` på posten, som när appen ändrar en låst
+     vecka,
+   - vägrar en ändring i en vecka med en skickad rapport för uppdraget utan `--last`. Ge `--last`
+     bara när Mats sagt ja till att just den låsta veckan ändras; förslaget utan `--skriv` visar
+     vilka rapporter som låser (`locked`).
 4. Säg vad som skrevs: sökväg, loggpostens id och var backupen ligger. Backupen kan läsas tillbaka
    med Återställ i appen eller `scripts/aterstall.mjs`.
 
