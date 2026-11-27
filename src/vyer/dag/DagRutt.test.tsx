@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import type { Firestore } from 'firebase/firestore';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { absenceTypes, assignment, at, code, report, work } from '../../domain/testdata.ts';
-import type { Entry, Report } from '../../domain/types.ts';
+import type { Assignment, Entry, Report } from '../../domain/types.ts';
 import { DagRutt } from './DagRutt';
 
 const feeds = vi.hoisted(() => ({
@@ -42,6 +42,7 @@ vi.mock('../../data/timer.ts', () => ({
 vi.mock('../../data/installningar.ts', () => ({
 	assignmentsPath: 'assignments',
 	absenceTypesPath: 'absenceTypes',
+	freeDaysPath: 'freeDays',
 	codesPath: (id: string) => `assignments/${id}/codes`,
 	watchCollection: (
 		_db: unknown,
@@ -55,7 +56,7 @@ vi.mock('../../data/installningar.ts', () => ({
 	}
 }));
 
-const writes = vi.hoisted(() => ({ saveEntry: vi.fn() }));
+const writes = vi.hoisted(() => ({ saveEntry: vi.fn(), addEntries: vi.fn() }));
 vi.mock('../../data/skrivning.ts', () => writes);
 
 const { setPause } = await import('../../data/dag.ts');
@@ -73,6 +74,7 @@ beforeAll(() => {
 
 beforeEach(() => {
 	writes.saveEntry.mockReset().mockResolvedValue(undefined);
+	writes.addEntries.mockReset().mockResolvedValue(undefined);
 	vi.mocked(setPause).mockClear();
 	feeds.collections.clear();
 });
@@ -81,10 +83,17 @@ afterEach(cleanup);
 
 const DAY = '2026-11-24';
 
-const feed = (entries: Entry[], reports: Report[] = []) => {
+const feed = (
+	entries: Entry[],
+	reports: Report[] = [],
+	standardDay: Assignment['standardDay'] = []
+) => {
 	act(() => {
-		feeds.collections.get('assignments')?.([assignment({ id: 'a1', name: 'Uppdrag A' })]);
+		feeds.collections.get('assignments')?.([
+			assignment({ id: 'a1', name: 'Uppdrag A', standardDay })
+		]);
 		feeds.collections.get('absenceTypes')?.(absenceTypes);
+		feeds.collections.get('freeDays')?.([]);
 		feeds.day(entries);
 		feeds.pause(false);
 		feeds.reports(reports);
@@ -101,6 +110,31 @@ const harness = (online = true) =>
 	render(<DagRutt db={{} as Firestore} uid="testperson-1" date={DAY} online={online} />);
 
 describe('DagRutt', () => {
+	it('adds the standard day of an empty workday in one write', async () => {
+		harness();
+		feed(
+			[],
+			[],
+			[
+				{ start: '08:00', end: '12:00', codeId: 'c1' },
+				{ start: '13:00', end: '17:00', codeId: 'c2' }
+			]
+		);
+		expect(screen.getByText('Uppdrag A · Möten')).toBeTruthy();
+		await userEvent.click(screen.getByRole('button', { name: 'Lägg in' }));
+		expect(writes.addEntries).toHaveBeenCalledWith({}, 'testperson-1', [
+			expect.objectContaining({
+				id: 'ny-1',
+				subject: { kind: 'code', codeId: 'c1' },
+				time: { kind: 'interval', start: at(DAY, '08:00'), end: at(DAY, '12:00') }
+			}),
+			expect.objectContaining({
+				subject: { kind: 'code', codeId: 'c2' },
+				time: { kind: 'interval', start: at(DAY, '13:00'), end: at(DAY, '17:00') }
+			})
+		]);
+	});
+
 	it('shows the day with names once everything has come', () => {
 		harness();
 		expect(screen.queryByText('Ingen tid den här dagen.')).toBeNull();

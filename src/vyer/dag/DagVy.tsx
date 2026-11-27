@@ -1,7 +1,7 @@
 // The day view (mockup "Dagvy", issue 29): the day's intervals and gaps in order, the overlap
 // warning, the day's sum and the button that adds an interval. Gets plain values; DagRutt connects
 // it to Firestore.
-import { Button, Notice, PeriodPicker, TopBar } from '@kodhast/web-ui-react';
+import { Button, Notice, PeriodPicker, Row, TopBar } from '@kodhast/web-ui-react';
 import type { ReactNode } from 'react';
 import { dayName, minutesLabel, spanLabel, type DayRow, type DaySum } from '../../domain/dag.ts';
 import type { Span } from '../../domain/intervall.ts';
@@ -38,6 +38,9 @@ export interface DagVyProps {
 	addDisabled?: boolean;
 	/** The interval sheet, when open. */
 	sheet?: ReactNode;
+	/** The standard day offered for an empty workday (issue 24), as rows and their sum. */
+	suggestion?: { rows: { span: Span; name: string }[]; sum: number } | null;
+	onAcceptSuggestion?: () => void;
 }
 
 export function DagVy(props: DagVyProps) {
@@ -80,7 +83,9 @@ export function DagVy(props: DagVyProps) {
 						detail={`${spanLabel(overlap[0])} och ${spanLabel(overlap[1])}. Tryck på ett av dem och rätta tiden.`}
 					/>
 				)}
-				{loading ? null : rows.length === 0 ? (
+				{loading ? null : rows.length === 0 && props.suggestion ? (
+					<Forslag suggestion={props.suggestion} onAccept={props.onAcceptSuggestion} />
+				) : rows.length === 0 ? (
 					<p className="kh-text-body dampad">Ingen tid den här dagen.</p>
 				) : (
 					<>
@@ -115,5 +120,43 @@ export function DagVy(props: DagVyProps) {
 			</div>
 			{props.sheet}
 		</>
+	);
+}
+
+/** The standard day as a suggestion (mockup "Dagvy – förslag på standarddag"). */
+function Forslag({
+	suggestion,
+	onAccept
+}: {
+	suggestion: NonNullable<DagVyProps['suggestion']>;
+	onAccept?: () => void;
+}) {
+	return (
+		<div className="kh-card forslag">
+			<span className="kh-text-caption dampad">FÖRSLAG · STANDARDDAG</span>
+			<span className="kh-text-body">
+				Ingen tid den här dagen. Lägg in din standarddag och rätta det som skilde sig.
+			</span>
+			<div className="radlista">
+				{suggestion.rows.map(({ span, name }) => (
+					<Row
+						key={span.start}
+						title={<span className="tabular">{spanLabel(span)}</span>}
+						subtitle={name}
+						trailing={
+							<span className="kh-text-item-subtitle tabular">
+								{minutesLabel((span.end - span.start) / 60_000)}
+							</span>
+						}
+					/>
+				))}
+			</div>
+			<div className="forslag-fot">
+				<span className="kh-text-item-subtitle">{`Summa ${minutesLabel(suggestion.sum)}`}</span>
+				<Button compact isDisabled={!onAccept} onPress={onAccept}>
+					Lägg in
+				</Button>
+			</div>
+		</div>
 	);
 }

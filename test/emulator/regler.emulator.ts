@@ -47,6 +47,7 @@ import {
 	saveReceiver
 } from '../../src/data/installningar.ts';
 import {
+	addEntries,
 	LockedChangeError,
 	saveEntry,
 	saveReport,
@@ -787,6 +788,18 @@ describe('the data layer’s writes pass the rules', () => {
 		const logs = await getDocs(collection(db, 'users', OWNER, 'changeLog'));
 		expect(logs.docs.map((d) => d.data().action).sort()).toEqual(['create', 'delete', 'update']);
 		expect(logs.docs.every((d) => d.data().path === 'entries/e-sent')).toBe(true);
+	});
+
+	it('addEntries writes the standard day in one batch without a log', async () => {
+		const db = owner();
+		const day = [
+			{ ...work('2026-11-23', '08:00', '12:00'), id: 'std-1' },
+			{ ...work('2026-11-23', '12:45', '16:45', 'c2'), id: 'std-2' }
+		];
+		await addEntries(db, OWNER, day);
+		const entries = await getDocs(collection(db, 'users', OWNER, 'entries'));
+		expect(entries.docs.map((d) => d.id).sort()).toEqual(['std-1', 'std-2']);
+		expect((await getDocs(collection(db, 'users', OWNER, 'changeLog'))).size).toBe(0);
 	});
 
 	it('stopTimer writes one entry and empties the timer; a second stop is refused', async () => {

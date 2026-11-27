@@ -29,11 +29,13 @@ import type {
 	Employer,
 	IsoDate,
 	Receiver,
+	StandardDaySlot,
 	TimeCode
 } from '../../domain/types.ts';
 import type { CodeChange } from '../../data/installningar.ts';
 import { href } from '../rutter.ts';
 import { ArchiveDelete, ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
+import { Standarddag } from './Standarddag';
 
 export const SUGGESTION_LABELS = {
 	fillNorm: 'Fyll mot normen',
@@ -95,16 +97,24 @@ export function UppdragVy({
 	const [form, setForm] = useState(initialForm);
 	const sortedCodes = [...codes].sort((a, b) => a.order - b.order);
 	const [codeList, setCodeList] = useState<TimeCode[]>(sortedCodes);
+	const initialSlots = assignment?.standardDay ?? [];
+	const [slots, setSlots] = useState<StandardDaySlot[]>(initialSlots);
 	// What the form and the list started from. The first values can come from the local cache and
 	// the server's a moment later: what the user has not touched follows the newer values.
-	const [shown, setShown] = useState({ form: initialForm, codes: sortedCodes });
+	const [shown, setShown] = useState({
+		form: initialForm,
+		codes: sortedCodes,
+		slots: initialSlots
+	});
 	const formMoved = !sameForm(initialForm, shown.form);
 	const codesMoved = JSON.stringify(sortedCodes) !== JSON.stringify(shown.codes);
-	if (formMoved || codesMoved) {
+	const slotsMoved = JSON.stringify(initialSlots) !== JSON.stringify(shown.slots);
+	if (formMoved || codesMoved || slotsMoved) {
 		if (formMoved && sameForm(form, shown.form)) setForm(initialForm);
 		if (codesMoved && JSON.stringify(codeList) === JSON.stringify(shown.codes))
 			setCodeList(sortedCodes);
-		setShown({ form: initialForm, codes: sortedCodes });
+		if (slotsMoved && JSON.stringify(slots) === JSON.stringify(shown.slots)) setSlots(initialSlots);
+		setShown({ form: initialForm, codes: sortedCodes, slots: initialSlots });
 	}
 	// The code sheet: a new code (id null) or one in the list being changed.
 	const [codeSheet, setCodeSheet] = useState<{
@@ -126,7 +136,8 @@ export function UppdragVy({
 			? []
 			: [{ before, after }];
 	});
-	const dirty = !sameForm(form, initialForm) || changedCodes.length > 0;
+	const slotsChanged = JSON.stringify(slots) !== JSON.stringify(initialSlots);
+	const dirty = !sameForm(form, initialForm) || changedCodes.length > 0 || slotsChanged;
 	const canSave = online && read.values !== null && dirty && !save.pending;
 	const set = (field: keyof AssignmentForm) => (value: string) =>
 		setForm((f) => ({ ...f, [field]: value }));
@@ -137,7 +148,10 @@ export function UppdragVy({
 	const submit = () => {
 		if (!read.values) return;
 		const id = assignment?.id ?? newId();
-		const after = assignmentAfter(assignment, read.values, today, id, nextOrder);
+		const after = {
+			...assignmentAfter(assignment, read.values, today, id, nextOrder),
+			standardDay: slots
+		};
 		const withParent = changedCodes.map((c) => ({
 			...c,
 			after: { ...c.after, assignmentId: after.id }
@@ -188,6 +202,7 @@ export function UppdragVy({
 		const refused = await onDeleteCode(id);
 		if (refused === null) {
 			setCodeList((list) => list.filter((c) => c.id !== id));
+			setSlots((list) => list.filter((s) => s.codeId !== id));
 			setCodeSheet(null);
 		}
 		return refused;
@@ -340,6 +355,8 @@ export function UppdragVy({
 						</Button>
 					</div>
 				</section>
+
+				<Standarddag slots={slots} codes={codeList} onChange={setSlots} />
 
 				<section className="sektion">
 					<h2 className="kh-text-section-title">Mottagare i ordning</h2>

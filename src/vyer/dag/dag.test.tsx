@@ -88,6 +88,34 @@ const mockupDay = () => [
 ];
 
 describe('DagVy', () => {
+	it('offers the standard day on an empty day and adds it with one press', async () => {
+		const user = userEvent.setup();
+		const onAccept = vi.fn();
+		const suggestion = {
+			rows: [
+				{
+					span: { start: at(DAY, '08:00'), end: at(DAY, '12:00') },
+					name: 'Uppdrag A · Utveckling'
+				},
+				{ span: { start: at(DAY, '12:45'), end: at(DAY, '16:45') }, name: 'Uppdrag A · Möten' }
+			],
+			sum: 480
+		};
+		render(<DagVy {...day([], { suggestion, onAcceptSuggestion: onAccept })} />);
+		expect(screen.getByText('FÖRSLAG · STANDARDDAG')).toBeTruthy();
+		expect(screen.getByText('12:45–16:45')).toBeTruthy();
+		expect(screen.getByText('Summa 8 h')).toBeTruthy();
+		expect(screen.queryByText('Ingen tid den här dagen.')).toBeNull();
+		await user.click(screen.getByRole('button', { name: 'Lägg in' }));
+		expect(onAccept).toHaveBeenCalledOnce();
+	});
+
+	it('shows no suggestion once the day has time', () => {
+		const suggestion = { rows: [], sum: 0 };
+		render(<DagVy {...day([work(DAY, '08:00', '09:00')], { suggestion })} />);
+		expect(screen.queryByText('FÖRSLAG · STANDARDDAG')).toBeNull();
+	});
+
 	it('shows the mockup’s day: rows, the gap, the overlap and the sum', () => {
 		render(<DagVy {...day(mockupDay())} />);
 		expect(screen.getByRole('button', { name: /Tisdag 24 november/ })).toBeTruthy();
