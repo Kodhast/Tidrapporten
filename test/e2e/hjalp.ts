@@ -72,6 +72,9 @@ export const stored = async (
 	return (body.documents ?? []).map((d) => ({ id: d.name.split('/').pop()!, fields: d.fields }));
 };
 
+/** The common fields, so that the app can update a seeded document under the rules. */
+const meta = () => ({ schemaVersion: 1, createdAt: new Date(), updatedAt: new Date() });
+
 /** A made-up assignment with codes, from 2026 on, at 100 % and an eight-hour day. */
 export const seedAssignment = async (
 	request: APIRequestContext,
@@ -89,14 +92,16 @@ export const seedAssignment = async (
 		standardDay: [],
 		archived: false,
 		order: 0,
-		lastChangeId: null
+		lastChangeId: null,
+		...meta()
 	});
 	for (const [order, codeName] of codes.entries()) {
 		await seed(request, user, `assignments/${id}/codes/c${order + 1}`, {
 			name: codeName,
 			billable: true,
 			archived: false,
-			order
+			order,
+			...meta()
 		});
 	}
 };

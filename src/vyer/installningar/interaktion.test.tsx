@@ -135,22 +135,82 @@ describe('UppdragVy', () => {
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 	});
 
-	it('saves a changed billable flag and archives, and says when a save fails', async () => {
+	it('saves a renamed code with a changed billable flag and archives, and says when a save fails', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
 		const a = assignment();
 		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
-		await user.click(screen.getByRole('switch', { name: /Intern tid/ }));
-		expect(screen.getByText(/Ändrad omfattning eller arbetsdag gäller från i dag/)).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: /Intern tid/ }));
+		expect(within(sheet()).getByText('Ändra tidkod')).toBeTruthy();
+		const klar = () => within(sheet()).getByRole('button', { name: 'Klar' }) as HTMLButtonElement;
+		expect(klar().disabled).toBe(true);
+		await user.clear(within(sheet()).getByLabelText('Namn'));
+		await user.type(within(sheet()).getByLabelText('Namn'), 'Interna möten');
+		await user.click(within(sheet()).getByRole('switch', { name: /Debiterbar/ }));
+		await user.click(klar());
+		expect(screen.getByText('Interna möten')).toBeTruthy();
+		expect(screen.getByText('Ändringar som påverkar flexen skrivs i ändringsloggen.')).toBeTruthy();
 		await user.click(spara());
 		await screen.findByText('Det gick inte att spara');
 		expect(onSave.mock.calls[0]![2]).toEqual([
-			{ before: codes[1], after: { ...codes[1], billable: true } }
+			{ before: codes[1], after: { ...codes[1], name: 'Interna möten', billable: true } }
 		]);
 
 		await user.click(screen.getByRole('button', { name: 'Arkivera uppdraget' }));
 		await waitFor(() => expect(screen.queryByText('Det gick inte att spara')).toBeNull());
 		expect(onSave.mock.calls[1]).toEqual([a, { ...a, archived: true }, [], []]);
+	});
+
+	it('sets an end, and applies a changed scope from the day chosen (#79)', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const a = assignment();
+		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
+		await user.clear(screen.getByLabelText('Omfattning'));
+		await user.type(screen.getByLabelText('Omfattning'), '80');
+		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från') as HTMLInputElement;
+		expect(from.value).toBe('2026-11-26');
+		await user.clear(from);
+		await user.type(from, '2026-10-05');
+		await user.type(screen.getByLabelText('Slutdatum'), '2027-06-30');
+		await user.click(spara());
+		const [, after] = onSave.mock.calls[0]!;
+		expect(after).toMatchObject({
+			endDate: '2027-06-30',
+			terms: [
+				{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
+				{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+			]
+		});
+	});
+
+	it('moves the day the scope in force applies from, without changing the scope (#79)', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		// 80 % from 2 November, but it really applied from 5 October.
+		const a = assignment({
+			terms: [
+				{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
+				{ from: '2026-11-02', scopePercent: 80, workdayMinutes: 480 }
+			]
+		});
+		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
+		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från');
+		await user.clear(from);
+		await user.type(from, '2026-10-05');
+		await user.click(spara());
+		expect(onSave.mock.calls[0]![1].terms).toEqual([
+			{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
+			{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+		]);
+	});
+
+	it('will not save an end before the start', async () => {
+		const user = userEvent.setup();
+		render(<UppdragVy {...base} assignment={assignment()} codes={codes} onSave={vi.fn()} />);
+		await user.type(screen.getByLabelText('Slutdatum'), '2025-12-31');
+		expect(screen.getByText('Tidigast startdatum')).toBeTruthy();
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it('deletes after the confirmation, and shows why when it may not', async () => {

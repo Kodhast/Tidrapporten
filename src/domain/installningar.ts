@@ -1,5 +1,5 @@
 // Rules for the settings (issue 17): the default absence types, reading hours as the owner types
-// them, validating the forms, new terms from today and the receivers' code mapping.
+// them, validating the forms, new terms from a chosen day and the receivers' code mapping.
 import { daysOffOf, type FreeDays } from './helgdagar.ts';
 import { DEFAULT_WORKDAY_MINUTES, termsOn } from './norm.ts';
 import type {
@@ -101,6 +101,10 @@ export interface AssignmentForm {
 	startDate: IsoDate;
 	employerId: Id; // '' = none chosen
 	customerId: Id; // '' = no customer
+	/** '' = runs until further notice; left out, the end is kept as it was. */
+	endDate?: IsoDate | '';
+	/** The day a changed scope or workday applies from; left out, from today. */
+	termsFrom?: IsoDate;
 }
 
 export type AssignmentFormErrors = Partial<Record<keyof AssignmentForm, string>>;
@@ -113,6 +117,10 @@ export interface AssignmentValues {
 	startDate: IsoDate;
 	employerId: Id | null;
 	customerId: Id | null;
+	/** Left out, the end is kept as it was. */
+	endDate?: IsoDate | null;
+	/** Left out, a changed scope or workday applies from today. */
+	termsFrom?: IsoDate;
 }
 
 /**
@@ -134,6 +142,13 @@ export const readAssignmentForm = (
 	const openingFlex = parseHours(form.openingFlex === '' ? '0' : form.openingFlex, true);
 	if (openingFlex === null) errors.openingFlex = 'Till exempel 4, -2,5 eller 1:30';
 	if (!isIsoDate(form.startDate)) errors.startDate = 'Välj ett datum';
+	if (form.endDate) {
+		if (!isIsoDate(form.endDate)) errors.endDate = 'Välj ett datum';
+		else if (isIsoDate(form.startDate) && form.endDate < form.startDate)
+			errors.endDate = 'Tidigast startdatum';
+	}
+	if (form.termsFrom !== undefined && !isIsoDate(form.termsFrom))
+		errors.termsFrom = 'Välj ett datum';
 	if (Object.keys(errors).length > 0) return { values: null, errors };
 	return {
 		values: {
@@ -143,7 +158,9 @@ export const readAssignmentForm = (
 			openingFlex: openingFlex!,
 			startDate: form.startDate,
 			employerId: form.employerId || null,
-			customerId: form.customerId || null
+			customerId: form.customerId || null,
+			...(form.endDate !== undefined && { endDate: form.endDate || null }),
+			...(form.termsFrom !== undefined && { termsFrom: form.termsFrom })
 		},
 		errors: null
 	};
@@ -166,7 +183,9 @@ export const assignmentForm = (
 			openingFlex: '0',
 			startDate: today,
 			employerId,
-			customerId: ''
+			customerId: '',
+			endDate: '',
+			termsFrom: today
 		};
 	}
 	const terms = currentTerms(assignment, today);
@@ -177,7 +196,9 @@ export const assignmentForm = (
 		openingFlex: formatHours(assignment.openingFlex, true),
 		startDate: assignment.startDate,
 		employerId: assignment.employerId ?? '',
-		customerId: assignment.customerId ?? ''
+		customerId: assignment.customerId ?? '',
+		endDate: assignment.endDate ?? '',
+		termsFrom: today
 	};
 };
 
@@ -192,16 +213,18 @@ const currentTerms = (assignment: Assignment, today: IsoDate): AssignmentTerms =
 
 /**
  * The terms after the form is saved. The first terms always start at the start date. A changed
- * scope or workday applies from today (or from the start, if that is later), so the norm of the
- * days before does not change and neither does their flex (ADR 0012); terms from that day on are
- * replaced.
+ * scope or workday applies from `from` (today unless the owner chose another day), held between
+ * the start and the end, so the norm of the days before does not change and neither does their
+ * flex (ADR 0012); terms from that day on are replaced. A day in the past changes the flex of the
+ * weeks after it, which the change log explains (ADR 0016).
  */
 export const termsAfter = (
 	before: readonly AssignmentTerms[],
 	values: AssignmentValues,
-	today: IsoDate
+	requested: IsoDate
 ): AssignmentTerms[] => {
 	const { startDate, scopePercent, workdayMinutes } = values;
+	const endDate = values.endDate ?? null;
 	const sorted = [...before].sort((a, b) => a.from.localeCompare(b.from));
 	// The terms in force on the start date become the first; earlier ones are dropped.
 	const first = sorted.findLast((t) => t.from <= startDate) ?? sorted[0];
@@ -211,7 +234,8 @@ export const termsAfter = (
 		{ ...first, from: startDate },
 		...sorted.filter((t) => t.from > startDate)
 	];
-	const from = today > startDate ? today : startDate;
+	let from = requested > startDate ? requested : startDate;
+	if (endDate !== null && from > endDate) from = endDate > startDate ? endDate : startDate;
 	const inForce = terms.findLast((t) => t.from <= from);
 	if (inForce?.scopePercent === scopePercent && inForce.workdayMinutes === workdayMinutes) {
 		return terms;
@@ -231,8 +255,8 @@ export const assignmentAfter = (
 	id: before?.id ?? id,
 	name: values.name,
 	startDate: values.startDate,
-	endDate: before?.endDate ?? null,
-	terms: termsAfter(before?.terms ?? [], values, today),
+	endDate: values.endDate !== undefined ? values.endDate : (before?.endDate ?? null),
+	terms: termsAfter(before?.terms ?? [], values, values.termsFrom ?? today),
 	openingFlex: values.openingFlex,
 	standardDay: before?.standardDay ?? [],
 	archived: before?.archived ?? false,
