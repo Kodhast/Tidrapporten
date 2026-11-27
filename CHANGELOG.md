@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.10.0
+
+- Underlag för en vecka: faktisk mot rapporterad tid per mottagare med skillnaden, intervallen
+  dag för dag och veckans ändringar. Öppnas från Veckan, och Skriv ut ger en ren utskrift eller
+  PDF.
+
 ## 1.9.0
 
 - Standarddag: ställ in passen för en vanlig dag på uppdraget. En arbetsdag utan tid föreslår

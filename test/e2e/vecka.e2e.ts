@@ -152,3 +152,46 @@ test('offline a report cannot be sent', async ({ page, context, request }) => {
 	await expect(page.getByRole('button', { name: 'Markera som skickad' })).toBeDisabled();
 	expect(await stored(request, user, 'reports')).toHaveLength(0);
 });
+
+test('the basis for the week shows actual against reported and prints', async ({
+	page,
+	request
+}) => {
+	const user = uid('underlag');
+	await seedWeek(request, user);
+	await signIn(page, user);
+	await openWeek(page);
+
+	// Send the suggestion as it is: 40 h against 42,5 h actual.
+	await page.getByRole('link', { name: /1 · Arbetsgivaren/ }).click();
+	await page.getByRole('link', { name: 'Visa avskriften' }).click();
+	await page.getByRole('button', { name: 'Markera som skickad' }).click();
+	await expect(page.getByText(/^Skickad .* · låst$/)).toBeVisible();
+
+	await openWeek(page);
+	await page.getByRole('link', { name: 'Underlag för veckan' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Underlag' })).toBeVisible();
+	await expect(page.getByText(/^Faktisk 42,5 h · rapporterad 40 h · skickad /)).toBeVisible();
+	await expect(page.getByText('−2,5 h')).toBeVisible();
+	await expect(page.getByText('Måndag 16 november · 8 h 30 min')).toBeVisible();
+	await expect(page.getByText('Fredag 20 november · 8 h 30 min')).toBeVisible();
+	await expect(page.getByText('Inga ändringar i loggen.')).toBeVisible();
+
+	// The print dialog is replaced by a counter, since a test cannot press its buttons.
+	type Printing = { printed: number; print: () => void };
+	await page.evaluate(() => {
+		const page = globalThis as unknown as Printing;
+		page.printed = 0;
+		page.print = () => {
+			page.printed += 1;
+		};
+	});
+	await page.getByRole('button', { name: 'Skriv ut' }).click();
+	expect(await page.evaluate(() => (globalThis as unknown as Printing).printed)).toBe(1);
+
+	// On paper the buttons and the week picker are gone, and the week is named in a heading.
+	await page.emulateMedia({ media: 'print' });
+	await expect(page.getByRole('button', { name: 'Skriv ut' })).toBeHidden();
+	await expect(page.getByRole('button', { name: 'Föregående vecka' })).toBeHidden();
+	await expect(page.getByRole('heading', { name: /^Underlag · Vecka 47/ })).toBeVisible();
+});

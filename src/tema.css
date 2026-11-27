@@ -468,3 +468,50 @@ body {
 	align-items: center;
 	gap: 8px;
 }
+
+/* The basis for a week (issue 25): the heading with the week shows only on paper. */
+.underlag .utskrift {
+	display: none;
+}
+
+.underlag-dag {
+	display: flex;
+	flex-direction: column;
+	gap: var(--kh-space-s);
+}
+
+.underlag-dag h3 {
+	margin: 0;
+}
+
+@media print {
+	body,
+	.kh-frame {
+		background: #fff;
+		box-shadow: none;
+	}
+
+	.kh-topbar,
+	.kh-toolbar,
+	.underlag .skarm {
+		display: none !important;
+	}
+
+	.underlag .utskrift {
+		display: block;
+	}
+
+	.underlag {
+		padding: 0;
+	}
+
+	.underlag .kh-card {
+		box-shadow: none;
+		border: 1px solid #ccc;
+	}
+
+	.underlag-dag,
+	.underlag .kh-card {
+		break-inside: avoid;
+	}
+}

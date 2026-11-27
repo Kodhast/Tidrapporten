@@ -22,6 +22,7 @@ import { BudgetBanderoll } from './vyer/BudgetBanderoll';
 import { useRoute } from './vyer/rutter';
 import { pendingShortcut, takeShortcut } from './vyer/genvagar';
 import { useStart } from './vyer/start/useStart';
+import { UnderlagRutt } from './vyer/vecka/UnderlagRutt';
 import { RapportRutt, VeckaRutt } from './vyer/vecka/VeckaRutt';
 
 const root = document.getElementById('root');
@@ -105,6 +106,8 @@ function Root() {
 						<DagRutt db={db} uid={shownUid} date={route.date} online={online} />
 					) : route.view === 'vecka' ? (
 						<VeckaRutt db={db} uid={shownUid} week={route.week} />
+					) : route.view === 'underlag' ? (
+						<UnderlagRutt db={db} uid={shownUid} week={route.week} />
 					) : route.view === 'rapport' ? (
 						// One key per report, so that a change stays from the report to its transcript.
 						<RapportRutt

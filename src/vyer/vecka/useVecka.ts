@@ -33,6 +33,8 @@ export interface Week {
 	view: WeekView | null;
 	assignments: Assignment[];
 	codes: Record<Id, TimeCode[]>;
+	/** The entries in and around the week, once they have come. */
+	entries: Entry[];
 	absenceTypes: AbsenceType[];
 	freeDays: ReturnType<typeof freeDaysByDate>;
 	/** A listener failed: what is shown is the latest known. */
@@ -106,6 +108,7 @@ export function useVecka(db: Firestore, uid: Id, week: IsoWeek, now: UtcMillis):
 		view,
 		assignments: assignments ?? [],
 		codes,
+		entries: entries?.week === week ? entries.value : [],
 		absenceTypes: absenceTypes ?? [],
 		freeDays: days,
 		failed

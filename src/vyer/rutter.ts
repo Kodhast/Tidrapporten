@@ -17,6 +17,7 @@ export type Route =
 	| { view: 'kund'; id: Id | null } // null: a new customer
 	| { view: 'dag'; date: IsoDate }
 	| { view: 'vecka'; week: IsoWeek | null } // null: the current week
+	| { view: 'underlag'; week: IsoWeek } // the basis for a week, for printing (issue 25)
 	| {
 			view: 'rapport';
 			week: IsoWeek;
@@ -62,6 +63,8 @@ export const parseRoute = (hash: string): Route => {
 			transcript: m[5] !== undefined
 		};
 	}
+	m = new RegExp(`^/underlag/${WEEK}$`).exec(path);
+	if (m && isValidWeek(`${m[1]}-W${m[2]}`)) return { view: 'underlag', week: `${m[1]}-W${m[2]}` };
 	m = new RegExp(`^/installningar/(arbetsgivare|kund)/${ID}$`).exec(path);
 	if (m) return { view: m[1] as 'arbetsgivare' | 'kund', id: m[2] === 'ny' ? null : m[2]! };
 	m = new RegExp(`^/installningar/uppdrag/${ID}$`).exec(path);
@@ -95,6 +98,8 @@ export const href = (route: Route): string => {
 			return `#/dag/${route.date}`;
 		case 'vecka':
 			return route.week ? `#/vecka/${route.week}` : '#/vecka';
+		case 'underlag':
+			return `#/underlag/${route.week}`;
 		case 'rapport':
 			return `#/vecka/${route.week}/${route.assignmentId}/${route.receiverId}${route.transcript ? '/avskrift' : ''}`;
 		case 'mottagare':
