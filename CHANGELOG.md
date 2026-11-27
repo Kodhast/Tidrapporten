@@ -3,6 +3,11 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.8.0
+
+- På en dator eller annan bred skärm ligger appen i ett kort med skugga mitt i fönstret i stället
+  för att fylla hela skärmen. Telefonen ser ut som förut.
+
 ## 1.7.0
 
 - Debiteringsgraden syns bredvid flexen på startsidan: tiden på debiterbara tidkoder delat med
