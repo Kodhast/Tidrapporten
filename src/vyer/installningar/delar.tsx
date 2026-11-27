@@ -1,6 +1,6 @@
-// What the settings views share: the offline notice, a failed save, the save state and a choice
-// among named items.
-import { BottomSheet, Notice, Row } from '@kodhast/web-ui-react';
+// What the settings views share: the offline notice, a failed save, the save state, a choice
+// among named items, and archiving and deleting.
+import { BottomSheet, Button, ConfirmDialog, Notice, Row } from '@kodhast/web-ui-react';
 import { useState } from 'react';
 import { OfflineIcon, WarningIcon } from '../ikoner';
 
@@ -93,6 +93,93 @@ export function ChoiceRow({
 					))}
 				</div>
 			</BottomSheet>
+		</>
+	);
+}
+
+export interface ArchiveDeleteProps {
+	/** The thing in definite form, as in "Arkivera uppdraget": "uppdraget", "tidkoden". */
+	noun: string;
+	archived: boolean;
+	/** What archiving means here, or that it is archived; shown above the buttons. */
+	hint: string;
+	/** The confirmation's text: what goes, and that what is in use can only be archived. */
+	confirmText: string;
+	/** Whether the buttons can be used: online and nothing else saving. */
+	enabled: boolean;
+	onArchive: () => void;
+	/** Deletes; gives the reason when it may not (something uses it), else null. */
+	onDelete: () => Promise<string | null>;
+}
+
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * Archive or restore, and delete after a confirmation (issues 26 and 80). Deleting goes through a
+ * function that refuses what is in use; its reason is shown, and archiving is the way left.
+ */
+export function ArchiveDelete({
+	noun,
+	archived,
+	hint,
+	confirmText,
+	enabled,
+	onArchive,
+	onDelete
+}: ArchiveDeleteProps) {
+	const removing = useSave();
+	const [ask, setAsk] = useState(false);
+	const [refused, setRefused] = useState<string | null>(null);
+	return (
+		<>
+			<p className="kh-text-item-subtitle dampad">{hint}</p>
+			<div>
+				<Button
+					variant={archived ? 'tonal' : 'destructiveText'}
+					isDisabled={!enabled || removing.pending}
+					onPress={onArchive}
+				>
+					{archived ? `Återställ ${noun}` : `Arkivera ${noun}`}
+				</Button>
+			</div>
+			{refused && (
+				<Notice
+					tone="ton-fel"
+					icon={<WarningIcon />}
+					title={`${capital(noun)} kan inte raderas`}
+					detail={refused}
+				/>
+			)}
+			{removing.failed && (
+				<Notice
+					tone="ton-fel"
+					icon={<WarningIcon />}
+					title="Det gick inte att radera"
+					detail="Kontrollera anslutningen och försök igen."
+				/>
+			)}
+			<div>
+				<Button
+					variant="destructiveText"
+					isDisabled={!enabled}
+					isPending={removing.pending}
+					onPress={() => setAsk(true)}
+				>
+					{`Radera ${noun}`}
+				</Button>
+			</div>
+			<ConfirmDialog
+				isOpen={ask}
+				onOpenChange={setAsk}
+				destructive
+				title={`Radera ${noun}?`}
+				text={confirmText}
+				confirmLabel="Radera"
+				onConfirm={() => {
+					setRefused(null);
+					void removing.run(async () => setRefused(await onDelete()));
+				}}
+			/>
 		</>
 	);
 }

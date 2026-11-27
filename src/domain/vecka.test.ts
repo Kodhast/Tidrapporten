@@ -221,6 +221,26 @@ describe('names', () => {
 		expect(codeName(renamed, sent, 'R-arbete')).toBe('Arbete');
 		expect(codeName(renamed, null, 'R-arbete')).toBe('Nytt namn');
 	});
+
+	it('keeps the sent name of a code taken off the receiver when the week is unlocked and sent again (#80)', () => {
+		// Week 48 was sent with 8 h on "Arbete"; the code is then deleted from the receiver, the week
+		// unlocked and sent again with the same line.
+		const first = sentReport(
+			report(WEEK, 'draft', [480, 0, 0, 0, 0, 0, 0]),
+			a1,
+			r1,
+			hm('8:00'),
+			NOW
+		);
+		const unlocked = { ...first, status: 'unlocked' as const };
+		const without = receiver({ codes: [] });
+		expect(codeName(without, unlocked, 'R-arbete')).toBe('Arbete');
+		const again = sentReport(first, a1, without, hm('8:00'), NOW, unlocked.snapshot);
+		expect(again.snapshot!.codeNames).toEqual({ 'R-arbete': 'Arbete' });
+		// A code still on the receiver shows its current name while the week is unlocked.
+		const renamed = receiver({ codes: [{ id: 'R-arbete', name: 'Nytt namn' }] });
+		expect(codeName(renamed, unlocked, 'R-arbete')).toBe('Nytt namn');
+	});
 });
 
 describe('sentReport', () => {

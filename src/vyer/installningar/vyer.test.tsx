@@ -14,6 +14,7 @@ import { UppdragVy } from './UppdragVy';
 // The views' first render with made-up data; what the forms do is tested in the domain and in
 // Playwright (test/e2e/installningar.e2e.ts).
 
+const noDelete = () => Promise.resolve(null);
 const noSave = () => Promise.resolve();
 
 const receiver = (overrides: Partial<Receiver> = {}): Receiver => ({
@@ -107,7 +108,8 @@ describe('UppdragVy', () => {
 		today: '2026-11-26',
 		online: true,
 		onSave: noSave,
-		onDelete: () => Promise.resolve(null)
+		onDelete: () => Promise.resolve(null),
+		onDeleteCode: () => Promise.resolve(null)
 	};
 
 	it('starts a new assignment with empty name and Spara off, and receivers after the save', () => {
@@ -175,7 +177,8 @@ describe('MottagareVy', () => {
 		codes,
 		absenceTypes: DEFAULT_ABSENCE_TYPES,
 		online: true,
-		onSave: noSave
+		onSave: noSave,
+		onDelete: () => Promise.resolve(null)
 	};
 
 	it('shows the receiver’s codes and what each of ours becomes, and warns about the rest', () => {
@@ -207,7 +210,8 @@ describe('FranvaroVy', () => {
 		today: '2026-11-26',
 		online: true,
 		onSaveAbsenceType: noSave,
-		onSaveFreeDay: noSave
+		onSaveFreeDay: noSave,
+		onDeleteAbsenceType: () => Promise.resolve(null)
 	};
 
 	it('lists the absence types with how they count', () => {
@@ -236,7 +240,14 @@ describe('FranvaroVy', () => {
 describe('PartVy', () => {
 	it('shows an employer with its suggestion for the report', () => {
 		const markup = renderToStaticMarkup(
-			<PartVy kind="employer" value={employer()} nextOrder={1} online onSave={noSave} />
+			<PartVy
+				kind="employer"
+				value={employer()}
+				nextOrder={1}
+				online
+				onSave={noSave}
+				onDelete={noDelete}
+			/>
 		);
 		expect(markup).toContain('value="Exempelkonsult AB"');
 		expect(markup).toContain('Veckorapporten till arbetsgivaren');
@@ -245,7 +256,14 @@ describe('PartVy', () => {
 
 	it('starts a new customer empty, without the suggestion', () => {
 		const markup = renderToStaticMarkup(
-			<PartVy kind="customer" value={null} nextOrder={1} online onSave={noSave} />
+			<PartVy
+				kind="customer"
+				value={null}
+				nextOrder={1}
+				online
+				onSave={noSave}
+				onDelete={noDelete}
+			/>
 		);
 		expect(markup).toContain('Ny kund');
 		expect(markup).not.toContain('Veckorapporten till arbetsgivaren');

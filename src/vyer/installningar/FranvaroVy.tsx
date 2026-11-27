@@ -23,7 +23,7 @@ import {
 } from '../../domain/installningar.ts';
 import type { AbsenceCounting, AbsenceType, FreeDay, IsoDate } from '../../domain/types.ts';
 import { href } from '../rutter.ts';
-import { OfflineNotice, SaveFailed, useSave } from './delar';
+import { ArchiveDelete, OfflineNotice, SaveFailed, useSave } from './delar';
 
 export interface FranvaroVyProps {
 	absenceTypes: readonly AbsenceType[];
@@ -32,6 +32,8 @@ export interface FranvaroVyProps {
 	online: boolean;
 	onSaveAbsenceType: (before: AbsenceType | null, after: AbsenceType) => Promise<void>;
 	onSaveFreeDay: (before: FreeDay | null, after: FreeDay | null) => Promise<void>;
+	/** Deletes an absence type no time uses (issue 80); gives the reason when it may not. */
+	onDeleteAbsenceType: (id: string) => Promise<string | null>;
 }
 
 const COUNTINGS: AbsenceCounting[] = ['fillsNorm', 'flexWithdrawal', 'worked'];
@@ -46,7 +48,8 @@ export function FranvaroVy({
 	today,
 	online,
 	onSaveAbsenceType,
-	onSaveFreeDay
+	onSaveFreeDay,
+	onDeleteAbsenceType
 }: FranvaroVyProps) {
 	const [absence, setAbsence] = useState<AbsenceSheet | null>(null);
 	const [freeDay, setFreeDay] = useState<FreeDaySheet | null>(null);
@@ -108,7 +111,11 @@ export function FranvaroVy({
 							<Row
 								key={t.id}
 								title={t.name}
-								subtitle={COUNTING_LABELS[t.counting]}
+								subtitle={
+									t.archived
+										? `Arkiverad · ${COUNTING_LABELS[t.counting]}`
+										: COUNTING_LABELS[t.counting]
+								}
 								inactive={t.archived}
 								navigates
 								onPress={() => setAbsence({ before: t, name: t.name, counting: t.counting })}
@@ -205,6 +212,30 @@ export function FranvaroVy({
 						<p className="kh-text-item-subtitle dampad">
 							Ändrad räkning ändrar flexen bakåt och skrivs i ändringsloggen.
 						</p>
+						{absence.before && (
+							<ArchiveDelete
+								noun="frånvarotypen"
+								archived={absence.before.archived}
+								hint={
+									absence.before.archived
+										? 'Arkiverad: typen går inte att välja för ny frånvaro.'
+										: 'En arkiverad typ går inte att välja för ny frånvaro. Frånvaron som har den finns kvar.'
+								}
+								confirmText="Frånvarotypen raderas och tas bort ur mottagarnas koppling. Det går inte att ångra. En typ med frånvaro kan bara arkiveras."
+								enabled={online && !save.pending}
+								onArchive={() => {
+									const before = absence.before!;
+									void save
+										.run(() => onSaveAbsenceType(before, { ...before, archived: !before.archived }))
+										.then((ok) => ok && setAbsence(null));
+								}}
+								onDelete={async () => {
+									const refused = await onDeleteAbsenceType(absence.before!.id);
+									if (refused === null) setAbsence(null);
+									return refused;
+								}}
+							/>
+						)}
 					</>
 				)}
 			</BottomSheet>

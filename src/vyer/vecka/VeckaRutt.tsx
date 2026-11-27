@@ -101,7 +101,7 @@ export function RapportRutt(props: RapportRuttProps) {
 					.lines;
 	const lines = edits ?? editableLines(receiver, base);
 	const sent = report?.status === 'sent';
-	const name = (line: ReportLine) => codeName(receiver, sent ? report : null, line.receiverCodeId);
+	const name = (line: ReportLine) => codeName(receiver, report, line.receiverCodeId);
 
 	const save = (action: 'send' | 'unlock', write: () => Promise<void>) => {
 		setBusy(true);
@@ -173,7 +173,8 @@ export function RapportRutt(props: RapportRuttProps) {
 								assignment,
 								receiver,
 								a.actual,
-								now
+								now,
+								report?.snapshot ?? null
 							),
 							report
 						)

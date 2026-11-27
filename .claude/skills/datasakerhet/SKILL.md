@@ -58,6 +58,16 @@ Som ett fält, och dessutom:
 - Återställningen provas i varje PR: `test/e2e/export.e2e.ts` exporterar, återställer till en ny
   användare och jämför varje dokument.
 
+## Radering
+
+- Klienten får inte radera uppdrag, koder, mottagare, arbetsgivare, kunder eller frånvarotyper
+  (reglerna nekar). Det går genom funktionerna i `firebase-functions/src/radering.ts`:
+  `raderaUppdrag` (issue 26) och `raderaDel` (issue 80). De skriver en post i `changeLog` med
+  dokumentet som det var, och vägrar det som används (tid, timer, standarddag, uppdrag, skickade
+  veckor). Det som används arkiveras i stället.
+- Pekar ett nytt fält eller en ny samling på en del (ett id), ska `deletePart` antingen vägra när
+  den används eller rensa pekaren i samma skrivning – annars blir id:t hängande.
+
 ## Aldrig
 
 - Radera eller ändra en post i `changeLog` (reglerna nekar det också).

@@ -78,7 +78,7 @@ test('an assignment is deleted with its time and logged; one with a sent week is
 
 	await remove('a2');
 	await expect(
-		page.getByText('Uppdraget har skickade veckor. Arkivera det i stället.')
+		page.getByText('Uppdraget har skickade veckor. Arkivera det i stället.', { exact: true })
 	).toBeVisible({ timeout: 15_000 });
 
 	await remove('a1');
@@ -94,4 +94,43 @@ test('an assignment is deleted with its time and logged; one with a sent week is
 		{ stringValue: 'assignments/a1' },
 		{ stringValue: 'delete' }
 	]);
+});
+
+test('a code with time is archived, an unused one deleted, both logged (#80)', async ({
+	page,
+	request
+}) => {
+	const user = uid('radera-del');
+	await seedAssignment(request, user, ['Utveckling', 'Oanvänd']);
+	await seed(request, user, 'entries/e1', entry('a1'));
+	await signIn(page, user);
+	await page.goto('/#/installningar/uppdrag/a1');
+	const sheet = page.getByRole('dialog');
+	const remove = async () => {
+		await sheet.getByRole('button', { name: 'Radera tidkoden' }).click();
+		await page
+			.getByRole('alertdialog', { name: 'Radera tidkoden?' })
+			.getByRole('button', { name: 'Radera' })
+			.click();
+	};
+
+	await page.getByRole('button', { name: /^Utveckling/ }).click();
+	await remove();
+	await expect(
+		sheet.getByText('Tidkoden används. Arkivera i stället.', { exact: true })
+	).toBeVisible();
+	await sheet.getByRole('button', { name: 'Arkivera tidkoden' }).click();
+	await page.getByRole('button', { name: 'Spara', exact: true }).click();
+	await expect
+		.poll(async () => (await stored(request, user, 'assignments/a1/codes'))[0]?.fields.archived)
+		.toEqual({ booleanValue: true });
+
+	await page.getByRole('button', { name: /^Oanvänd/ }).click();
+	await remove();
+	await expect(page.getByRole('button', { name: /^Oanvänd/ })).toBeHidden();
+	expect((await stored(request, user, 'assignments/a1/codes')).map((c) => c.id)).toEqual(['c1']);
+	const log = await stored(request, user, 'changeLog');
+	expect(log.map((e) => e.fields.path)).toContainEqual({
+		stringValue: 'assignments/a1/codes/c2'
+	});
 });
