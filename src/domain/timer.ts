@@ -138,8 +138,8 @@ export type PauseKind = 'lunch' | 'errand';
 export const PAUSE_NAMES: Record<PauseKind, string> = { lunch: 'Lunch', errand: 'Ärende' };
 
 /** The lengths offered, in minutes, and the one chosen when the owner has not chosen before. */
-export const PAUSE_LENGTHS = [15, 30, 45, 60] as const;
-export const DEFAULT_PAUSE: Record<PauseKind, number> = { lunch: 30, errand: 15 };
+export const PAUSE_LENGTHS = [30, 45, 60] as const;
+export const DEFAULT_PAUSE: Record<PauseKind, number> = { lunch: 30, errand: 30 };
 
 export interface Pause {
 	from: UtcMillis;
@@ -171,6 +171,17 @@ export const parsePause = (
 	}
 	return { pause: { from: typed.start, until: typed.start + minutes * MINUTE } };
 };
+
+/**
+ * The pause's length in minutes when it begins at `from` and ends at the local clock time `end`
+ * on the same day (issue 95: a length of one's own). Zero or less when the end is not after the
+ * start, which the sheet refuses. A pause over midnight takes the lengths' buttons; the wheel
+ * would otherwise read an end picked by mistake as a pause until the next day.
+ */
+export const pauseMinutes = (from: UtcMillis, end: string): number =>
+	Math.round((atLocalTime(dateOf(from), end) - from) / MINUTE);
+
+export const PAUSE_END_ERROR = 'Pausen måste sluta efter att den börjat';
 
 /** Running time as the owner reads it, without seconds: `42 min`, `1 h 42`, `11 h 05`. */
 export const elapsedLabel = (from: UtcMillis, to: UtcMillis): string => {

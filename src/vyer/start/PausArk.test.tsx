@@ -64,12 +64,12 @@ describe('PausArk', () => {
 		expect(onClose).toHaveBeenCalled();
 	});
 
-	it('starts an errand of 15 minutes, and remembers another length for next time', async () => {
+	it('starts an errand of 30 minutes, and remembers another length for next time', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn();
 		render(<PausArk {...props({ kind: 'errand', onSave })} />);
 		const errand = sheet('Ärende');
-		expect(within(errand).getByRole('button', { name: 'Ärende 11:52–12:07' })).toBeTruthy();
+		expect(within(errand).getByRole('button', { name: 'Ärende 11:52–12:22' })).toBeTruthy();
 		await user.click(within(errand).getByRole('radio', { name: '45 min' }));
 		await user.click(within(errand).getByRole('button', { name: 'Ärende 11:52–12:37' }));
 		expect(lastLength('errand')).toBe(45);
@@ -86,6 +86,38 @@ describe('PausArk', () => {
 			from: at('2026-11-25', '11:40'),
 			until: at('2026-11-25', '12:10')
 		});
+	});
+
+	it('takes a length of one’s own from the end’s wheels, and refuses an end before the start', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn();
+		render(<PausArk {...props({ kind: 'errand', onSave })} />);
+		await pickTime(user, 'Slutar', '12:40');
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio.getAttribute('aria-checked')).toBe('false');
+		}
+		await user.click(screen.getByRole('button', { name: 'Ärende 11:52–12:40' }));
+		expect(onSave).toHaveBeenCalledWith({
+			from: at('2026-11-25', '11:52'),
+			until: at('2026-11-25', '12:40')
+		});
+		// A length that is not offered is not remembered.
+		expect(lastLength('errand')).toBe(30);
+
+		cleanup();
+		render(<PausArk {...props()} />);
+		await pickTime(user, 'Slutar', '11:30');
+		expect(screen.getByText('Pausen måste sluta efter att den börjat')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Lunch' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('changes a pause of a length of its own, with no button chosen', () => {
+		const inPause: Timer = { ...running, start: at('2026-11-25', '12:29') };
+		render(<PausArk {...props({ kind: null, timer: inPause, from: at('2026-11-25', '11:52') })} />);
+		expect(screen.getByRole('button', { name: 'Paus 11:52–12:29' })).toBeTruthy();
+		for (const radio of screen.getAllByRole('radio')) {
+			expect(radio.getAttribute('aria-checked')).toBe('false');
+		}
 	});
 
 	it('refuses a start before the timer’s first minute', async () => {

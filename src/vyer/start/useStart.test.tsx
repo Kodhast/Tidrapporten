@@ -241,7 +241,7 @@ describe('useStart', () => {
 			feed({ timer: running(at('2026-11-25', '08:05')) });
 			act(() => listeners.pause(true));
 			await u.click(screen.getByRole('button', { name: 'Ärende' }));
-			await u.click(screen.getByRole('button', { name: 'Ärende 09:47–10:02' }));
+			await u.click(screen.getByRole('button', { name: 'Ärende 09:47–10:17' }));
 			expect(writes.pauseTimer.mock.calls[0]![5]).toBe(true);
 		});
 

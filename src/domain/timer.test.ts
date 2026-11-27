@@ -9,6 +9,7 @@ import {
 	isPaused,
 	parseEnd,
 	parsePause,
+	pauseMinutes,
 	parseStart,
 	startChoice,
 	stopBlockedOffline,
@@ -299,6 +300,14 @@ describe('a pause on the timer (issue 95)', () => {
 	// The timer runs from 08:15; at 11:52 the owner takes 30 minutes of lunch.
 	const running = timer(at('2026-11-25', '08:15'));
 	const now = at('2026-11-25', '11:52');
+
+	it('counts a length of one’s own from where the pause begins to the end’s clock time', () => {
+		expect(pauseMinutes(at('2026-11-25', '11:52'), '12:40')).toBe(48);
+		expect(pauseMinutes(at('2026-11-25', '11:52'), '11:52')).toBe(0);
+		expect(pauseMinutes(at('2026-11-25', '11:52'), '11:30')).toBe(-22);
+		// Over the change to winter time, 02:30 is the first of the two: an hour after 01:30.
+		expect(pauseMinutes(at('2026-10-25', '01:30'), '02:30')).toBe(60);
+	});
 
 	it('ends the interval where the pause begins and starts the timer where it ends', () => {
 		expect(parsePause('11:52', 30, running, now)).toEqual({

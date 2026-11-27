@@ -3,6 +3,12 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.14.0
+
+- Pausen kan få en egen längd: arket har ett rullhjul för när pausen slutar, och knapparna
+  30 min, 45 min och 1 h ställer det. Ärende har 30 minuter som förval, som lunch. Ändra pausen
+  visar pausens verkliga längd.
+
 ## 1.13.0
 
 - Lunch och Ärende under timern: pausen läggs ovanpå den pågående timern och räknas av, utan att
