@@ -111,7 +111,8 @@ export const timerEnd = (timer: Timer, end: UtcMillis): UtcMillis =>
 /**
  * Whether stopping the timer at `end` must wait for the network: offline, an entry in a week that
  * is sent or unlocked would be queued and could be written without its log entry once another
- * device has sent the week (ADR 0012). `reports` are the latest known, from the cache.
+ * device has sent the week (ADR 0012). `reports` are the latest known, from the cache. A timer
+ * in a pause (start ahead) writes no entry when it stops, so it is never blocked.
  */
 export const stopBlockedOffline = (
 	timer: Timer,
@@ -119,7 +120,7 @@ export const stopBlockedOffline = (
 	reports: readonly Report[],
 	online: boolean
 ): boolean =>
-	!online && !isPaused(timer, end) && entryChange(null, timerEntry(timer, end), reports).logged;
+	!online && timer.start <= end && entryChange(null, timerEntry(timer, end), reports).logged;
 
 /**
  * Whether the timer is in a pause (issue 95): a pause splits the timer, so its start is the pause's

@@ -268,6 +268,20 @@ describe('useStart', () => {
 			expect(writes.stopPausedTimer).toHaveBeenCalledWith({}, 'testperson-1');
 			expect(writes.stopTimer).not.toHaveBeenCalled();
 		});
+
+		it('stops without an interval in the pause’s last minute, from the button and the shortcut', async () => {
+			const u = user();
+			const timer = running(NOW + 30_000);
+			render(<Harness />);
+			feed({ timer });
+			await u.click(screen.getByRole('button', { name: 'Stoppa timern' }));
+			expect(writes.stopPausedTimer).toHaveBeenCalledTimes(1);
+			cleanup();
+			render(<Harness shortcut={pendingShortcut('stoppa')} />);
+			feed({ timer });
+			expect(writes.stopPausedTimer).toHaveBeenCalledTimes(2);
+			expect(writes.stopTimer).not.toHaveBeenCalled();
+		});
 	});
 
 	it('changes the code of a running timer from now', async () => {

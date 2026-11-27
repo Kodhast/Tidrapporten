@@ -505,8 +505,8 @@ service cloud.firestore {
       // one device cannot delete or overwrite a timer another device started meanwhile. A change
       // of code within the first minute keeps the start and needs no entry. A timer in a pause has
       // written its entry when the pause began, so it is stopped without one (issue 95). A stop
-    // queued offline during one pause can remove a later pause another device put on: the time
-    // up to that pause is written, and only the timer after it is lost, as at any stop.
+      // queued offline during one pause can remove a later pause another device put on: the time
+      // up to that pause is written, and only the timer after it is lost, as at any stop.
       match /state/timer {
         allow read: if isOwner(uid);
         allow delete: if isOwner(uid) && (hasTimerEntryAfter(uid) || isPausedTimer());
