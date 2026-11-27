@@ -310,7 +310,7 @@ export function useStart(
 							now={now}
 							name={names ? [names.assignment, names.code].filter(Boolean).join(' · ') : ''}
 							suggestion={suggestStart(timer, entries ?? [])}
-							entries={todays.filter((e) => e.id !== runningEntry?.id)}
+							entries={entries ?? []}
 							online={online}
 							onSave={(start) => write(() => moveTimerStart(db, uid, timer, start))}
 							onClose={() => setMoving(null)}
