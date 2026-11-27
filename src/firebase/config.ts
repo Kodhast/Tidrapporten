@@ -62,8 +62,8 @@ export function firebaseOptions(environment: Environment): FirebaseOptions {
  * the owner has made the pair; the reminder settings then say that notifications are not set up.
  */
 const vapidKeys: Record<Environment, string | null> = {
-	test: null,
-	drift: null,
+	test: 'BC9MCspw8IPIv0v2z1p9JOW4WlBkGgpZ-A5qliXyQdXT3f_lYvJTgYb9CO2QC7PQfxI5H8kxvA19ap_-SvpXrdU',
+	drift: 'BDLWhrJq7ckC5Ue5djNEXy098B-fBgDj3sGNo0J3X-uZvnQ0IQvL4tFsyBjBke_YKK5zIH95SBNZDkomvQT16Zc',
 	emulator: null
 };
 
