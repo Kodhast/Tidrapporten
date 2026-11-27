@@ -1,7 +1,7 @@
 # 0017. Inloggningen: Access-JWT till Firebase custom token
 
 - **Status:** Beslutat
-- **Datum:** 2026-11-25
+- **Datum:** 2026-11-25 (namn och bild 2026-11-27)
 
 ## Sammanhang
 
@@ -34,8 +34,14 @@ funktionen ligger i repot (issue 11).
 - **Pages får `functions/`.** Cloudflare Pages läser sina funktioner ur `functions/` i roten, så
   Firebase Cloud Functions flyttades till `firebase-functions/` (beslut 0014). Delad kod ligger i
   `functions/_lib/`, som inte blir rutter.
+- **Namn och bild följer med i fragmentet.** Access-JWT:n har bara e-postadressen, så funktionen
+  frågar teamets `/cdn-cgi/access/get-identity` med JWT:n och lägger `namn` och `bild` (Googles
+  `picture`) bredvid `token` när Access ger dem (issue 66). Appen sparar dem i Firebase Auth med
+  `updateProfile`, inte i Firestore, och visar dem i avatarmenyn. Bilden kräver anspråket
+  `picture` under OIDC Claims för Google i Zero Trust (docs/drift.md). Ett fel från
+  `get-identity` stoppar inte inloggningen; avataren visar då initialerna.
 - **Service workern** svarar aldrig på `/inloggning` eller `/cdn-cgi/` ur cachen.
-- **Loggarna** har händelse och uid, aldrig e-postadress, JWT eller token (beslut 0008).
+- **Loggarna** har händelse, uid och om en bild kom med, aldrig namn, bild-adress, e-postadress, JWT eller token (beslut 0008).
 
 ## Följder
 
