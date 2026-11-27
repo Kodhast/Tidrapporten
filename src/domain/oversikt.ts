@@ -5,7 +5,7 @@ import { assignmentFlex, firstReceiver, timeByDay, type AbsenceCountings } from 
 import type { FreeDays } from './helgdagar.ts';
 import { normMinutes } from './norm.ts';
 import { dateOf, daysOfWeek, isoWeekOf } from './tid.ts';
-import { timerEntry } from './timer.ts';
+import { runningEntry } from './timer.ts';
 import type {
 	Assignment,
 	Entry,
@@ -26,7 +26,7 @@ export interface OverviewInput {
 	reports: readonly Report[];
 	freeDays: FreeDays;
 	countings: AbsenceCountings;
-	/** The running timer counts as time up to now. */
+	/** The running timer counts as time up to now, and nothing in a pause (issue 95). */
 	timer: Timer | null;
 	now: UtcMillis;
 }
@@ -60,9 +60,8 @@ export const overview = (input: OverviewInput): Overview => {
 	const { now, freeDays, countings } = input;
 	const today = dateOf(now);
 	const week = isoWeekOf(today);
-	const entries = input.timer
-		? [...input.entries, timerEntry(input.timer, Math.max(now, input.timer.start))]
-		: input.entries;
+	const running = runningEntry(input.timer, now);
+	const entries = running ? [...input.entries, running] : input.entries;
 	let todayActual = 0;
 	let todayNorm = 0;
 	let unsent = 0;

@@ -1,6 +1,7 @@
 // The working day's wheel (issue 19, mockup "Arbetsdagens hjul"): 07–19 as an arc of 300 degrees
 // with the day's intervals in their code's colour, and the running timer with a round end and a
-// dot. The centre (the code chip and the time) is the caller's.
+// dot, and a pause the timer is in as a thin arc (issue 95). The centre (the code chip and the time)
+// is the caller's.
 import type { ReactNode } from 'react';
 import type { CodeColour, WheelArc } from '../../domain/hjul.ts';
 import { DEGREES_PER_HOUR, WHEEL_HOURS } from '../../domain/hjul.ts';
@@ -23,15 +24,16 @@ function Arc({
 	from,
 	degrees,
 	className,
-	round
-}: WheelArc & { className: string; round: boolean }) {
+	round,
+	width = 22
+}: WheelArc & { className: string; round: boolean; width?: number }) {
 	return (
 		<circle
 			className={className}
 			cx={CENTRE}
 			cy={CENTRE}
 			r={RADIUS}
-			strokeWidth={22}
+			strokeWidth={width}
 			strokeLinecap={round ? 'round' : undefined}
 			strokeDasharray={dash(degrees)}
 			transform={`rotate(${SEVEN + from} ${CENTRE} ${CENTRE})`}
@@ -39,7 +41,16 @@ function Arc({
 	);
 }
 
-export function Hjul({ arcs, children }: { arcs: readonly HjulArc[]; children: ReactNode }) {
+export function Hjul({
+	arcs,
+	pause = null,
+	children
+}: {
+	arcs: readonly HjulArc[];
+	/** The pause the timer is in (issue 95), drawn thin: it is not time. */
+	pause?: WheelArc | null;
+	children: ReactNode;
+}) {
 	const running = arcs.find((a) => a.running);
 	const end = running && ((SEVEN + running.from + running.degrees) * Math.PI) / 180;
 	return (
@@ -55,6 +66,7 @@ export function Hjul({ arcs, children }: { arcs: readonly HjulArc[]; children: R
 						round={arc.running}
 					/>
 				))}
+				{pause && <Arc className="paus" {...pause} round width={6} />}
 				{running && end !== undefined && (
 					<circle
 						className={`prick accent-kod-${running.colour}`}

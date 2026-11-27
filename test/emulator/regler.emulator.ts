@@ -51,12 +51,15 @@ import {
 	LockedChangeError,
 	saveEntry,
 	saveReport,
+	pauseTimer,
 	startTimer,
+	stopPausedTimer,
 	stopTimer,
 	switchTimer,
 	moveTimerStart,
 	TimerChangedError
 } from '../../src/data/skrivning.ts';
+import { dateOf } from '../../src/domain/tid.ts';
 import { startDocuments } from '../../src/domain/komigang.ts';
 import { assignment, code, receiver, report, work } from '../../src/domain/testdata.ts';
 import { removeDevice, saveDevice, saveSettings } from '../../src/data/paminnelser.ts';
@@ -955,6 +958,74 @@ describe('the data layer’s writes pass the rules', () => {
 				...updateMeta()
 			})
 		);
+	});
+
+	it('pauseTimer splits the timer: the entry so far, the timer again after the pause, the day marked (issue 95)', async () => {
+		const db = owner();
+		const now = Date.now();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: now - 3 * 3_600_000
+		};
+		await startTimer(db, OWNER, timer);
+		const pause = { from: now - 60_000, until: now + 29 * 60_000 };
+		const next = await pauseTimer(db, OWNER, timer, pause);
+		expect(next).toEqual({ ...timer, start: pause.until });
+		const stored = timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!);
+		expect(stored).toEqual(next);
+		const entry = entryCodec.fromData(
+			`timer-${timer.start}`,
+			(await getDoc(at(db, `entries/timer-${timer.start}`))).data()!
+		);
+		expect(entry.time).toEqual({ kind: 'interval', start: timer.start, end: pause.from });
+		expect((await getDoc(at(db, `pauses/${dateOf(pause.from)}`))).exists()).toBe(true);
+		// A device that had not seen the pause cannot pause or stop the old timer again.
+		await denied(pauseTimer(db, OWNER, timer, pause));
+		await denied(stopTimer(db, OWNER, timer, now));
+	});
+
+	it('a timer in a pause moves within the time ahead, comes back now and stops without an entry', async () => {
+		const db = owner();
+		const now = Date.now();
+		const timer = {
+			assignmentId: 'a1',
+			subject: { kind: 'code' as const, codeId: 'c1' },
+			start: now - 2 * 3_600_000
+		};
+		await startTimer(db, OWNER, timer);
+		const paused = await pauseTimer(db, OWNER, timer, {
+			from: now - 5 * 60_000,
+			until: now + 10 * 60_000
+		});
+		// Ändra pausen: a later end.
+		const longer = now + 40 * 60_000;
+		await moveTimerStart(db, OWNER, paused, longer);
+		const later = { ...paused, start: longer };
+		expect(timerCodec.fromData('timer', (await getDoc(at(db, 'state/timer'))).data()!)).toEqual(
+			later
+		);
+		// Not more than a day ahead.
+		await denied(moveTimerStart(db, OWNER, later, now + 25 * 3_600_000));
+		// Stopped in the pause: the timer goes, and only the entry before the pause is left.
+		await stopPausedTimer(db, OWNER);
+		expect((await getDoc(at(db, 'state/timer'))).exists()).toBe(false);
+		expect((await getDocs(collection(db, 'users', OWNER, 'entries'))).size).toBe(1);
+
+		// Tillbaka nu: the start moves to now, and the timer runs again.
+		const again = { ...timer, start: now - 60 * 60_000 };
+		await startTimer(db, OWNER, again);
+		const second = { from: now - 2 * 60_000, until: now + 20 * 60_000 };
+		// The day is marked already: writing the mark again would change its createdAt.
+		await denied(pauseTimer(db, OWNER, again, second));
+		const inPause = await pauseTimer(db, OWNER, again, second, [], true);
+		const back = Date.now();
+		await moveTimerStart(db, OWNER, inPause, back);
+		const running = { ...inPause, start: back };
+		// A running timer is not stopped without its entry.
+		await denied(stopPausedTimer(db, OWNER));
+		await stopTimer(db, OWNER, running, Date.now() + 120_000);
+		expect((await getDoc(at(db, `entries/timer-${back}`))).exists()).toBe(true);
 	});
 
 	it('saveEntry refuses to change an entry’s id', async () => {

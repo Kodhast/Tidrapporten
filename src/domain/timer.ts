@@ -118,7 +118,58 @@ export const stopBlockedOffline = (
 	end: UtcMillis,
 	reports: readonly Report[],
 	online: boolean
-): boolean => !online && entryChange(null, timerEntry(timer, end), reports).logged;
+): boolean =>
+	!online && !isPaused(timer, end) && entryChange(null, timerEntry(timer, end), reports).logged;
+
+/**
+ * Whether the timer is in a pause (issue 95): a pause splits the timer, so its start is the pause's
+ * end, which is still ahead. Nothing runs until then. A start less than a minute ahead is a timer
+ * just started or brought back, seen with a clock that ticks once a minute, and counts as running.
+ */
+export const isPaused = (timer: Timer, now: UtcMillis): boolean => timer.start - now > MINUTE;
+
+/** The running timer as an entry up to now; null without a timer or in a pause. */
+export const runningEntry = (timer: Timer | null, now: UtcMillis): Entry | null =>
+	timer && !isPaused(timer, now) ? timerEntry(timer, now) : null;
+
+export type PauseKind = 'lunch' | 'errand';
+
+export const PAUSE_NAMES: Record<PauseKind, string> = { lunch: 'Lunch', errand: 'Ärende' };
+
+/** The lengths offered, in minutes, and the one chosen when the owner has not chosen before. */
+export const PAUSE_LENGTHS = [15, 30, 45, 60] as const;
+export const DEFAULT_PAUSE: Record<PauseKind, number> = { lunch: 30, errand: 15 };
+
+export interface Pause {
+	from: UtcMillis;
+	until: UtcMillis;
+}
+
+export type PauseResult = { pause: Pause } | { error: string };
+
+/**
+ * A pause on the running timer from the typed start and the length (issue 95): the start on today's
+ * date, or yesterday's for a timer over midnight, as `parseStart`. It is not later than now, and
+ * at least a minute after the timer's start, since the interval before it is at least a minute.
+ */
+export const parsePause = (
+	text: string,
+	minutes: number,
+	timer: Timer,
+	now: UtcMillis
+): PauseResult => {
+	const typed = parseStart(text, timer, now);
+	if ('error' in typed) {
+		return {
+			error: typed.error === CLOCK_ERROR ? CLOCK_ERROR : 'Pausen kan inte börja senare än nu'
+		};
+	}
+	const earliest = timer.start + MINUTE;
+	if (typed.start < earliest) {
+		return { error: `Pausen kan börja tidigast ${clockOf(Math.ceil(earliest / MINUTE) * MINUTE)}` };
+	}
+	return { pause: { from: typed.start, until: typed.start + minutes * MINUTE } };
+};
 
 /** Running time as the owner reads it, without seconds: `42 min`, `1 h 42`, `11 h 05`. */
 export const elapsedLabel = (from: UtcMillis, to: UtcMillis): string => {
@@ -175,16 +226,28 @@ export const parseStart = (text: string, timer: Timer, now: UtcMillis): StartRes
 };
 
 /**
- * The start the dialog suggests: the end of the latest interval that ended at or before the
- * timer's start on the timer's day, which fills the gap since then; else the timer's own start.
+ * The latest interval that ended at or before the timer's start on the timer's day: the one the
+ * gap before the timer follows, and in a pause (issue 95) the one the timer was split from, which
+ * ends where the pause began. Null when there is none.
  */
-export const suggestStart = (timer: Timer, entries: readonly Entry[]): UtcMillis => {
+export const entryBefore = (timer: Timer, entries: readonly Entry[]): Entry | null => {
 	const day = dateOf(timer.start);
-	let suggestion: UtcMillis | null = null;
+	let before: Entry | null = null;
+	let end = -Infinity;
 	for (const entry of entries) {
 		if (entry.time.kind !== 'interval' || entry.time.end > timer.start) continue;
-		if (dateOf(entry.time.end) !== day) continue;
-		if (suggestion === null || entry.time.end > suggestion) suggestion = entry.time.end;
+		if (dateOf(entry.time.end) !== day || entry.time.end <= end) continue;
+		before = entry;
+		end = entry.time.end;
 	}
-	return suggestion ?? timer.start;
+	return before;
+};
+
+/**
+ * The start the dialog suggests: the end of the interval before the timer, which fills the gap
+ * since then; else the timer's own start.
+ */
+export const suggestStart = (timer: Timer, entries: readonly Entry[]): UtcMillis => {
+	const before = entryBefore(timer, entries);
+	return before?.time.kind === 'interval' ? before.time.end : timer.start;
 };

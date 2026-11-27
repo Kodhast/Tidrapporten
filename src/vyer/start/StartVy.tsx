@@ -2,23 +2,33 @@
 // round the timer's code chip and running time, today's time against the norm, today's intervals
 // and gaps, the reports not yet sent, the offline notice and the forgotten-timer question. Gets
 // plain values; useStart connects it to Firestore.
-import { buttonClass, Chip, EmptyState, Notice, Pill } from '@kodhast/web-ui-react';
+import { Button, buttonClass, Chip, EmptyState, Notice, Pill } from '@kodhast/web-ui-react';
 import { useState, type ReactNode } from 'react';
 import { dayName, minutesLabel, type DayRow } from '../../domain/dag.ts';
-import type { CodeColour } from '../../domain/hjul.ts';
+import type { CodeColour, WheelArc } from '../../domain/hjul.ts';
 import type { Span } from '../../domain/intervall.ts';
 import { billingLabel, type Billing } from '../../domain/debitering.ts';
 import { flexLabel, isFlexNegative, type Overview } from '../../domain/oversikt.ts';
-import { isoWeekOf } from '../../domain/tid.ts';
+import { clockOf, isoWeekOf } from '../../domain/tid.ts';
 import {
 	choiceNames,
 	elapsedLabel,
+	PAUSE_NAMES,
 	timerChoice,
 	type CodeChoice,
-	type CodeGroup
+	type CodeGroup,
+	type PauseKind
 } from '../../domain/timer.ts';
 import type { Entry, Id, IsoDate, Timer, UtcMillis } from '../../domain/types.ts';
-import { ExpandIcon, OfflineIcon, WarningIcon, WorkIcon } from '../ikoner';
+import {
+	ErrandIcon,
+	ExpandIcon,
+	LunchIcon,
+	OfflineIcon,
+	PauseIcon,
+	WarningIcon,
+	WorkIcon
+} from '../ikoner';
 import { DagRader } from '../dag/DagRader';
 import { Sidhuvud } from '../konto';
 import { href } from '../rutter.ts';
@@ -64,6 +74,24 @@ export interface StartVyProps {
 	onMoveStart?: () => void;
 	/** The interval sheet for a gap that is filled, when open. */
 	sheet?: ReactNode;
+	/** Lunch or Ärende on the running timer (issue 95); none while the timer cannot take a pause. */
+	onPauseTimer?: ((kind: PauseKind) => void) | null;
+	/** The pause the timer is in; null when it runs or there is none. */
+	pause?: TimerPause | null;
+}
+
+/** The pause the timer is in (issue 95). */
+export interface TimerPause {
+	/** Where the pause ends and the timer goes on. */
+	until: UtcMillis;
+	/** The time of the interval before the pause, which the timer showed when it began. */
+	shown: string;
+	/** The pause on the wheel, thin. */
+	arc: WheelArc | null;
+	onResume: () => void;
+	onChange: () => void;
+	/** Both move the timer in a transaction, so they need the network. */
+	online: boolean;
 }
 
 export interface StartDay {
@@ -100,7 +128,9 @@ export function StartVy({
 	onPause = () => {},
 	onFill = () => {},
 	onMoveStart,
-	sheet
+	sheet,
+	onPauseTimer = null,
+	pause = null
 }: StartVyProps) {
 	const [choosing, setChoosing] = useState(false);
 	const [showingFlex, setShowingFlex] = useState(false);
@@ -170,7 +200,7 @@ export function StartVy({
 					/>
 				) : (
 					<>
-						<Hjul arcs={day?.arcs ?? []}>
+						<Hjul arcs={day?.arcs ?? []} pause={pause?.arc ?? null}>
 							<Chip
 								icon={
 									chipColour && (
@@ -185,15 +215,45 @@ export function StartVy({
 							>
 								{names?.code || 'Välj tidkod'}
 							</Chip>
-							<span className="kh-text-big-number tabular">
-								{timer ? elapsedLabel(timer.start, now) : '0 min'}
+							<span className={`kh-text-big-number tabular${pause ? ' dampad' : ''}`}>
+								{pause ? pause.shown : timer ? elapsedLabel(timer.start, now) : '0 min'}
 							</span>
-							{overview && (
-								<span className="kh-text-item-subtitle dampad">
-									{`${minutesLabel(overview.todayActual)} av ${minutesLabel(overview.todayNorm)} idag`}
-								</span>
+							{pause ? (
+								<Pill>
+									<PauseIcon />
+									{`Paus till ${clockOf(pause.until)}`}
+								</Pill>
+							) : (
+								overview && (
+									<span className="kh-text-item-subtitle dampad">
+										{`${minutesLabel(overview.todayActual)} av ${minutesLabel(overview.todayNorm)} idag`}
+									</span>
+								)
 							)}
 						</Hjul>
+						{pause && (
+							<div className="knapprad centrerad">
+								<Button variant="primary" isDisabled={!pause.online} onPress={pause.onResume}>
+									Tillbaka nu
+								</Button>
+								<Button variant="text" isDisabled={!pause.online} onPress={pause.onChange}>
+									Ändra pausen
+								</Button>
+							</div>
+						)}
+						{onPauseTimer && (
+							<div className="knapprad centrerad">
+								{(['lunch', 'errand'] as const).map((kind) => (
+									<Button
+										key={kind}
+										icon={kind === 'lunch' ? <LunchIcon /> : <ErrandIcon />}
+										onPress={() => onPauseTimer(kind)}
+									>
+										{PAUSE_NAMES[kind]}
+									</Button>
+								))}
+							</div>
+						)}
 						{day && day.rows.length > 0 && (
 							<DagRader
 								rows={day.rows}

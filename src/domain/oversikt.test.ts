@@ -124,6 +124,21 @@ describe('overview', () => {
 		// Week 48: 17:00 against 16:00 so far; today's norm counts only up to the actual time.
 		expect(result.perAssignment[0]!.weekFlex).toBe(hm('1:00'));
 	});
+
+	it('counts only the interval before a pause the timer is in (issue 95)', () => {
+		// The timer ran 08:00–11:30 and is in a lunch until 12:30; it is 12:00.
+		const result = overview(
+			input({
+				entries: [...week47, ...week48, work('2026-11-25', '08:00', '11:30')],
+				timer: {
+					assignmentId: 'a1',
+					subject: { kind: 'code', codeId: 'c1' },
+					start: at('2026-11-25', '12:30')
+				}
+			})
+		);
+		expect(result.todayActual).toBe(hm('3:30'));
+	});
 });
 
 describe('flexLabel', () => {

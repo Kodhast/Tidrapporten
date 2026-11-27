@@ -15,8 +15,10 @@ import {
 } from '../../data/installningar.ts';
 import {
 	moveTimerStart,
+	pauseTimer,
 	saveEntry,
 	startTimer,
+	stopPausedTimer,
 	stopTimer,
 	switchTimer
 } from '../../data/skrivning.ts';
@@ -32,12 +34,16 @@ import { overview } from '../../domain/oversikt.ts';
 import { dateOf } from '../../domain/tid.ts';
 import {
 	choiceNames,
+	elapsedLabel,
+	entryBefore,
+	isPaused,
+	runningEntry as runningTimerEntry,
 	startChoice,
 	stopBlockedOffline,
 	suggestStart,
 	timerCodeGroups,
-	timerEntry,
-	type CodeChoice
+	type CodeChoice,
+	type PauseKind
 } from '../../domain/timer.ts';
 import type {
 	AbsenceType,
@@ -56,6 +62,7 @@ import type { HjulArc } from './Hjul';
 import type { PendingShortcut } from '../genvagar';
 import { PlayIcon, StopIcon } from '../ikoner';
 import { AndraStart } from './AndraStart';
+import { PausArk } from './PausArk';
 import { StartVy, type StartDay, type TimerProblem } from './StartVy';
 
 const MINUTE = 60_000;
@@ -91,6 +98,8 @@ export function useStart(
 	const [filling, setFilling] = useState<{ gap: Span; newId: Id } | null>(null);
 	// The running timer whose start is being moved in the dialog (issue 78).
 	const [moving, setMoving] = useState<UtcMillis | null>(null);
+	// The pause sheet (issue 95): a new lunch or errand, or 'change' for the pause the timer is in.
+	const [pausing, setPausing] = useState<PauseKind | 'change' | null>(null);
 	const [picked, setPicked] = useState<CodeChoice | null>(null);
 	const [problem, setProblem] = useState<TimerProblem>(null);
 	// The timer whose ten-hour question was answered "Jag jobbar fortfarande", until the app is
@@ -160,11 +169,15 @@ export function useStart(
 		return true;
 	};
 
+	// In a pause (issue 95) the interval before it is written, so the stop only empties the timer.
+	const stopTimerAt = (running: Timer, end: UtcMillis, known: readonly Report[]) =>
+		isPaused(running, end) ? stopPausedTimer(db, uid) : stopTimer(db, uid, running, end, known);
+
 	const stopAt = (running: Timer, end: UtcMillis) => {
 		if (blocked(running, end)) return;
 		setDismissed(null);
 		setPicked(null);
-		write(() => stopTimer(db, uid, running, end, reports ?? []));
+		write(() => stopTimerAt(running, end, reports ?? []));
 	};
 
 	const start = (choice: CodeChoice) => {
@@ -204,7 +217,12 @@ export function useStart(
 	const names = timer && timerNames(assignments, codes, timer);
 
 	// The running timer counts as an interval up to now: on the wheel, in today's list and in flex.
-	const runningEntry = timer ? timerEntry(timer, Math.max(now, timer.start)) : null;
+	// In a pause nothing runs (issue 95).
+	const runningEntry = runningTimerEntry(timer ?? null, now);
+	const paused = timer ? isPaused(timer, now) : false;
+	const beforePause = timer && paused ? entryBefore(timer, entries ?? []) : null;
+	const pauseFrom =
+		beforePause?.time.kind === 'interval' ? beforePause.time.end : timer ? timer.start : now;
 	const withTimer = [...(entries ?? []), ...(runningEntry ? [runningEntry] : [])];
 	const known =
 		!loading &&
@@ -268,10 +286,26 @@ export function useStart(
 				startTimer(db, uid, { assignmentId, subject: { kind: 'code', codeId }, start: at });
 		}
 		if (action === 'stoppa' && timer && !isTimerForgotten(timer, at)) {
-			save = () => stopTimer(db, uid, timer, at, known);
+			save = () =>
+				isPaused(timer, at) ? stopPausedTimer(db, uid) : stopTimer(db, uid, timer, at, known);
 		}
 		save?.().catch(() => setProblem('failed'));
 	}, [db, uid, shortcut, loading, timer, next, reports, online]);
+
+	const code = names?.code ?? '';
+	const pauseArc =
+		timer && paused
+			? wheelArc(
+					{
+						id: 'paus',
+						assignmentId: timer.assignmentId,
+						subject: timer.subject,
+						time: { kind: 'interval', start: pauseFrom, end: timer.start },
+						note: ''
+					},
+					today
+				)
+			: null;
 
 	let action: ToolbarAction | undefined;
 	if (loading) {
@@ -310,8 +344,43 @@ export function useStart(
 				onPause={(on) => write(() => setPause(db, uid, today, on))}
 				onFill={(gap) => setFilling({ gap, newId: newEntryId(db, uid) })}
 				onMoveStart={() => timer && setMoving(timer.start)}
+				onPauseTimer={timer && !paused && !forgotten ? setPausing : null}
+				pause={
+					timer && paused
+						? {
+								until: timer.start,
+								shown:
+									beforePause?.time.kind === 'interval'
+										? elapsedLabel(beforePause.time.start, beforePause.time.end)
+										: '0 min',
+								arc: pauseArc,
+								online,
+								onResume: () => write(() => moveTimerStart(db, uid, timer, Date.now())),
+								onChange: () => setPausing('change')
+							}
+						: null
+				}
 				sheet={
-					timer && moving === timer.start ? (
+					timer && pausing && (pausing === 'change') === paused ? (
+						<PausArk
+							key={`${pausing}-${timer.start}`}
+							kind={pausing === 'change' ? null : pausing}
+							timer={timer}
+							now={now}
+							code={code}
+							from={pausing === 'change' ? pauseFrom : null}
+							online={online}
+							onSave={(pause) => {
+								if (pausing === 'change') {
+									write(() => moveTimerStart(db, uid, timer, pause.until));
+								} else if (!blocked(timer, pause.from)) {
+									const marked = day?.paused === true && dateOf(pause.from) === today;
+									write(() => pauseTimer(db, uid, timer, pause, reports ?? [], marked));
+								}
+							}}
+							onClose={() => setPausing(null)}
+						/>
+					) : timer && moving === timer.start ? (
 						<AndraStart
 							timer={timer}
 							now={now}

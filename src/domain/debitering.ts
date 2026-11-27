@@ -4,7 +4,7 @@
 import { splitByDay } from './intervall.ts';
 import { isWithinAssignment } from './norm.ts';
 import { dateOf, isoWeekOf } from './tid.ts';
-import { timerEntry } from './timer.ts';
+import { runningEntry } from './timer.ts';
 import type { Assignment, Entry, Id, Minutes, TimeCode, Timer, UtcMillis } from './types.ts';
 
 export interface BillingTime {
@@ -30,7 +30,7 @@ export interface BillingInput {
 	/** Each assignment's codes, archived ones too, by assignment id. */
 	codes: Readonly<Record<Id, readonly TimeCode[]>>;
 	entries: readonly Entry[];
-	/** The running timer counts as time up to now. */
+	/** The running timer counts as time up to now, and nothing in a pause (issue 95). */
 	timer: Timer | null;
 	now: UtcMillis;
 }
@@ -61,9 +61,8 @@ export const billing = (input: BillingInput): Billing => {
 	const today = dateOf(input.now);
 	const week = isoWeekOf(today);
 	const month = today.slice(0, 7);
-	const entries = input.timer
-		? [...input.entries, timerEntry(input.timer, Math.max(input.now, input.timer.start))]
-		: input.entries;
+	const running = runningEntry(input.timer, input.now);
+	const entries = running ? [...input.entries, running] : input.entries;
 	const perAssignment = input.assignments
 		.filter((a) => !a.archived && a.startDate <= today)
 		.sort((a, b) => a.order - b.order)
