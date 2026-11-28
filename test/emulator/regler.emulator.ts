@@ -162,7 +162,10 @@ const valid: [string, DocumentData][] = [
 			name: 'Exempelkonsult AB',
 			suggestionMode: 'fillNorm',
 			archived: false,
-			order: 0
+			order: 0,
+			terms: [{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 }],
+			endDate: null,
+			openingFlex: 0
 		})
 	],
 	['customers/k1', customerCodec.toData({ id: 'k1', name: 'Kund A', archived: false, order: 0 })],
@@ -221,6 +224,32 @@ describe('only the owner', () => {
 		await allowed(updateDoc(at(owner(), 'assignments/a1'), { ...old, ...updateMeta() }));
 		const oldReceiver = without(receiverCodec.toData(receiver()), 'party');
 		await allowed(createAny(owner(), 'assignments/a1/receivers/r1', oldReceiver));
+	});
+
+	it('takes an employer from before ADR 0021, and its first write with the defaults is no change', async () => {
+		const old = without(validAt('employers/g1'), 'terms', 'endDate', 'openingFlex', 'lastChangeId');
+		await allowed(createAny(owner(), 'employers/g1', old));
+		await allowed(
+			updateDoc(at(owner(), 'employers/g1'), {
+				...old,
+				name: 'Nytt namn',
+				terms: [],
+				endDate: null,
+				openingFlex: 0,
+				lastChangeId: null,
+				...updateMeta()
+			})
+		);
+		await denied(
+			updateDoc(at(owner(), 'employers/g1'), {
+				...old,
+				terms: [{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 }],
+				...updateMeta()
+			})
+		);
+		await denied(
+			updateDoc(at(owner(), 'employers/g1'), { ...old, openingFlex: 1.5, ...updateMeta() })
+		);
 	});
 
 	it.each(valid)(
@@ -684,7 +713,10 @@ describe('changes that alter the flex (ADR 0016)', () => {
 			validAt('absenceTypes/semester'),
 			{ counting: 'flexWithdrawal' }
 		],
-		['position', 'assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { position: 2 }]
+		['position', 'assignments/a1/receivers/r1', receiverCodec.toData(receiver()), { position: 2 }],
+		['employment terms', 'employers/g1', validAt('employers/g1'), { terms: [] }],
+		['employment endDate', 'employers/g1', validAt('employers/g1'), { endDate: '2026-12-31' }],
+		['employment openingFlex', 'employers/g1', validAt('employers/g1'), { openingFlex: -30 }]
 	];
 
 	it.each(changed)(
@@ -1119,7 +1151,10 @@ describe('the settings’ writes pass the rules (issue 17)', () => {
 			name: 'Exempelkonsult AB',
 			suggestionMode: 'fillNorm' as const,
 			archived: false,
-			order: 0
+			order: 0,
+			terms: [],
+			endDate: null,
+			openingFlex: 0
 		};
 		const customer = { id: 'k1', name: 'Kund A', archived: false, order: 0 };
 		await allowed(saveEmployer(db, OWNER, null, employer));

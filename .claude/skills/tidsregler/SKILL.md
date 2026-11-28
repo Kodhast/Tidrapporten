@@ -38,6 +38,10 @@ proven och vid behov ADR:en i samma PR – och ett nytt räknat exempel skrivs s
 - 0 på lediga dagar och utanför uppdragets start- och slutdatum (båda inräknade).
 - Villkoren (`terms`) gäller från sitt datum; dagen räknas med de villkor som gällde då, så en
   ändrad omfattning skriver inte om flexen bakåt. Inga villkor än → 0.
+- **Perioder** (`perioder.ts`, ADR 0021): villkoren är perioder kant i kant. En period varar från
+  sitt `from` till dagen före nästa; den sista till `endDate` eller tills vidare. Omfattning
+  0–100 %, och 0 % är ett uppehåll. Uppdraget och arbetsgivaren har var sina perioder med samma
+  regel (`periodsNorm`).
 
 ## Faktisk tid och frånvaro (`flex.ts`, `timeByDay`)
 
@@ -67,6 +71,15 @@ dag ger 0.
   arkivering inte räknar om tidigare veckor.
 - **Saldo** = `openingFlex` + varje veckas flex från veckan med `startDate` till i dag eller
   `endDate`. Totalen är summan över uppdragen.
+- **Flex mot anställningen** (`anstallning.ts`, ADR 0021), bara för en arbetsgivare med perioder:
+  per vecka Σ uppdragens veckoflex − den norm uppdragen lämnar otäckt. Otäckt norm en dag =
+  anställningens norm hittills − Σ uppdragens norm hittills, där "hittills" är som för öppen vecka
+  (hel norm före i dag, `min(norm, faktisk)` i dag, 0 efter). Uppdrag som ber om mer än
+  anställningen ger otäckt norm under noll, alltså plus. Arkiverade uppdrag räknas med.
+  Saldot = arbetsgivarens `openingFlex` + veckorna från första perioden till i dag eller `endDate`;
+  uppdragens ingående saldon ingår inte.
+- **Totalen på startsidan** = anställningarnas saldon + saldot för varje uppdrag utan arbetsgivare
+  eller vars arbetsgivare saknar perioder.
 - Har en annan skickad rapport samma vecka en annan summa visar appen en varning
   (`reportsWithOtherSum`); flexen följer ändå den första mottagaren.
 
@@ -102,3 +115,12 @@ Ur ADR 0012, uppdrag 100 % och 8 h. Proven: `flex.test.ts` och `veckoforslag.tes
 3. Semester mån, tis 9:00, ons 8:30, helgdag tors, komptid fre: norm 32:00, faktisk 25:30 →
    **−6:30** både som öppen och som skickad vecka (2026-W20, Kristi himmelsfärd).
 4. Ingående +12:00 och exempel 2 och 3 → **+7:00**.
+
+Anställningen 100 % och 8 h från måndag 2026-11-16 (vecka 47), prov i `anstallning.test.ts`:
+
+5. Uppdrag A 50 %: 22:00 faktisk, 20:00 rapporterad och skickad → +2:00. Internt uppdrag 0 %:
+   19:00 → +19:00. Otäckt norm 40:00 − 20:00 − 0 = 20:00. Anställningen: 2 + 19 − 20 =
+   **+1:00** (41 h arbetat mot 20 h rapporterat och 20 h otäckt).
+6. Bänk: inget uppdrag ber om norm hela veckan → **−40:00**.
+7. Anställning 50 %, uppdrag 100 % arbetat till normen: uppdraget 0, otäckt norm −20:00 →
+   **+20:00**.

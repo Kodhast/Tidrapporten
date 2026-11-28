@@ -6,10 +6,16 @@ import type { ToolbarAction } from '@kodhast/web-ui-react';
 import type { Firestore } from 'firebase/firestore';
 import { useEffect, useState, type ReactNode } from 'react';
 import { newEntryId, setPause, watchPause } from '../../data/dag.ts';
-import { absenceTypeCodec, assignmentCodec, freeDayCodec } from '../../data/dokument.ts';
+import {
+	absenceTypeCodec,
+	assignmentCodec,
+	employerCodec,
+	freeDayCodec
+} from '../../data/dokument.ts';
 import {
 	absenceTypesPath,
 	assignmentsPath,
+	employersPath,
 	freeDaysPath,
 	watchCollection
 } from '../../data/installningar.ts';
@@ -49,6 +55,7 @@ import type {
 	AbsenceType,
 	Assignment,
 	Entry,
+	Employer,
 	FreeDay,
 	Id,
 	Report,
@@ -93,6 +100,7 @@ export function useStart(
 	const [reports, setReports] = useState<Report[] | null>(null);
 	const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
 	const [freeDays, setFreeDays] = useState<FreeDay[] | null>(null);
+	const [employers, setEmployers] = useState<Employer[] | null>(null);
 	const [pause, setPaused] = useState<{ date: string; paused: boolean } | null>(null);
 	// A gap that is being filled in the interval sheet, as in the day view.
 	const [filling, setFilling] = useState<{ gap: Span; newId: Id } | null>(null);
@@ -131,6 +139,7 @@ export function useStart(
 		[db, uid]
 	);
 	useEffect(() => watchCollection(db, uid, freeDaysPath, freeDayCodec, setFreeDays), [db, uid]);
+	useEffect(() => watchCollection(db, uid, employersPath, employerCodec, setEmployers), [db, uid]);
 	useEffect(
 		() => watchPause(db, uid, today, (paused) => setPaused({ date: today, paused }), failed),
 		[db, uid, today]
@@ -228,11 +237,13 @@ export function useStart(
 		!loading &&
 		absenceTypes !== null &&
 		freeDays !== null &&
+		employers !== null &&
 		assignments.every((a) => receivers[a.id] !== undefined);
 	const summary =
 		known &&
 		overview({
 			assignments,
+			employers,
 			receivers,
 			entries: entries ?? [],
 			reports: reports ?? [],

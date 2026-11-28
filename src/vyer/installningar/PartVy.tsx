@@ -3,10 +3,13 @@
 // name is not copied to receivers that already exist.
 import { Button, SegmentedChoice, TextField, TopBar } from '@kodhast/web-ui-react';
 import { useState } from 'react';
-import { nameError, newId } from '../../domain/installningar.ts';
-import type { Customer, Employer, SuggestionMode } from '../../domain/types.ts';
+import { formatHours, nameError, newId, parseHours } from '../../domain/installningar.ts';
+import type { Periods } from '../../domain/perioder.ts';
+import { dateOf } from '../../domain/tid.ts';
+import type { Customer, Employer, IsoDate, SuggestionMode } from '../../domain/types.ts';
 import { href } from '../rutter.ts';
 import { ArchiveDelete, OfflineNotice, SaveFailed, useSave } from './delar';
+import { Perioder } from './Perioder';
 import { SUGGESTION_LABELS } from './UppdragVy';
 
 type PartyProps<T> = {
@@ -14,6 +17,8 @@ type PartyProps<T> = {
 	/** The order a new one gets. */
 	nextOrder: number;
 	online: boolean;
+	/** Today by default; where a new period of the employment starts. */
+	today?: IsoDate;
 	onSave: (before: T | null, after: T) => Promise<void>;
 	/** Deletes it; gives the reason when it may not (it has assignments). */
 	onDelete: (id: string) => Promise<string | null>;
@@ -35,6 +40,17 @@ const TITLES = {
 
 export function PartVy(props: PartVyProps) {
 	const { kind, value, nextOrder, online, onDelete } = props;
+	const [today] = useState(() => props.today ?? dateOf(Date.now()));
+	const employer = props.kind === 'employer' ? props.value : null;
+	// The employment (ADR 0021): its periods and opening balance.
+	const initialPeriods: Periods = {
+		terms: employer?.terms ?? [],
+		endDate: employer?.endDate ?? null
+	};
+	const [periods, setPeriods] = useState<Periods>(initialPeriods);
+	const initialOpening = formatHours(employer?.openingFlex ?? 0, true);
+	const [opening, setOpening] = useState(initialOpening);
+	const openingFlex = parseHours(opening === '' ? '0' : opening, true);
 	const [name, setName] = useState(value?.name ?? '');
 	const [mode, setMode] = useState<SuggestionMode>(
 		props.kind === 'employer' ? (props.value?.suggestionMode ?? 'fillNorm') : 'fillNorm'
@@ -50,13 +66,23 @@ export function PartVy(props: PartVyProps) {
 	};
 	const dirty =
 		name.trim() !== (value?.name ?? '') ||
-		(props.kind === 'employer' && mode !== (props.value?.suggestionMode ?? 'fillNorm'));
-	const canSave = online && nameError(name) === null && dirty && !save.pending;
+		(props.kind === 'employer' &&
+			(mode !== (props.value?.suggestionMode ?? 'fillNorm') ||
+				JSON.stringify(periods) !== JSON.stringify(initialPeriods) ||
+				opening !== initialOpening));
+	const canSave =
+		online && nameError(name) === null && openingFlex !== null && dirty && !save.pending;
 
 	const submit = () =>
 		void save.run(() =>
 			props.kind === 'employer'
-				? props.onSave(props.value, { ...base, suggestionMode: mode })
+				? props.onSave(props.value, {
+						...base,
+						suggestionMode: mode,
+						terms: [...periods.terms],
+						endDate: periods.endDate,
+						openingFlex: openingFlex ?? 0
+					})
 				: props.onSave(props.value, base)
 		);
 	// Archiving saves what is stored with the flag turned, not what the form has.
@@ -97,6 +123,14 @@ export function PartVy(props: PartVyProps) {
 					/>
 					{kind === 'employer' && (
 						<>
+							<TextField
+								label="Ingående flexsaldo"
+								suffix="h"
+								value={opening}
+								onChange={setOpening}
+								description="Flexen hos arbetsgivaren när anställningen börjar i appen"
+								errorMessage={openingFlex === null ? 'Till exempel 4, -2,5 eller 1:30' : undefined}
+							/>
 							<h2 className="kh-text-section-title">Veckorapporten till arbetsgivaren</h2>
 							<SegmentedChoice
 								aria-label="Förslag i veckorapporten"
@@ -116,6 +150,19 @@ export function PartVy(props: PartVyProps) {
 						Ett nytt namn ändrar inte mottagare som redan finns.
 					</p>
 				</section>
+				{kind === 'employer' && (
+					<Perioder
+						periods={periods}
+						onChange={setPeriods}
+						today={today}
+						title="Anställningens omfattning"
+						hint={
+							periods.terms.length === 0
+								? 'Utan omfattning räknas flexen bara per uppdrag. Lägg till en period för att få flexen mot anställningen.'
+								: 'Normen för hela anställningen. Det uppdragen inte täcker räknas också: tid i ett internt uppdrag eller frånvaro fyller ut det.'
+						}
+					/>
+				)}
 				{value && (
 					<section className="sektion">
 						<ArchiveDelete

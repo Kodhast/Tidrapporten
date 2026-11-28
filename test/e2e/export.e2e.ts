@@ -31,7 +31,11 @@ const seedEverything = async (request: APIRequestContext, user: string) => {
 		name: 'Exempelkonsult AB',
 		suggestionMode: 'fillNorm',
 		archived: false,
-		order: 0
+		order: 0,
+		terms: [{ from: '2026-11-02', scopePercent: 80, workdayMinutes: 480 }],
+		endDate: null,
+		openingFlex: 90,
+		lastChangeId: null
 	});
 	await seed(request, user, 'customers/k1', { name: 'Kund A', archived: false, order: 0 });
 	await seed(request, user, 'assignments/a1/receivers/r1', {
@@ -123,6 +127,10 @@ test('the export holds every document the server has', async ({ page, request })
 			'state/settings'
 		])
 	);
+	expect(file.documents['employers/g1']).toMatchObject({
+		terms: [{ from: '2026-11-02', scopePercent: 80, workdayMinutes: 480 }],
+		openingFlex: 90
+	});
 	expect(file.documents['entries/e1']).toMatchObject({
 		note: 'Påhittad anteckning',
 		time: {

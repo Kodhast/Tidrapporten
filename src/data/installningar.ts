@@ -11,7 +11,11 @@ import {
 	type Firestore,
 	type Transaction
 } from 'firebase/firestore';
-import { assignmentChangeIsLogged, DEFAULT_ABSENCE_TYPES } from '../domain/installningar.ts';
+import {
+	assignmentChangeIsLogged,
+	DEFAULT_ABSENCE_TYPES,
+	employmentChangeIsLogged
+} from '../domain/installningar.ts';
 import type {
 	AbsenceType,
 	Assignment,
@@ -203,7 +207,10 @@ const writeAssignment = (
 	}
 };
 
-/** Saves an employer (ADR 0019). Its name is copied to receivers, so a change is not logged. */
+/**
+ * Saves an employer (ADR 0019). Its name is copied to receivers, so a new name is not logged; a
+ * change of the employment's periods, end or opening balance alters its flex and is (ADR 0021).
+ */
 export const saveEmployer = (
 	db: Firestore,
 	uid: Id,
@@ -218,7 +225,7 @@ export const saveEmployer = (
 			userPath(employersPath, after.id),
 			before && employerCodec.toData(before),
 			employerCodec.toData(after),
-			false
+			employmentChangeIsLogged(before, after)
 		);
 	});
 

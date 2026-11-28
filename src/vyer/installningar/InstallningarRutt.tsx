@@ -205,6 +205,7 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					value={employer}
 					nextOrder={nextNumber(employers.map((e) => e.order))}
 					online={online}
+					today={today}
 					onSave={async (before, after) => {
 						await saveEmployer(db, uid, before, after);
 						if (!before) replaceRoute({ view: 'arbetsgivare', id: after.id });
@@ -228,6 +229,7 @@ export function InstallningarRutt({ db, functions, uid, route, online }: Install
 					value={customer}
 					nextOrder={nextNumber(customers.map((c) => c.order))}
 					online={online}
+					today={today}
 					onSave={async (before, after) => {
 						await saveCustomer(db, uid, before, after);
 						if (!before) replaceRoute({ view: 'kund', id: after.id });

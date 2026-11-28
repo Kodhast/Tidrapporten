@@ -19,7 +19,8 @@ rules_version = '2';
 //   openingFlex int, standardDay list ≤ 20, archived bool, order int, lastChangeId string|null,
 //   employerId id|null, customerId id|null (ADR 0019)
 // employers/{id}: name string 1–100, suggestionMode 'fillNorm'|'actualQuarter', archived bool,
-//   order int (ADR 0019)
+//   order int (ADR 0019); terms list ≤ 50, endDate day|null, openingFlex int, lastChangeId
+//   string|null (ADR 0021), all four missing on employers from before it
 // customers/{id}: name string 1–100, archived bool, order int (ADR 0019)
 // assignments/{id}/codes/{id}: name string 1–100, billable bool, archived bool, order int
 // assignments/{id}/receivers/{id}: name string 1–100, position int ≥ 1, suggestionMode
@@ -59,8 +60,9 @@ rules_version = '2';
 // is not empty. A report that becomes sent carries the server time in snapshot.sentAt.
 // Changes that alter the flex of weeks already counted (ADR 0016) need a new changeLog entry the
 // same way, with before (on update) and after but a reason that may be empty: an assignment's
-// openingFlex, startDate, endDate or terms, an absence type's counting, a receiver's position or
-// a new receiver, and every create or update of a free day. Deleting a free day and corrections
+// openingFlex, startDate, endDate or terms, an employer's terms, endDate or openingFlex (ADR 0021),
+// an absence type's counting, a receiver's position or a new receiver, and every create or update
+// of a free day. Deleting a free day and corrections
 // of entries in a sent week are logged by the app, not enforced here.
 //
 // Lists are checked for type and size only; rules cannot look inside every element. The data
@@ -192,11 +194,25 @@ service cloud.firestore {
     }
 
     function isValidEmployer() {
-      return hasExactly(['name', 'suggestionMode', 'archived', 'order'])
+      return hasExactlyOrOlder(['name', 'suggestionMode', 'archived', 'order'],
+          ['terms', 'endDate', 'openingFlex', 'lastChangeId'])
         && isName(data().name)
         && data().suggestionMode in ['fillNorm', 'actualQuarter']
         && data().archived is bool
-        && data().order is int;
+        && data().order is int
+        && data().get('terms', []) is list && data().get('terms', []).size() <= 50
+        && (data().get('endDate', null) == null || isDay(data().get('endDate', null)))
+        && data().get('openingFlex', 0) is int
+        && isIdOrNull(data().get('lastChangeId', null));
+    }
+
+    // The employment's periods, end or opening balance changed (ADR 0021). Missing fields read as
+    // their defaults, so the first write of an employer from before it is no change.
+    function changesEmployment() {
+      return resource != null && (
+        data().get('terms', []) != resource.data.get('terms', [])
+        || data().get('endDate', null) != resource.data.get('endDate', null)
+        || data().get('openingFlex', 0) != resource.data.get('openingFlex', 0));
     }
 
     function isValidCustomer() {
@@ -441,11 +457,12 @@ service cloud.firestore {
         }
       }
 
-      // Employers and customers (ADR 0019). Their names are copied to receivers, so nothing here
-      // alters the flex and no change is logged.
+      // Employers and customers (ADR 0019). Their names are copied to receivers, so a new name
+      // alters no flex and is not logged; the employment's periods are (ADR 0021).
       match /employers/{employerId} {
         allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid) && isValidMeta() && isValidEmployer();
+        allow create, update: if isOwner(uid) && isValidMeta() && isValidEmployer()
+          && (!changesEmployment() || isLoggedSetting(uid, 'employers/' + employerId));
         allow delete: if false;
       }
 

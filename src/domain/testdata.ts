@@ -154,6 +154,9 @@ export const employer = (overrides: Partial<Employer> = {}): Employer => ({
 	suggestionMode: 'fillNorm',
 	archived: false,
 	order: 0,
+	terms: [],
+	endDate: null,
+	openingFlex: 0,
 	...overrides
 });
 

@@ -161,7 +161,7 @@ describe('readAssignmentForm', () => {
 		expect(
 			readAssignmentForm({
 				name: '',
-				scope: '0',
+				scope: '-1',
 				workday: '25',
 				openingFlex: 'mycket',
 				startDate: '',
@@ -170,16 +170,16 @@ describe('readAssignmentForm', () => {
 			}).errors
 		).toEqual({
 			name: 'Skriv ett namn',
-			scope: 'Mellan 1 och 100 %',
+			scope: 'Mellan 0 och 100 %',
 			workday: 'Mellan 0 och 24 h',
 			openingFlex: 'Till exempel 4, -2,5 eller 1:30',
 			startDate: 'Välj ett datum'
 		});
 		expect(readAssignmentForm({ ...valid, scope: '101' }).errors).toEqual({
-			scope: 'Mellan 1 och 100 %'
+			scope: 'Mellan 0 och 100 %'
 		});
 		expect(readAssignmentForm({ ...valid, scope: '50,5' }).errors).toEqual({
-			scope: 'Mellan 1 och 100 %'
+			scope: 'Mellan 0 och 100 %'
 		});
 	});
 });
@@ -234,7 +234,10 @@ describe('receiversForNewAssignment (ADR 0019)', () => {
 		name: 'Exempelkonsult AB',
 		suggestionMode: 'actualQuarter' as const,
 		archived: false,
-		order: 0
+		order: 0,
+		terms: [],
+		endDate: null,
+		openingFlex: 0
 	};
 	const customer = { id: 'k1', name: 'Kund A', archived: false, order: 0 };
 	const codes = [

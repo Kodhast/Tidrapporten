@@ -74,7 +74,13 @@ export const roundTrips: [string, Codec<never>, unknown, string, string?][] = [
 			name: 'Exempelkonsult AB',
 			suggestionMode: 'actualQuarter',
 			archived: true,
-			order: 2
+			order: 2,
+			terms: [
+				{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 },
+				{ from: '2026-09-01', scopePercent: 80, workdayMinutes: 465 }
+			],
+			endDate: '2027-03-31',
+			openingFlex: -150
 		},
 		'g1'
 	],

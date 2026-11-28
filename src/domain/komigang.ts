@@ -65,7 +65,12 @@ export const startDocuments = (
 		name: employerName,
 		suggestionMode: answers.suggestionMode,
 		archived: false,
-		order: 0
+		order: 0,
+		// The employment's scope is not asked for at the start; until it is set, the
+		// assignments' flex counts on its own (ADR 0021).
+		terms: [],
+		endDate: null,
+		openingFlex: 0
 	};
 	const customer: Customer | null =
 		customerName === null ? null : { id: makeId(), name: customerName, archived: false, order: 0 };

@@ -86,13 +86,16 @@ export const assignmentCodec: Codec<Assignment> = {
 };
 
 export const employerCodec: Codec<Employer> = {
-	toData: (value) => without(value, 'id'),
+	toData: (value) => ({ ...without(value, 'id'), ...NO_LOG }),
 	fromData: (id, d) => ({
 		id,
 		name: str(d.name),
 		suggestionMode: oneOf(d.suggestionMode, ['fillNorm', 'actualQuarter'], 'fillNorm'),
 		archived: bool(d.archived),
-		order: int(d.order)
+		order: int(d.order),
+		terms: list(d.terms).map(terms),
+		endDate: strOrNull(d.endDate),
+		openingFlex: int(d.openingFlex)
 	})
 };
 

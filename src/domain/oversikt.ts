@@ -1,13 +1,16 @@
 // The start page's overview (issue 19): flex in total and per assignment, the week against the
 // norm, today's time against today's norm and the reports not yet sent. Everything is counted by
 // the functions in flex.ts and norm.ts; this only gathers it for the view.
+import { employmentFlex, type CountedAssignment } from './anstallning.ts';
 import { assignmentFlex, firstReceiver, timeByDay, type AbsenceCountings } from './flex.ts';
 import type { FreeDays } from './helgdagar.ts';
 import { normMinutes } from './norm.ts';
+import { termsIn } from './perioder.ts';
 import { dateOf, daysOfWeek, isoWeekOf } from './tid.ts';
 import { runningEntry } from './timer.ts';
 import type {
 	Assignment,
+	Employer,
 	Entry,
 	Id,
 	IsoWeek,
@@ -20,6 +23,8 @@ import type {
 
 export interface OverviewInput {
 	assignments: readonly Assignment[];
+	/** The employers whose periods give a flex against the employment (ADR 0021). */
+	employers?: readonly Employer[];
 	/** Each assignment's receivers, by assignment id. */
 	receivers: Readonly<Record<Id, readonly Receiver[]>>;
 	entries: readonly Entry[];
@@ -42,8 +47,22 @@ export interface AssignmentOverview {
 	weekNorm: Minutes;
 }
 
+export interface EmploymentOverview {
+	employer: Employer;
+	/** The flex against the employment: its opening balance plus each week's flex. */
+	balance: Minutes;
+	weekFlex: Minutes;
+	/** The scope in force today, or null outside the employment. */
+	scopePercent: number | null;
+}
+
 export interface Overview {
+	/**
+	 * The employments' flex, plus the balance of each assignment whose employer has no periods
+	 * or that has no employer (ADR 0021).
+	 */
 	total: Minutes;
+	employments: EmploymentOverview[];
 	perAssignment: AssignmentOverview[];
 	/** Today's actual time and norm over all assignments. */
 	todayActual: Minutes;
@@ -62,6 +81,27 @@ export const overview = (input: OverviewInput): Overview => {
 	const week = isoWeekOf(today);
 	const running = runningEntry(input.timer, now);
 	const entries = running ? [...input.entries, running] : input.entries;
+	const counted = new Map<Id, CountedAssignment>(
+		input.assignments.map((assignment) => {
+			const receivers = input.receivers[assignment.id] ?? [];
+			const first = firstReceiver(receivers);
+			const firstReports = new Map<IsoWeek, Report>(
+				input.reports
+					.filter((r) => r.assignmentId === assignment.id && r.receiverId === first?.id)
+					.map((r) => [r.week, r])
+			);
+			const { byWeek } = assignmentFlex({
+				assignment,
+				entries,
+				freeDays,
+				countings,
+				firstReports,
+				now
+			});
+			const days = timeByDay(assignment, entries, freeDays, countings);
+			return [assignment.id, { assignment, days, byWeek }];
+		})
+	);
 	let todayActual = 0;
 	let todayNorm = 0;
 	let unsent = 0;
@@ -71,19 +111,7 @@ export const overview = (input: OverviewInput): Overview => {
 		.map((assignment): AssignmentOverview => {
 			const receivers = input.receivers[assignment.id] ?? [];
 			const own = input.reports.filter((r) => r.assignmentId === assignment.id);
-			const first = firstReceiver(receivers);
-			const firstReports = new Map<IsoWeek, Report>(
-				own.filter((r) => r.receiverId === first?.id).map((r) => [r.week, r])
-			);
-			const flex = assignmentFlex({
-				assignment,
-				entries,
-				freeDays,
-				countings,
-				firstReports,
-				now
-			});
-			const days = timeByDay(assignment, entries, freeDays, countings);
+			const { days, byWeek } = counted.get(assignment.id)!;
 			const dates = daysOfWeek(week);
 			todayActual += days.get(today)?.actual ?? 0;
 			todayNorm += normMinutes(assignment, today, freeDays);
@@ -104,14 +132,40 @@ export const overview = (input: OverviewInput): Overview => {
 			}
 			return {
 				assignment,
-				balance: flex.balance,
-				weekFlex: flex.byWeek.get(week) ?? 0,
+				balance: [...byWeek.values()].reduce((sum, f) => sum + f, assignment.openingFlex),
+				weekFlex: byWeek.get(week) ?? 0,
 				weekActual: dates.reduce((sum, d) => sum + (days.get(d)?.actual ?? 0), 0),
 				weekNorm: dates.reduce((sum, d) => sum + normMinutes(assignment, d, freeDays), 0)
 			};
 		});
+	const employments: EmploymentOverview[] = [];
+	const byEmployment = new Set<Id>();
+	for (const employer of [...(input.employers ?? [])].sort((a, b) => a.order - b.order)) {
+		const own = input.assignments.filter((a) => a.employerId === employer.id);
+		const flex = employmentFlex({
+			employer,
+			assignments: own.map((a) => counted.get(a.id)!),
+			freeDays,
+			now
+		});
+		if (!flex) continue;
+		for (const a of own) byEmployment.add(a.id);
+		if (employer.archived && flex.balance === 0) continue;
+		employments.push({
+			employer,
+			balance: flex.balance,
+			weekFlex: flex.byWeek.get(week) ?? 0,
+			scopePercent:
+				termsIn({ terms: employer.terms, endDate: employer.endDate }, today)?.scopePercent ?? null
+		});
+	}
 	return {
-		total: perAssignment.reduce((sum, a) => sum + a.balance, 0),
+		total:
+			employments.reduce((sum, e) => sum + e.balance, 0) +
+			perAssignment
+				.filter((a) => !byEmployment.has(a.assignment.id))
+				.reduce((sum, a) => sum + a.balance, 0),
+		employments,
 		perAssignment,
 		todayActual,
 		todayNorm,
