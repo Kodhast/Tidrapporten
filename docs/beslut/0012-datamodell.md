@@ -1,6 +1,6 @@
 # 0012. Datamodell, låsning och flex
 
-- **Status:** Beslutat; normens avrundning ersatt av 0013; loggade ändringar av inställningar i 0016; arbetsgivare och kunder i 0019
+- **Status:** Beslutat; normens avrundning ersatt av 0013; loggade ändringar av inställningar i 0016; arbetsgivare och kunder i 0019; perioder och anställningens flex i 0021
 - **Datum:** 2026-11-25
 
 ## Sammanhang
