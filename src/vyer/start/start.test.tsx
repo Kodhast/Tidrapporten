@@ -242,6 +242,26 @@ describe('the overview', () => {
 		).toBeTruthy();
 	});
 
+	it('says totalt and lists the employment when the total has more than it', async () => {
+		const user = userEvent.setup();
+		const g1 = employer({ terms: [{ from: '2026-01-05', scopePercent: 80, workdayMinutes: 480 }] });
+		render(
+			<StartVy
+				{...props({
+					overview: {
+						...overview(720, 0),
+						employments: [{ employer: g1, balance: 120, weekFlex: 0, scopePercent: 80 }]
+					}
+				})}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: 'Flex +12,0 h' }));
+		const sheet = screen.getByRole('dialog', { name: 'Flex' });
+		expect(within(sheet).getByText('totalt')).toBeTruthy();
+		expect(within(sheet).queryByText('Exempelkonsult AB · 80 %')).toBeNull();
+		expect(within(sheet).getByText('Anställning 80 %')).toBeTruthy();
+	});
+
 	it('shows the week’s billing rate beside the flex and per assignment in a sheet (issue 23)', async () => {
 		const user = userEvent.setup();
 		const billing: Billing = {

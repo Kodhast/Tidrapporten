@@ -9,7 +9,16 @@ import {
 	type Check,
 	type ReminderData
 } from './paminnelser.ts';
-import { absenceTypes, absentAllDay, assignment, at, receiver, report, work } from './testdata.ts';
+import {
+	absenceTypes,
+	absentAllDay,
+	assignment,
+	at,
+	employer,
+	receiver,
+	report,
+	work
+} from './testdata.ts';
 import type { Settings } from './types.ts';
 
 const settings: Settings = {
@@ -220,6 +229,23 @@ describe('reminderNotice', () => {
 			'Flexsaldot är −21,0 h'
 		);
 		expect(reminderNotice(check('flex'), opening(1200), settings)).toBeNull();
+	});
+
+	it('flex: against the employment when the employer has periods (ADR 0021)', () => {
+		// The assignment's own +21 h is not in the total: the employment's −21 h opening is.
+		const withEmployment = data({
+			assignments: [assignment({ startDate: '2026-11-26', openingFlex: 1260, employerId: 'g1' })],
+			employers: [
+				employer({
+					terms: [{ from: '2026-11-26', scopePercent: 100, workdayMinutes: 480 }],
+					openingFlex: -1260
+				})
+			],
+			now: at('2026-11-26', '00:00')
+		});
+		expect(reminderNotice(check('flex'), withEmployment, settings)?.title).toBe(
+			'Flexsaldot är −21,0 h'
+		);
 	});
 });
 

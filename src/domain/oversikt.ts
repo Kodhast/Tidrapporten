@@ -58,8 +58,9 @@ export interface EmploymentOverview {
 
 export interface Overview {
 	/**
-	 * The employments' flex, plus the balance of each assignment whose employer has no periods
-	 * or that has no employer (ADR 0021).
+	 * The employments' flex, plus the balance of each assignment whose employer has no periods,
+	 * whose employment has not started or that has no employer, plus the assignments' weeks after
+	 * their employment has ended (ADR 0021).
 	 */
 	total: Minutes;
 	employments: EmploymentOverview[];
@@ -140,6 +141,8 @@ export const overview = (input: OverviewInput): Overview => {
 		});
 	const employments: EmploymentOverview[] = [];
 	const byEmployment = new Set<Id>();
+	// The assignments' weeks after an employment has ended count on their own again.
+	let afterEnd = 0;
 	for (const employer of [...(input.employers ?? [])].sort((a, b) => a.order - b.order)) {
 		const own = input.assignments.filter((a) => a.employerId === employer.id);
 		const flex = employmentFlex({
@@ -148,8 +151,13 @@ export const overview = (input: OverviewInput): Overview => {
 			freeDays,
 			now
 		});
-		if (!flex) continue;
+		// Before the employment starts, its assignments count on their own.
+		if (!flex || flex.byWeek.size === 0) continue;
 		for (const a of own) byEmployment.add(a.id);
+		const lastWeek = [...flex.byWeek.keys()].at(-1)!;
+		for (const a of own) {
+			for (const [w, f] of counted.get(a.id)!.byWeek) if (w > lastWeek) afterEnd += f;
+		}
 		if (employer.archived && flex.balance === 0) continue;
 		employments.push({
 			employer,
@@ -162,6 +170,7 @@ export const overview = (input: OverviewInput): Overview => {
 	return {
 		total:
 			employments.reduce((sum, e) => sum + e.balance, 0) +
+			afterEnd +
 			perAssignment
 				.filter((a) => !byEmployment.has(a.assignment.id))
 				.reduce((sum, a) => sum + a.balance, 0),

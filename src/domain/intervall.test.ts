@@ -140,6 +140,15 @@ describe('forgotten timer', () => {
 		expect(suggestTimerEnd(timer, part, at('2026-11-26', '07:00'))).toBe(at('2026-11-25', '14:30'));
 	});
 
+	it('suggests the whole workday at 0 %, where the norm is nothing (ADR 0021)', () => {
+		const internal = assignment({
+			terms: [{ from: '2026-01-01', scopePercent: 0, workdayMinutes: 450 }]
+		});
+		expect(suggestTimerEnd(timer, internal, at('2026-11-26', '07:00'))).toBe(
+			at('2026-11-25', '15:30')
+		);
+	});
+
 	it('suggests 8 hours when no terms are in force', () => {
 		const later = assignment({
 			terms: [{ from: '2026-12-01', scopePercent: 50, workdayMinutes: 480 }]

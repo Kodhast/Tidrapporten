@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { freeDaysByDate } from './helgdagar.ts';
+import { addDays } from './tid.ts';
 import {
 	periodForm,
 	periodLabel,
 	periodRows,
+	MAX_PERIODS,
 	periodsNorm,
 	putPeriod,
 	removePeriod,
@@ -126,6 +128,15 @@ describe('putPeriod', () => {
 			to: 'Tidigast periodens start'
 		});
 		expect(putPeriod(periods, null, form({ from: '' })).errors).toEqual({ from: 'Välj ett datum' });
+		const full: Periods = {
+			terms: Array.from({ length: MAX_PERIODS }, (_, i) => ({
+				from: addDays('2026-01-01', i),
+				scopePercent: 100,
+				workdayMinutes: 480
+			})),
+			endDate: null
+		};
+		expect(putPeriod(full, null, form()).errors).toEqual({ from: 'Högst 50 perioder' });
 	});
 
 	it('makes the first period of an employment without any', () => {
@@ -144,6 +155,8 @@ describe('removePeriod and periodForm', () => {
 			['2026-07-01', null]
 		]);
 		expect(removePeriod(periods, 0).terms).toHaveLength(3);
+		const only = { terms: periods.terms.slice(0, 1), endDate: '2026-12-31' };
+		expect(removePeriod(only, 0)).toEqual({ terms: [], endDate: null });
 	});
 
 	it('fills the form from a row, or a new one with the end the periods have', () => {

@@ -81,9 +81,18 @@ export const isTimerForgotten = (timer: Timer, now: UtcMillis): boolean =>
 	now - timer.start > FORGOTTEN_TIMER_AFTER * MINUTE;
 
 /**
- * A suggested end for a forgotten timer: the start plus the assignment's daily norm under the
- * terms on the start day (workday × scope; 8 h when there are none), but never past midnight
- * or now.
+ * The working day a forgotten timer is ended after: the assignment's daily norm on the date
+ * (workday × scope), the whole workday at 0 % (ADR 0021), and 8 h without terms.
+ */
+export const timerWorkday = (assignment: Assignment, date: IsoDate): Minutes => {
+	const terms = termsOn(assignment, date);
+	if (!terms) return 8 * 60;
+	return fullDayNorm(terms) || terms.workdayMinutes;
+};
+
+/**
+ * A suggested end for a forgotten timer: the start plus the working day (timerWorkday), but
+ * never past midnight or now.
  */
 export const suggestTimerEnd = (
 	timer: Timer,
@@ -91,7 +100,6 @@ export const suggestTimerEnd = (
 	now: UtcMillis
 ): UtcMillis => {
 	const startDate = dateOf(timer.start);
-	const terms = termsOn(assignment, startDate);
-	const workday = terms ? fullDayNorm(terms) : 8 * 60;
+	const workday = timerWorkday(assignment, startDate);
 	return Math.min(timer.start + workday * MINUTE, startOfDay(addDays(startDate, 1)), now);
 };

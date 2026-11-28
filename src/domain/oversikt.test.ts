@@ -114,6 +114,26 @@ describe('overview', () => {
 		expect(result.total).toBe(hm('3:30'));
 	});
 
+	it('counts the assignments on their own before the employment and after its end', () => {
+		const own = [{ ...a1, employerId: 'g1' }];
+		const later = employer({
+			terms: [{ from: '2026-12-01', scopePercent: 100, workdayMinutes: 480 }]
+		});
+		const before = overview(input({ assignments: own, employers: [later] }));
+		expect(before.employments).toEqual([]);
+		expect(before.total).toBe(hm('3:30'));
+		// Ended on Friday of week 47 (+2:30); week 48's +1:00 is a1's own again.
+		const ended = employer({
+			terms: [{ from: '2026-11-16', scopePercent: 100, workdayMinutes: 480 }],
+			endDate: '2026-11-20'
+		});
+		const after = overview(input({ assignments: own, employers: [ended] }));
+		expect(after.employments).toEqual([
+			{ employer: ended, balance: hm('2:30'), weekFlex: 0, scopePercent: null }
+		]);
+		expect(after.total).toBe(hm('3:30'));
+	});
+
 	it('counts an archived assignment in the employment, but does not show it', () => {
 		// a1 is archived: the employment still has its time, so the bench is not counted as empty.
 		const g1 = employer({

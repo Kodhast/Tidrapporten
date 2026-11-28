@@ -315,6 +315,7 @@ export function UppdragVy({
 					periods={periods}
 					onChange={setPeriods}
 					today={today}
+					logged={assignment !== null}
 					title="Omfattning"
 					hint="Uppdraget gäller från första periodens start till sista periodens slut. Perioderna ligger kant i kant; ett uppehåll är en period med 0 %."
 				/>

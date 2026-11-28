@@ -34,8 +34,12 @@ import { billing } from '../../domain/debitering.ts';
 import { absenceCountings } from '../../domain/flex.ts';
 import { freeDaysByDate } from '../../domain/helgdagar.ts';
 import { codeColour, wheelArc } from '../../domain/hjul.ts';
-import { isTimerForgotten, suggestTimerEnd, type Span } from '../../domain/intervall.ts';
-import { fullDayNorm, termsOn } from '../../domain/norm.ts';
+import {
+	isTimerForgotten,
+	suggestTimerEnd,
+	timerWorkday,
+	type Span
+} from '../../domain/intervall.ts';
 import { overview } from '../../domain/oversikt.ts';
 import { dateOf } from '../../domain/tid.ts';
 import {
@@ -221,8 +225,7 @@ export function useStart(
 	const timerAssignment = timer && assignments.find((a) => a.id === timer.assignmentId);
 	const forgotten = timer ? isTimerForgotten(timer, now) : false;
 	const asking = timer && forgotten && dismissed !== timer.start;
-	const terms = timerAssignment && termsOn(timerAssignment, dateOf(timer.start));
-	const workday = terms ? fullDayNorm(terms) : 8 * 60;
+	const workday = timerAssignment ? timerWorkday(timerAssignment, dateOf(timer.start)) : 8 * 60;
 	const names = timer && timerNames(assignments, codes, timer);
 
 	// The running timer counts as an interval up to now: on the wheel, in today's list and in flex.

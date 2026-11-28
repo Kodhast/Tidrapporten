@@ -28,6 +28,9 @@ function FlexPill({ minutes }: { minutes: number }) {
 }
 
 export function FlexArk({ isOpen, onOpenChange, overview }: FlexArkProps) {
+	const [first] = overview.employments;
+	const onlyEmployment =
+		overview.employments.length === 1 && first!.balance === overview.total ? first : undefined;
 	return (
 		<BottomSheet
 			isOpen={isOpen}
@@ -40,17 +43,14 @@ export function FlexArk({ isOpen, onOpenChange, overview }: FlexArkProps) {
 				</Button>
 			}
 		>
+			{/* One employment that is the whole total names it; otherwise the total and a list. */}
 			<div className="flex-totalt">
 				<span className="kh-text-screen-title tabular">{flexLabel(overview.total)}</span>
 				<span className="kh-text-item-subtitle">
-					{overview.employments.length === 1 && overview.perAssignment.length > 0
-						? employmentText(overview.employments[0]!)
-						: 'totalt'}
+					{onlyEmployment ? employmentText(onlyEmployment) : 'totalt'}
 				</span>
 			</div>
-			{(overview.employments.length > 1 ||
-				(overview.employments.length === 1 &&
-					overview.total !== overview.employments[0]!.balance)) && (
+			{overview.employments.length > 0 && !onlyEmployment && (
 				<div className="kh-card radlista">
 					{overview.employments.map((e) => (
 						<Row

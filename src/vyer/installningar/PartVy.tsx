@@ -42,19 +42,29 @@ export function PartVy(props: PartVyProps) {
 	const { kind, value, nextOrder, online, onDelete } = props;
 	const [today] = useState(() => props.today ?? dateOf(Date.now()));
 	const employer = props.kind === 'employer' ? props.value : null;
-	// The employment (ADR 0021): its periods and opening balance.
-	const initialPeriods: Periods = {
-		terms: employer?.terms ?? [],
-		endDate: employer?.endDate ?? null
+	// What the stored value gives the form. The employment (ADR 0021): its periods and opening
+	// balance.
+	const initial = {
+		name: value?.name ?? '',
+		mode: employer?.suggestionMode ?? 'fillNorm',
+		periods: { terms: employer?.terms ?? [], endDate: employer?.endDate ?? null } as Periods,
+		openingFlex: employer?.openingFlex ?? 0
 	};
-	const [periods, setPeriods] = useState<Periods>(initialPeriods);
-	const initialOpening = formatHours(employer?.openingFlex ?? 0, true);
-	const [opening, setOpening] = useState(initialOpening);
+	const [name, setName] = useState(initial.name);
+	const [mode, setMode] = useState<SuggestionMode>(initial.mode);
+	const [periods, setPeriods] = useState<Periods>(initial.periods);
+	const [opening, setOpening] = useState(formatHours(initial.openingFlex, true));
 	const openingFlex = parseHours(opening === '' ? '0' : opening, true);
-	const [name, setName] = useState(value?.name ?? '');
-	const [mode, setMode] = useState<SuggestionMode>(
-		props.kind === 'employer' ? (props.value?.suggestionMode ?? 'fillNorm') : 'fillNorm'
-	);
+	// A newer stored value (the server after the cache, or another device) replaces each field
+	// the owner has not touched, as in UppdragVy.
+	const [shown, setShown] = useState(initial);
+	if (JSON.stringify(initial) !== JSON.stringify(shown)) {
+		if (name === shown.name) setName(initial.name);
+		if (mode === shown.mode) setMode(initial.mode);
+		if (JSON.stringify(periods) === JSON.stringify(shown.periods)) setPeriods(initial.periods);
+		if (openingFlex === shown.openingFlex) setOpening(formatHours(initial.openingFlex, true));
+		setShown(initial);
+	}
 	const save = useSave();
 
 	const error = name !== (value?.name ?? '') ? nameError(name) : null;
@@ -65,11 +75,11 @@ export function PartVy(props: PartVyProps) {
 		order: value?.order ?? nextOrder
 	};
 	const dirty =
-		name.trim() !== (value?.name ?? '') ||
+		name.trim() !== initial.name ||
 		(props.kind === 'employer' &&
-			(mode !== (props.value?.suggestionMode ?? 'fillNorm') ||
-				JSON.stringify(periods) !== JSON.stringify(initialPeriods) ||
-				opening !== initialOpening));
+			(mode !== initial.mode ||
+				JSON.stringify(periods) !== JSON.stringify(initial.periods) ||
+				openingFlex !== initial.openingFlex));
 	const canSave =
 		online && nameError(name) === null && openingFlex !== null && dirty && !save.pending;
 
@@ -128,7 +138,7 @@ export function PartVy(props: PartVyProps) {
 								suffix="h"
 								value={opening}
 								onChange={setOpening}
-								description="Flexen hos arbetsgivaren när anställningen börjar i appen"
+								description="Flexen hos arbetsgivaren i början av veckan då första perioden börjar"
 								errorMessage={openingFlex === null ? 'Till exempel 4, -2,5 eller 1:30' : undefined}
 							/>
 							<h2 className="kh-text-section-title">Veckorapporten till arbetsgivaren</h2>
@@ -155,6 +165,8 @@ export function PartVy(props: PartVyProps) {
 						periods={periods}
 						onChange={setPeriods}
 						today={today}
+						optional
+						logged={employer !== null}
 						title="Anställningens omfattning"
 						hint={
 							periods.terms.length === 0

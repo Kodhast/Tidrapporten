@@ -25,9 +25,22 @@ export interface PerioderProps {
 	hint: string;
 	/** The workday a new period starts with when there are none. */
 	defaultWorkday?: Minutes;
+	/** Whether there may be no periods, so the only one can be removed: the employer's. */
+	optional?: boolean;
+	/** Whether a saved change is logged: an existing assignment or employer (ADR 0016). */
+	logged?: boolean;
 }
 
-export function Perioder({ periods, onChange, today, title, hint, defaultWorkday }: PerioderProps) {
+export function Perioder({
+	periods,
+	onChange,
+	today,
+	title,
+	hint,
+	defaultWorkday,
+	optional = false,
+	logged = false
+}: PerioderProps) {
 	const rows = periodRows(periods);
 	const inForce = termsIn(periods, today);
 	// The sheet: a new period (index null) or the period at `index` being changed.
@@ -137,10 +150,10 @@ export function Perioder({ periods, onChange, today, title, hint, defaultWorkday
 							/>
 						</div>
 						<p className="kh-text-item-subtitle dampad">
-							Flexen för veckorna i perioden räknas om. Ändringen skrivs i ändringsloggen när du
-							sparar.
+							Flexen för veckorna i perioden räknas om.
+							{logged && ' Ändringen skrivs i ändringsloggen när du sparar.'}
 						</p>
-						{sheet.index !== null && sheet.index > 0 && (
+						{sheet.index !== null && (sheet.index > 0 || (optional && rows.length === 1)) && (
 							<div>
 								<Button
 									variant="text"

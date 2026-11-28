@@ -38,8 +38,10 @@ const normSoFar = (norm: Minutes, actual: Minutes, date: IsoDate, today: IsoDate
  * The employment's balance: its opening balance plus, for each week from its first period, the
  * assignments' week flex less the norm they leave uncovered. Uncovered norm on a day is the
  * employment's norm so far less the assignments' norm so far; it is negative when the assignments
- * ask for more than the employment, which then shows as plus. Null for an employer without
- * periods, whose assignments count on their own as before.
+ * ask for more than the employment, which then shows as plus. The assignments' flex counts for
+ * whole weeks, also the first and the last, so the opening balance is the one at the start of
+ * the first week. Null for an employer without periods, whose assignments count on their own
+ * as before.
  */
 export const employmentFlex = (input: EmploymentFlexInput): EmploymentFlex | null => {
 	const { employer, assignments, freeDays, now } = input;

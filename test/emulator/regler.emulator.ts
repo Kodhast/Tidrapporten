@@ -1162,6 +1162,16 @@ describe('the settings’ writes pass the rules (issue 17)', () => {
 		await allowed(saveCustomer(db, OWNER, null, customer));
 		await allowed(saveCustomer(db, OWNER, customer, { ...customer, name: 'Kund B' }));
 		expect(await logCount(db)).toBe(0);
+		// The employment's periods are logged (ADR 0021).
+		const renamed = { ...employer, name: 'Nytt namn' };
+		await allowed(
+			saveEmployer(db, OWNER, renamed, {
+				...renamed,
+				terms: [{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 }],
+				openingFlex: -30
+			})
+		);
+		expect(await logCount(db)).toBe(1);
 		const a = assignment({ employerId: 'g1', customerId: 'k1' });
 		await allowed(
 			saveAssignment(
@@ -1176,7 +1186,7 @@ describe('the settings’ writes pass the rules (issue 17)', () => {
 				]
 			)
 		);
-		expect(await logCount(db)).toBe(2);
+		expect(await logCount(db)).toBe(3);
 		expect((await getDoc(at(db, 'assignments/a1/receivers/r2'))).data()).toMatchObject({
 			party: { kind: 'customer', id: 'k1' }
 		});

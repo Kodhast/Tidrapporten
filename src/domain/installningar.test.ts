@@ -3,6 +3,7 @@ import { freeDaysByDate } from './helgdagar.ts';
 import {
 	assignmentAfter,
 	assignmentChangeIsLogged,
+	employmentChangeIsLogged,
 	assignmentForm,
 	cleanMapping,
 	DEFAULT_ABSENCE_TYPES,
@@ -24,7 +25,7 @@ import {
 	unmappedCodes,
 	type AssignmentValues
 } from './installningar.ts';
-import { assignment, code } from './testdata.ts';
+import { assignment, code, employer } from './testdata.ts';
 
 describe('the default absence types', () => {
 	it('are the interview’s six, counted as ADR 0012 says, with fixed ids', () => {
@@ -474,6 +475,19 @@ describe('assignmentAfter and the log', () => {
 			employerId: 'g1',
 			customerId: 'k1'
 		});
+	});
+
+	it('logs a change of the employment, not of the name or the suggestions (ADR 0021)', () => {
+		const before = employer();
+		expect(employmentChangeIsLogged(null, before)).toBe(false);
+		expect(employmentChangeIsLogged(before, { ...before, name: 'Nytt namn' })).toBe(false);
+		expect(employmentChangeIsLogged(before, { ...before, suggestionMode: 'actualQuarter' })).toBe(
+			false
+		);
+		const terms = [{ from: '2026-01-05', scopePercent: 80, workdayMinutes: 480 }];
+		expect(employmentChangeIsLogged(before, { ...before, terms })).toBe(true);
+		expect(employmentChangeIsLogged(before, { ...before, endDate: '2026-12-31' })).toBe(true);
+		expect(employmentChangeIsLogged(before, { ...before, openingFlex: -30 })).toBe(true);
 	});
 
 	it('keeps id, order, end, standard day and archive of an existing one', () => {

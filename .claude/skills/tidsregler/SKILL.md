@@ -77,9 +77,12 @@ dag ger 0.
   (hel norm före i dag, `min(norm, faktisk)` i dag, 0 efter). Uppdrag som ber om mer än
   anställningen ger otäckt norm under noll, alltså plus. Arkiverade uppdrag räknas med.
   Saldot = arbetsgivarens `openingFlex` + veckorna från första perioden till i dag eller `endDate`;
-  uppdragens ingående saldon ingår inte.
-- **Totalen på startsidan** = anställningarnas saldon + saldot för varje uppdrag utan arbetsgivare
-  eller vars arbetsgivare saknar perioder.
+  uppdragens ingående saldon ingår inte. Uppdragens flex räknas i hela veckor, också den första
+  och den sista, så `openingFlex` är saldot i början av veckan då första perioden börjar; den
+  otäckta normen räknas bara för dagarna inom anställningen.
+- **Totalen på startsidan** = anställningarnas saldon + saldot för varje uppdrag utan arbetsgivare,
+  vars arbetsgivare saknar perioder eller vars anställning inte börjat än + uppdragens veckor efter
+  anställningens sista vecka.
 - Har en annan skickad rapport samma vecka en annan summa visar appen en varning
   (`reportsWithOtherSum`); flexen följer ändå den första mottagaren.
 

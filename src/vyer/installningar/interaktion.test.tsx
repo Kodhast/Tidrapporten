@@ -393,6 +393,42 @@ describe('PartVy', () => {
 		});
 	});
 
+	it('removes the only period, and follows a newer stored value it has not changed', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const g = employer({
+			terms: [{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 }],
+			endDate: '2026-12-31',
+			openingFlex: 240
+		});
+		const view = (value: typeof g) => (
+			<PartVy
+				kind="employer"
+				value={value}
+				nextOrder={3}
+				online
+				today="2026-11-26"
+				onSave={onSave}
+				onDelete={vi.fn()}
+			/>
+		);
+		const { rerender } = render(view(g));
+		// A positive balance shows with its sign and is not a change.
+		expect((screen.getByLabelText('Ingående flexsaldo') as HTMLInputElement).value).toBe('+4');
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		// The server's newer value replaces what the form had, untouched.
+		rerender(view({ ...g, openingFlex: 60 }));
+		expect((screen.getByLabelText('Ingående flexsaldo') as HTMLInputElement).value).toBe('+1');
+		await user.click(screen.getByRole('button', { name: /^5 jan – 31 dec 2026/ }));
+		expect(within(sheet()).getByText(/skrivs i ändringsloggen/)).toBeTruthy();
+		await user.click(within(sheet()).getByRole('button', { name: 'Ta bort perioden' }));
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(
+			{ ...g, openingFlex: 60 },
+			{ ...g, openingFlex: 60, terms: [], endDate: null }
+		);
+	});
+
 	it('renames a customer, and Spara is off until the name changes', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);

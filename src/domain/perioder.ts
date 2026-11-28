@@ -72,6 +72,9 @@ export const periodForm = (
  * period splits the one in force on its first day; a changed `from` moves where the one before
  * ends. Periods never overlap and never leave a gap; a break is a period with 0 %.
  */
+/** As many as the rules allow in terms (firestore.rules). */
+export const MAX_PERIODS = 50;
+
 export const putPeriod = (
 	periods: Periods,
 	index: number | null,
@@ -86,7 +89,9 @@ export const putPeriod = (
 	const from = form.from;
 	if (!isIsoDate(from)) errors.from = 'Välj ett datum';
 	else if (index === null) {
-		if (list.some((t) => t.from === from)) errors.from = 'Det finns redan en period från den dagen';
+		if (list.length >= MAX_PERIODS) errors.from = `Högst ${MAX_PERIODS} perioder`;
+		else if (list.some((t) => t.from === from))
+			errors.from = 'Det finns redan en period från den dagen';
 		else if (list.length > 0 && from < list[0]!.from)
 			errors.from = 'Ändra första perioden i stället';
 		else if (periods.endDate !== null && from > periods.endDate)
@@ -118,11 +123,15 @@ export const putPeriod = (
 
 /**
  * The periods without one: the one before covers its days. The first cannot be removed while
- * others follow, since it is where the assignment or employment starts.
+ * others follow, since it is where the assignment or employment starts; the only one can, which
+ * leaves no periods and no end.
  */
 export const removePeriod = (periods: Periods, index: number): Periods => {
 	const list = sorted(periods.terms);
-	if (index === 0) return { terms: list, endDate: periods.endDate };
+	if (index === 0)
+		return list.length === 1
+			? { terms: [], endDate: null }
+			: { terms: list, endDate: periods.endDate };
 	return { terms: list.filter((_, i) => i !== index), endDate: periods.endDate };
 };
 

@@ -32,7 +32,7 @@ export interface Employer {
 	/** The employment's periods (ADR 0021), edge to edge; empty for employers from before it. */
 	terms: AssignmentTerms[];
 	endDate: IsoDate | null;
-	openingFlex: Minutes; // signed, the employment's balance at terms[0].from
+	openingFlex: Minutes; // signed, the employment's balance at the start of terms[0].from's week
 }
 
 /** A customer (ADR 0019); free of the employers, so one customer can come via several. */
