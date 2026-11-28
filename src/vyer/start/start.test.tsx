@@ -7,7 +7,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dayRows } from '../../domain/dag.ts';
 import type { Billing } from '../../domain/debitering.ts';
 import type { Overview } from '../../domain/oversikt.ts';
-import { assignment, at, code, work } from '../../domain/testdata.ts';
+import { assignment, at, code, employer, work } from '../../domain/testdata.ts';
 import { timerCodeGroups } from '../../domain/timer.ts';
 import type { Timer } from '../../domain/types.ts';
 import { StartVy, type StartDay, type StartVyProps } from './StartVy';
@@ -179,6 +179,7 @@ describe('the overview', () => {
 	const a2 = groups[1]!.assignment;
 	const overview = (total: number, unsent: number): Overview => ({
 		total,
+		employments: [],
 		perAssignment: [
 			{ assignment: a1, balance: 480, weekFlex: 60, weekActual: 1122, weekNorm: 2400 },
 			{ assignment: a2, balance: total - 480, weekFlex: 0, weekActual: 0, weekNorm: 0 }
@@ -217,6 +218,48 @@ describe('the overview', () => {
 		expect(within(sheet).queryByText(/Veckan 0 min/)).toBeNull();
 		await user.click(within(sheet).getByRole('button', { name: 'Stäng' }));
 		expect(screen.queryByRole('dialog', { name: 'Flex' })).toBeNull();
+	});
+
+	it('shows the flex against the employment and the assignments under it (ADR 0021)', async () => {
+		const user = userEvent.setup();
+		const g1 = employer({ terms: [{ from: '2026-01-05', scopePercent: 80, workdayMinutes: 480 }] });
+		render(
+			<StartVy
+				{...props({
+					overview: {
+						...overview(720, 0),
+						employments: [{ employer: g1, balance: 720, weekFlex: 0, scopePercent: 80 }]
+					}
+				})}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: 'Flex +12,0 h' }));
+		const sheet = screen.getByRole('dialog', { name: 'Flex' });
+		expect(within(sheet).getByText('Exempelkonsult AB · 80 %')).toBeTruthy();
+		expect(within(sheet).getByText('Per uppdrag')).toBeTruthy();
+		expect(
+			within(sheet).getByText(/Mot anställningen räknas all tid hos arbetsgivaren/)
+		).toBeTruthy();
+	});
+
+	it('says totalt and lists the employment when the total has more than it', async () => {
+		const user = userEvent.setup();
+		const g1 = employer({ terms: [{ from: '2026-01-05', scopePercent: 80, workdayMinutes: 480 }] });
+		render(
+			<StartVy
+				{...props({
+					overview: {
+						...overview(720, 0),
+						employments: [{ employer: g1, balance: 120, weekFlex: 0, scopePercent: 80 }]
+					}
+				})}
+			/>
+		);
+		await user.click(screen.getByRole('button', { name: 'Flex +12,0 h' }));
+		const sheet = screen.getByRole('dialog', { name: 'Flex' });
+		expect(within(sheet).getByText('totalt')).toBeTruthy();
+		expect(within(sheet).queryByText('Exempelkonsult AB · 80 %')).toBeNull();
+		expect(within(sheet).getByText('Anställning 80 %')).toBeTruthy();
 	});
 
 	it('shows the week’s billing rate beside the flex and per assignment in a sheet (issue 23)', async () => {

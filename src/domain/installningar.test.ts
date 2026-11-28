@@ -3,6 +3,7 @@ import { freeDaysByDate } from './helgdagar.ts';
 import {
 	assignmentAfter,
 	assignmentChangeIsLogged,
+	employmentChangeIsLogged,
 	assignmentForm,
 	cleanMapping,
 	DEFAULT_ABSENCE_TYPES,
@@ -24,7 +25,7 @@ import {
 	unmappedCodes,
 	type AssignmentValues
 } from './installningar.ts';
-import { assignment, code } from './testdata.ts';
+import { assignment, code, employer } from './testdata.ts';
 
 describe('the default absence types', () => {
 	it('are the interview’s six, counted as ADR 0012 says, with fixed ids', () => {
@@ -161,7 +162,7 @@ describe('readAssignmentForm', () => {
 		expect(
 			readAssignmentForm({
 				name: '',
-				scope: '0',
+				scope: '-1',
 				workday: '25',
 				openingFlex: 'mycket',
 				startDate: '',
@@ -170,16 +171,16 @@ describe('readAssignmentForm', () => {
 			}).errors
 		).toEqual({
 			name: 'Skriv ett namn',
-			scope: 'Mellan 1 och 100 %',
+			scope: 'Mellan 0 och 100 %',
 			workday: 'Mellan 0 och 24 h',
 			openingFlex: 'Till exempel 4, -2,5 eller 1:30',
 			startDate: 'Välj ett datum'
 		});
 		expect(readAssignmentForm({ ...valid, scope: '101' }).errors).toEqual({
-			scope: 'Mellan 1 och 100 %'
+			scope: 'Mellan 0 och 100 %'
 		});
 		expect(readAssignmentForm({ ...valid, scope: '50,5' }).errors).toEqual({
-			scope: 'Mellan 1 och 100 %'
+			scope: 'Mellan 0 och 100 %'
 		});
 	});
 });
@@ -234,7 +235,10 @@ describe('receiversForNewAssignment (ADR 0019)', () => {
 		name: 'Exempelkonsult AB',
 		suggestionMode: 'actualQuarter' as const,
 		archived: false,
-		order: 0
+		order: 0,
+		terms: [],
+		endDate: null,
+		openingFlex: 0
 	};
 	const customer = { id: 'k1', name: 'Kund A', archived: false, order: 0 };
 	const codes = [
@@ -471,6 +475,19 @@ describe('assignmentAfter and the log', () => {
 			employerId: 'g1',
 			customerId: 'k1'
 		});
+	});
+
+	it('logs a change of the employment, not of the name or the suggestions (ADR 0021)', () => {
+		const before = employer();
+		expect(employmentChangeIsLogged(null, before)).toBe(false);
+		expect(employmentChangeIsLogged(before, { ...before, name: 'Nytt namn' })).toBe(false);
+		expect(employmentChangeIsLogged(before, { ...before, suggestionMode: 'actualQuarter' })).toBe(
+			false
+		);
+		const terms = [{ from: '2026-01-05', scopePercent: 80, workdayMinutes: 480 }];
+		expect(employmentChangeIsLogged(before, { ...before, terms })).toBe(true);
+		expect(employmentChangeIsLogged(before, { ...before, endDate: '2026-12-31' })).toBe(true);
+		expect(employmentChangeIsLogged(before, { ...before, openingFlex: -30 })).toBe(true);
 	});
 
 	it('keeps id, order, end, standard day and archive of an existing one', () => {

@@ -7,6 +7,7 @@ import {
 	absentAllDay,
 	assignment,
 	at,
+	employer,
 	hm,
 	receiver,
 	report,
@@ -84,6 +85,65 @@ describe('overview', () => {
 		// Today's norm is both assignments' norm; the actual time is the timer's on a1.
 		expect(result.todayNorm).toBe(hm('16:00'));
 		expect(result.todayActual).toBe(hm('4:00'));
+	});
+
+	it('counts the total against the employment, with its own opening balance (ADR 0021)', () => {
+		// The employment at 100 % from 16 November with +1:00 opening; a1 at 100 % under it, so
+		// nothing is uncovered: +1:00 + 2:30 + 1:00 = +4:30. a2 has no employer and adds its own.
+		const g1 = employer({
+			terms: [{ from: '2026-11-16', scopePercent: 100, workdayMinutes: 480 }],
+			openingFlex: hm('1:00')
+		});
+		const a2 = assignment({ id: 'a2', startDate: '2026-11-23', openingFlex: -90, order: 1 });
+		const result = overview(
+			input({ assignments: [{ ...a1, employerId: 'g1' }, a2], employers: [g1] })
+		);
+		expect(result.employments).toEqual([
+			{ employer: g1, balance: hm('4:30'), weekFlex: hm('1:00'), scopePercent: 100 }
+		]);
+		expect(result.total).toBe(hm('4:30') + hm('-17:30'));
+		// The assignment's own flex is still there.
+		expect(result.perAssignment[0]!.balance).toBe(hm('3:30'));
+	});
+
+	it('counts the assignments on their own under an employer without periods', () => {
+		const result = overview(
+			input({ assignments: [{ ...a1, employerId: 'g1' }], employers: [employer()] })
+		);
+		expect(result.employments).toEqual([]);
+		expect(result.total).toBe(hm('3:30'));
+	});
+
+	it('counts the assignments on their own before the employment and after its end', () => {
+		const own = [{ ...a1, employerId: 'g1' }];
+		const later = employer({
+			terms: [{ from: '2026-12-01', scopePercent: 100, workdayMinutes: 480 }]
+		});
+		const before = overview(input({ assignments: own, employers: [later] }));
+		expect(before.employments).toEqual([]);
+		expect(before.total).toBe(hm('3:30'));
+		// Ended on Friday of week 47 (+2:30); week 48's +1:00 is a1's own again.
+		const ended = employer({
+			terms: [{ from: '2026-11-16', scopePercent: 100, workdayMinutes: 480 }],
+			endDate: '2026-11-20'
+		});
+		const after = overview(input({ assignments: own, employers: [ended] }));
+		expect(after.employments).toEqual([
+			{ employer: ended, balance: hm('2:30'), weekFlex: 0, scopePercent: null }
+		]);
+		expect(after.total).toBe(hm('3:30'));
+	});
+
+	it('counts an archived assignment in the employment, but does not show it', () => {
+		// a1 is archived: the employment still has its time, so the bench is not counted as empty.
+		const g1 = employer({
+			terms: [{ from: '2026-11-16', scopePercent: 100, workdayMinutes: 480 }]
+		});
+		const result = overview(
+			input({ assignments: [{ ...a1, employerId: 'g1', archived: true }], employers: [g1] })
+		);
+		expect(result.perAssignment).toEqual([]);
+		expect(result.total).toBe(hm('3:30'));
 	});
 
 	it('leaves out archived assignments and those that have not started', () => {

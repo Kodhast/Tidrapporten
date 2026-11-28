@@ -45,7 +45,10 @@ describe('the start at first use', () => {
 			name: 'Exempelkonsult AB',
 			suggestionMode: 'actualQuarter',
 			archived: false,
-			order: 0
+			order: 0,
+			terms: [],
+			endDate: null,
+			openingFlex: 0
 		});
 		expect(docs.customer).toEqual({ id: 'id2', name: 'Kund A', archived: false, order: 0 });
 		expect(docs.assignment).toMatchObject({
@@ -121,8 +124,8 @@ describe('the start at first use', () => {
 
 	it('gives the assignment step its errors without asking for an employer', () => {
 		expect(assignmentStepErrors(answers().assignment)).toBeNull();
-		expect(assignmentStepErrors({ ...answers().assignment, scope: '0' })).toEqual({
-			scope: 'Mellan 1 och 100 %'
+		expect(assignmentStepErrors({ ...answers().assignment, scope: '101' })).toEqual({
+			scope: 'Mellan 0 och 100 %'
 		});
 	});
 });

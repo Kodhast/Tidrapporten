@@ -3,6 +3,13 @@
 Det användaren märker, en rad per ändring. Versionen höjs i PR:en som gör ändringen (se
 `.claude/skills/release/SKILL.md`).
 
+## 1.15.0
+
+- Omfattning per period: uppdraget och arbetsgivaren har en lista med perioder, var och en med
+  omfattning och arbetsdag, från ett datum till nästa period eller tills vidare. 0 % är ett
+  uppehåll. En arbetsgivare med perioder får en egen flex mot anställningen, som räknar med den
+  tid uppdragen inte täcker, och den är det som summeras i flexen på startsidan.
+
 ## 1.14.0
 
 - Pausen kan få en egen längd: arket har ett rullhjul för när pausen slutar, och knapparna

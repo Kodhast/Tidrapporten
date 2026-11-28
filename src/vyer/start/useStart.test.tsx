@@ -58,6 +58,7 @@ vi.mock('../../data/installningar.ts', () => ({
 	assignmentsPath: 'assignments',
 	absenceTypesPath: 'absenceTypes',
 	freeDaysPath: 'freeDays',
+	employersPath: 'employers',
 	codesPath: (id: string) => `assignments/${id}/codes`,
 	receiversPath: (id: string) => `assignments/${id}/receivers`,
 	watchCollection: (
@@ -148,6 +149,7 @@ const feed = (values: {
 		listeners.collections.get('assignments')?.(values.assignments ?? [a1]);
 		listeners.collections.get('absenceTypes')?.(absenceTypes);
 		listeners.collections.get('freeDays')?.([]);
+		listeners.collections.get('employers')?.([]);
 		listeners.entries(values.entries ?? []);
 		listeners.pause(false);
 	});

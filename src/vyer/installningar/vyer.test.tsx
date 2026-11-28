@@ -118,8 +118,8 @@ describe('UppdragVy', () => {
 		);
 		expect(markup).toContain('Nytt uppdrag');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Spara<\/button>/);
-		expect(markup).toContain('value="100"');
-		expect(markup).toContain('value="2026-11-26"');
+		expect(markup).toContain('26 nov 2026 – tills vidare');
+		expect(markup).toContain('100 %');
 		expect(markup).toContain('Exempelkonsult AB');
 		expect(markup).toContain('Ingen kund');
 		expect(markup).toContain('Arbetsgivaren blir mottagare 1');

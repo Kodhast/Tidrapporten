@@ -29,6 +29,10 @@ export interface Employer {
 	suggestionMode: SuggestionMode; // for the employer's report in a new assignment
 	archived: boolean;
 	order: number;
+	/** The employment's periods (ADR 0021), edge to edge; empty for employers from before it. */
+	terms: AssignmentTerms[];
+	endDate: IsoDate | null;
+	openingFlex: Minutes; // signed, the employment's balance at the start of terms[0].from's week
 }
 
 /** A customer (ADR 0019); free of the employers, so one customer can come via several. */
@@ -41,7 +45,7 @@ export interface Customer {
 
 export interface AssignmentTerms {
 	from: IsoDate;
-	scopePercent: number; // 1–100
+	scopePercent: number; // 0–100; 0 is a break (ADR 0021)
 	workdayMinutes: Minutes; // full-time workday, 480 by default
 }
 

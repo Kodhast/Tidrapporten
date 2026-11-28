@@ -121,7 +121,13 @@ describe('tolerant reading', () => {
 				'a1'
 			).party
 		).toBeNull();
-		expect(employerCodec.fromData('g1', {})).toMatchObject({ suggestionMode: 'fillNorm' });
+		// An employer from before ADR 0021 has no employment: no periods, no end, no balance.
+		expect(employerCodec.fromData('g1', {})).toMatchObject({
+			suggestionMode: 'fillNorm',
+			terms: [],
+			endDate: null,
+			openingFlex: 0
+		});
 	});
 
 	it('fills in the defaults the domain expects', () => {

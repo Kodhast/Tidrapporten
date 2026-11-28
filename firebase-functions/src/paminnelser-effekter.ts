@@ -8,6 +8,7 @@ import {
 	absenceTypeCodec,
 	assignmentCodec,
 	deviceCodec,
+	employerCodec,
 	entryCodec,
 	freeDayCodec,
 	receiverCodec,
@@ -56,7 +57,7 @@ export const reminderEffects: ReminderEffects = {
 	},
 	load: async (uid, now) => {
 		const base = `users/${uid}`;
-		const [assignments, entries, reports, freeDays, absenceTypes, pauses, timer] =
+		const [assignments, entries, reports, freeDays, absenceTypes, pauses, timer, employers] =
 			await Promise.all([
 				all(`${base}/assignments`, assignmentCodec),
 				all(`${base}/entries`, entryCodec),
@@ -64,7 +65,8 @@ export const reminderEffects: ReminderEffects = {
 				all(`${base}/freeDays`, freeDayCodec),
 				all(`${base}/absenceTypes`, absenceTypeCodec),
 				getFirestore().collection(`${base}/pauses`).select().get(),
-				userDoc(uid, 'state/timer').get()
+				userDoc(uid, 'state/timer').get(),
+				all(`${base}/employers`, employerCodec)
 			]);
 		const receivers: Record<string, Receiver[]> = Object.fromEntries(
 			await Promise.all(
@@ -76,6 +78,7 @@ export const reminderEffects: ReminderEffects = {
 		);
 		return {
 			assignments,
+			employers,
 			receivers,
 			entries,
 			reports,

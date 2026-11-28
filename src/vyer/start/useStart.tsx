@@ -6,10 +6,16 @@ import type { ToolbarAction } from '@kodhast/web-ui-react';
 import type { Firestore } from 'firebase/firestore';
 import { useEffect, useState, type ReactNode } from 'react';
 import { newEntryId, setPause, watchPause } from '../../data/dag.ts';
-import { absenceTypeCodec, assignmentCodec, freeDayCodec } from '../../data/dokument.ts';
+import {
+	absenceTypeCodec,
+	assignmentCodec,
+	employerCodec,
+	freeDayCodec
+} from '../../data/dokument.ts';
 import {
 	absenceTypesPath,
 	assignmentsPath,
+	employersPath,
 	freeDaysPath,
 	watchCollection
 } from '../../data/installningar.ts';
@@ -28,8 +34,12 @@ import { billing } from '../../domain/debitering.ts';
 import { absenceCountings } from '../../domain/flex.ts';
 import { freeDaysByDate } from '../../domain/helgdagar.ts';
 import { codeColour, wheelArc } from '../../domain/hjul.ts';
-import { isTimerForgotten, suggestTimerEnd, type Span } from '../../domain/intervall.ts';
-import { fullDayNorm, termsOn } from '../../domain/norm.ts';
+import {
+	isTimerForgotten,
+	suggestTimerEnd,
+	timerWorkday,
+	type Span
+} from '../../domain/intervall.ts';
 import { overview } from '../../domain/oversikt.ts';
 import { dateOf } from '../../domain/tid.ts';
 import {
@@ -49,6 +59,7 @@ import type {
 	AbsenceType,
 	Assignment,
 	Entry,
+	Employer,
 	FreeDay,
 	Id,
 	Report,
@@ -93,6 +104,7 @@ export function useStart(
 	const [reports, setReports] = useState<Report[] | null>(null);
 	const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
 	const [freeDays, setFreeDays] = useState<FreeDay[] | null>(null);
+	const [employers, setEmployers] = useState<Employer[] | null>(null);
 	const [pause, setPaused] = useState<{ date: string; paused: boolean } | null>(null);
 	// A gap that is being filled in the interval sheet, as in the day view.
 	const [filling, setFilling] = useState<{ gap: Span; newId: Id } | null>(null);
@@ -131,6 +143,7 @@ export function useStart(
 		[db, uid]
 	);
 	useEffect(() => watchCollection(db, uid, freeDaysPath, freeDayCodec, setFreeDays), [db, uid]);
+	useEffect(() => watchCollection(db, uid, employersPath, employerCodec, setEmployers), [db, uid]);
 	useEffect(
 		() => watchPause(db, uid, today, (paused) => setPaused({ date: today, paused }), failed),
 		[db, uid, today]
@@ -212,8 +225,7 @@ export function useStart(
 	const timerAssignment = timer && assignments.find((a) => a.id === timer.assignmentId);
 	const forgotten = timer ? isTimerForgotten(timer, now) : false;
 	const asking = timer && forgotten && dismissed !== timer.start;
-	const terms = timerAssignment && termsOn(timerAssignment, dateOf(timer.start));
-	const workday = terms ? fullDayNorm(terms) : 8 * 60;
+	const workday = timerAssignment ? timerWorkday(timerAssignment, dateOf(timer.start)) : 8 * 60;
 	const names = timer && timerNames(assignments, codes, timer);
 
 	// The running timer counts as an interval up to now: on the wheel, in today's list and in flex.
@@ -228,11 +240,13 @@ export function useStart(
 		!loading &&
 		absenceTypes !== null &&
 		freeDays !== null &&
+		employers !== null &&
 		assignments.every((a) => receivers[a.id] !== undefined);
 	const summary =
 		known &&
 		overview({
 			assignments,
+			employers,
 			receivers,
 			entries: entries ?? [],
 			reports: reports ?? [],

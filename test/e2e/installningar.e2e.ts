@@ -55,7 +55,11 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 	await page.getByRole('link', { name: 'Lägg till uppdrag' }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Nytt uppdrag' })).toBeVisible();
 	await page.getByLabel('Namn').fill('Exempeluppdraget');
-	await page.getByLabel('Omfattning').fill('80');
+	// A new assignment starts with a period from today until further notice (ADR 0021).
+	await page.getByRole('button', { name: /tills vidare/ }).click();
+	await page.getByRole('dialog').getByLabel('Omfattning').fill('80');
+	await page.getByRole('dialog').getByRole('button', { name: 'Klar' }).click();
+	await expect(page.getByRole('dialog')).toBeHidden();
 	await page.getByLabel('Ingående flexsaldo').fill('4,5');
 	// The only employer is chosen from the start.
 	await expect(page.getByRole('button', { name: /^Arbetsgivare/ })).toContainText(
@@ -76,7 +80,7 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 
 	await page.reload();
 	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
-	await expect(page.getByLabel('Omfattning', { exact: true })).toHaveValue('80');
+	await expect(page.getByRole('button', { name: /tills vidare/ })).toContainText('80 %');
 	await expect(page.getByLabel('Ingående flexsaldo')).toHaveValue('+4,5');
 	await expect(page.getByRole('button', { name: /^Intern tid/ })).toContainText('Inte debiterbar');
 	await expect(page.getByRole('button', { name: /^Utveckling/ })).toContainText('Debiterbar');
@@ -96,7 +100,7 @@ test('an employer, a customer and an assignment that gets both as receivers (ADR
 	await expect(page.getByRole('link', { name: /^Kund A/ })).toContainText('1 uppdrag');
 });
 
-test('an end, terms from a day in the past and a renamed code, logged (#79)', async ({
+test('a period from a day in the past with an end, and a renamed code, logged (#79, ADR 0021)', async ({
 	page,
 	request
 }) => {
@@ -106,11 +110,14 @@ test('an end, terms from a day in the past and a renamed code, logged (#79)', as
 	await page.goto('/#/installningar/uppdrag/a1');
 	await expect(page.getByRole('heading', { level: 1, name: 'Exempeluppdraget' })).toBeVisible();
 
-	await page.getByLabel('Omfattning', { exact: true }).fill('80');
-	await page.getByLabel('Omfattning och arbetsdag gäller från').fill('2026-10-05');
-	await page.getByLabel('Slutdatum').fill('2027-06-30');
-	await page.getByRole('button', { name: /^Utveckling/ }).click();
 	const sheet = page.getByRole('dialog');
+	await page.getByRole('button', { name: 'Ny period' }).click();
+	await sheet.getByLabel('Från').fill('2026-10-05');
+	await sheet.getByLabel('Till').fill('2027-06-30');
+	await sheet.getByLabel('Omfattning').fill('80');
+	await sheet.getByRole('button', { name: 'Lägg till' }).click();
+	await expect(sheet).toBeHidden();
+	await page.getByRole('button', { name: /^Utveckling/ }).click();
 	await sheet.getByLabel('Namn').fill('Systemutveckling');
 	await sheet.getByRole('button', { name: 'Klar' }).click();
 	await expect(sheet).toBeHidden();
@@ -121,7 +128,10 @@ test('an end, terms from a day in the past and a renamed code, logged (#79)', as
 		.toEqual({ stringValue: '2027-06-30' });
 
 	await page.reload();
-	await expect(page.getByLabel('Slutdatum')).toHaveValue('2027-06-30');
+	await expect(page.getByRole('button', { name: /^1 jan – 4 okt 2026/ })).toContainText('100 %');
+	await expect(page.getByRole('button', { name: /^5 okt 2026 – 30 jun 2027/ })).toContainText(
+		'80 %'
+	);
 	await expect(page.getByRole('button', { name: /^Systemutveckling/ })).toBeVisible();
 	const [a] = await stored(request, user, 'assignments');
 	const terms = (

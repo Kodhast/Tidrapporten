@@ -1,4 +1,4 @@
-// An assignment (mockup "Uppdrag"): name, scope, workday, start and opening balance, the internal
+// An assignment (mockup "Uppdrag"): name, the periods of scope (ADR 0021), opening balance, the internal
 // codes with billable, the employer and customer (ADR 0019), and the receivers in the chain.
 import {
 	BottomSheet,
@@ -22,6 +22,8 @@ import {
 	unmappedCodes,
 	type AssignmentForm
 } from '../../domain/installningar.ts';
+import { DEFAULT_WORKDAY_MINUTES } from '../../domain/norm.ts';
+import { termsIn, type Periods } from '../../domain/perioder.ts';
 import type {
 	Assignment,
 	Id,
@@ -35,6 +37,7 @@ import type {
 import type { CodeChange } from '../../data/installningar.ts';
 import { href } from '../rutter.ts';
 import { ArchiveDelete, ChoiceRow, OfflineNotice, SaveFailed, useSave } from './delar';
+import { Perioder } from './Perioder';
 import { Standarddag } from './Standarddag';
 
 export const SUGGESTION_LABELS = {
@@ -99,22 +102,48 @@ export function UppdragVy({
 	const [codeList, setCodeList] = useState<TimeCode[]>(sortedCodes);
 	const initialSlots = assignment?.standardDay ?? [];
 	const [slots, setSlots] = useState<StandardDaySlot[]>(initialSlots);
+	// The periods of scope (ADR 0021). A new assignment starts today with the employer's workday.
+	const chosenEmployer = employers.find((e) => e.id === initialForm.employerId);
+	const initialPeriods: Periods = assignment
+		? { terms: assignment.terms, endDate: assignment.endDate }
+		: {
+				terms: [
+					{
+						from: today,
+						scopePercent: 100,
+						workdayMinutes:
+							(chosenEmployer && termsIn(chosenEmployer, today)?.workdayMinutes) ??
+							DEFAULT_WORKDAY_MINUTES
+					}
+				],
+				endDate: null
+			};
+	const [periods, setPeriods] = useState<Periods>(initialPeriods);
 	// What the form and the list started from. The first values can come from the local cache and
 	// the server's a moment later: what the user has not touched follows the newer values.
 	const [shown, setShown] = useState({
 		form: initialForm,
 		codes: sortedCodes,
-		slots: initialSlots
+		slots: initialSlots,
+		periods: initialPeriods
 	});
 	const formMoved = !sameForm(initialForm, shown.form);
 	const codesMoved = JSON.stringify(sortedCodes) !== JSON.stringify(shown.codes);
 	const slotsMoved = JSON.stringify(initialSlots) !== JSON.stringify(shown.slots);
-	if (formMoved || codesMoved || slotsMoved) {
+	const periodsMoved = JSON.stringify(initialPeriods) !== JSON.stringify(shown.periods);
+	if (formMoved || codesMoved || slotsMoved || periodsMoved) {
 		if (formMoved && sameForm(form, shown.form)) setForm(initialForm);
 		if (codesMoved && JSON.stringify(codeList) === JSON.stringify(shown.codes))
 			setCodeList(sortedCodes);
 		if (slotsMoved && JSON.stringify(slots) === JSON.stringify(shown.slots)) setSlots(initialSlots);
-		setShown({ form: initialForm, codes: sortedCodes, slots: initialSlots });
+		if (periodsMoved && JSON.stringify(periods) === JSON.stringify(shown.periods))
+			setPeriods(initialPeriods);
+		setShown({
+			form: initialForm,
+			codes: sortedCodes,
+			slots: initialSlots,
+			periods: initialPeriods
+		});
 	}
 	// The code sheet: a new code (id null) or one in the list being changed.
 	const [codeSheet, setCodeSheet] = useState<{
@@ -137,7 +166,9 @@ export function UppdragVy({
 			: [{ before, after }];
 	});
 	const slotsChanged = JSON.stringify(slots) !== JSON.stringify(initialSlots);
-	const dirty = !sameForm(form, initialForm) || changedCodes.length > 0 || slotsChanged;
+	const periodsChanged = JSON.stringify(periods) !== JSON.stringify(initialPeriods);
+	const dirty =
+		!sameForm(form, initialForm) || changedCodes.length > 0 || slotsChanged || periodsChanged;
 	const canSave = online && read.values !== null && dirty && !save.pending;
 	const set = (field: keyof AssignmentForm) => (value: string) =>
 		setForm((f) => ({ ...f, [field]: value }));
@@ -149,7 +180,7 @@ export function UppdragVy({
 		if (!read.values) return;
 		const id = assignment?.id ?? newId();
 		const after = {
-			...assignmentAfter(assignment, read.values, today, id, nextOrder),
+			...assignmentAfter(assignment, { ...read.values, periods }, today, id, nextOrder),
 			standardDay: slots
 		};
 		const withParent = changedCodes.map((c) => ({
@@ -243,35 +274,6 @@ export function UppdragVy({
 						onChange={set('name')}
 						errorMessage={error('name')}
 					/>
-					<div className="falt-par">
-						<TextField
-							label="Omfattning"
-							suffix="%"
-							inputMode="numeric"
-							value={form.scope}
-							onChange={set('scope')}
-							errorMessage={error('scope')}
-						/>
-						<TextField
-							label="Arbetsdag"
-							suffix="h"
-							inputMode="decimal"
-							value={form.workday}
-							onChange={set('workday')}
-							description="Vid 100 %"
-							errorMessage={error('workday')}
-						/>
-					</div>
-					{assignment && (
-						<TextField
-							label="Omfattning och arbetsdag gäller från"
-							type="date"
-							value={form.termsFrom ?? ''}
-							onChange={set('termsFrom')}
-							description="Dagarna före behåller sin norm. Ett tidigare datum rättar dem bakåt."
-							errorMessage={read.errors?.termsFrom}
-						/>
-					)}
 					{employerOptions.length > 0 ? (
 						<ChoiceRow
 							label="Arbetsgivare"
@@ -295,24 +297,6 @@ export function UppdragVy({
 						noneLabel="Ingen kund"
 					/>
 					<TextField
-						label="Startdatum"
-						type="date"
-						value={form.startDate}
-						onChange={set('startDate')}
-						description="Flexen räknas från den dagen"
-						errorMessage={error('startDate')}
-					/>
-					{assignment && (
-						<TextField
-							label="Slutdatum"
-							type="date"
-							value={form.endDate ?? ''}
-							onChange={set('endDate')}
-							description="Tomt: uppdraget löper tills vidare"
-							errorMessage={error('endDate')}
-						/>
-					)}
-					<TextField
 						label="Ingående flexsaldo"
 						suffix="h"
 						value={form.openingFlex}
@@ -326,6 +310,15 @@ export function UppdragVy({
 						</p>
 					)}
 				</section>
+
+				<Perioder
+					periods={periods}
+					onChange={setPeriods}
+					today={today}
+					logged={assignment !== null}
+					title="Omfattning"
+					hint="Uppdraget gäller från första periodens start till sista periodens slut. Perioderna ligger kant i kant; ett uppehåll är en period med 0 %."
+				/>
 
 				<section className="sektion">
 					<h2 className="kh-text-section-title">Tidkoder</h2>

@@ -60,8 +60,10 @@ describe('UppdragVy', () => {
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 
 		await user.type(screen.getByLabelText('Namn'), 'Exempeluppdraget');
-		await user.clear(screen.getByLabelText('Omfattning'));
-		await user.type(screen.getByLabelText('Omfattning'), '80');
+		await user.click(screen.getByRole('button', { name: /26 nov 2026 – tills vidare/ }));
+		await user.clear(within(sheet()).getByLabelText('Omfattning'));
+		await user.type(within(sheet()).getByLabelText('Omfattning'), '80');
+		await user.click(within(sheet()).getByRole('button', { name: 'Klar' }));
 		await user.click(screen.getByRole('button', { name: 'Lägg till tidkod' }));
 		await user.type(within(sheet()).getByLabelText('Namn'), 'Utveckling');
 		await user.click(within(sheet()).getByRole('switch', { name: /Debiterbar/ }));
@@ -127,12 +129,15 @@ describe('UppdragVy', () => {
 		expect(receivers).toHaveLength(1);
 	});
 
-	it('shows an error once a field is wrong, and Spara stays off', async () => {
+	it('shows an error in the period sheet, and the period is not changed (ADR 0021)', async () => {
 		const user = userEvent.setup();
 		render(<UppdragVy {...base} assignment={assignment()} codes={codes} onSave={vi.fn()} />);
-		await user.clear(screen.getByLabelText('Omfattning'));
-		await user.type(screen.getByLabelText('Omfattning'), '120');
-		expect(screen.getByText('Mellan 1 och 100 %')).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: /1 jan 2026 – tills vidare/ }));
+		await user.clear(within(sheet()).getByLabelText('Omfattning'));
+		await user.type(within(sheet()).getByLabelText('Omfattning'), '120');
+		expect(within(sheet()).getByText('Mellan 0 och 100 %')).toBeTruthy();
+		const klar = within(sheet()).getByRole('button', { name: 'Klar' }) as HTMLButtonElement;
+		expect(klar.disabled).toBe(true);
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 	});
 
@@ -162,30 +167,34 @@ describe('UppdragVy', () => {
 		expect(onSave.mock.calls[1]).toEqual([a, { ...a, archived: true }, [], []]);
 	});
 
-	it('sets an end, and applies a changed scope from the day chosen (#79)', async () => {
+	it('adds a period from a chosen day and ends the last one (ADR 0021)', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);
-		const a = assignment();
-		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
-		await user.clear(screen.getByLabelText('Omfattning'));
-		await user.type(screen.getByLabelText('Omfattning'), '80');
-		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från') as HTMLInputElement;
+		render(<UppdragVy {...base} assignment={assignment()} codes={codes} onSave={onSave} />);
+		await user.click(screen.getByRole('button', { name: 'Ny period' }));
+		const from = within(sheet()).getByLabelText('Från') as HTMLInputElement;
 		expect(from.value).toBe('2026-11-26');
 		await user.clear(from);
 		await user.type(from, '2026-10-05');
-		await user.type(screen.getByLabelText('Slutdatum'), '2027-06-30');
+		await user.clear(within(sheet()).getByLabelText('Omfattning'));
+		await user.type(within(sheet()).getByLabelText('Omfattning'), '0');
+		await user.type(within(sheet()).getByLabelText('Till'), '2027-06-30');
+		await user.click(within(sheet()).getByRole('button', { name: 'Lägg till' }));
+		expect(screen.getByRole('button', { name: /1 jan – 4 okt 2026/ })).toBeTruthy();
+		expect(screen.getByRole('button', { name: /5 okt 2026 – 30 jun 2027/ })).toBeTruthy();
 		await user.click(spara());
 		const [, after] = onSave.mock.calls[0]!;
 		expect(after).toMatchObject({
+			startDate: '2026-01-01',
 			endDate: '2027-06-30',
 			terms: [
 				{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
-				{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
+				{ from: '2026-10-05', scopePercent: 0, workdayMinutes: 480 }
 			]
 		});
 	});
 
-	it('moves the day the scope in force applies from, without changing the scope (#79)', async () => {
+	it('moves where a period starts, and removes one (ADR 0021)', async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn().mockResolvedValue(undefined);
 		// 80 % from 2 November, but it really applied from 5 October.
@@ -196,22 +205,32 @@ describe('UppdragVy', () => {
 			]
 		});
 		render(<UppdragVy {...base} assignment={a} codes={codes} onSave={onSave} />);
-		const from = screen.getByLabelText('Omfattning och arbetsdag gäller från');
+		expect(
+			screen.getByRole('button', { name: /2 nov 2026 – tills vidare.*gäller nu/ })
+		).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: /2 nov 2026 – tills vidare/ }));
+		const from = within(sheet()).getByLabelText('Från');
 		await user.clear(from);
 		await user.type(from, '2026-10-05');
+		await user.click(within(sheet()).getByRole('button', { name: 'Klar' }));
 		await user.click(spara());
 		expect(onSave.mock.calls[0]![1].terms).toEqual([
 			{ from: '2026-01-01', scopePercent: 100, workdayMinutes: 480 },
 			{ from: '2026-10-05', scopePercent: 80, workdayMinutes: 480 }
 		]);
+
+		await user.click(screen.getByRole('button', { name: /5 okt 2026 – tills vidare/ }));
+		await user.click(within(sheet()).getByRole('button', { name: 'Ta bort perioden' }));
+		expect(screen.getByRole('button', { name: /1 jan 2026 – tills vidare/ })).toBeTruthy();
 	});
 
-	it('will not save an end before the start', async () => {
+	it('will not end a period before it starts', async () => {
 		const user = userEvent.setup();
 		render(<UppdragVy {...base} assignment={assignment()} codes={codes} onSave={vi.fn()} />);
-		await user.type(screen.getByLabelText('Slutdatum'), '2025-12-31');
-		expect(screen.getByText('Tidigast startdatum')).toBeTruthy();
-		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		await user.click(screen.getByRole('button', { name: /1 jan 2026 – tills vidare/ }));
+		expect(within(sheet()).queryByRole('button', { name: 'Ta bort perioden' })).toBeNull();
+		await user.type(within(sheet()).getByLabelText('Till'), '2025-12-31');
+		expect(within(sheet()).getByText('Tidigast periodens start')).toBeTruthy();
 	});
 
 	it('follows newer values from the server in what has not been touched (cache, then server)', async () => {
@@ -225,7 +244,7 @@ describe('UppdragVy', () => {
 				codes={[{ ...codes[0]!, name: 'Systemutveckling' }, ...codes.slice(1)]}
 			/>
 		);
-		expect((screen.getByLabelText('Slutdatum') as HTMLInputElement).value).toBe('2027-06-30');
+		expect(screen.getByRole('button', { name: /1 jan 2026 – 30 jun 2027/ })).toBeTruthy();
 		expect(screen.getByRole('button', { name: /^Systemutveckling/ })).toBeTruthy();
 		expect((spara() as HTMLButtonElement).disabled).toBe(true);
 
@@ -329,8 +348,85 @@ describe('PartVy', () => {
 			name: 'Exempelkonsult AB',
 			suggestionMode: 'actualQuarter',
 			archived: false,
-			order: 3
+			order: 3,
+			terms: [],
+			endDate: null,
+			openingFlex: 0
 		});
+	});
+
+	it('gives the employment its periods and opening balance (ADR 0021)', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const g = employer();
+		render(
+			<PartVy
+				kind="employer"
+				value={g}
+				nextOrder={3}
+				online
+				today="2026-11-26"
+				onSave={onSave}
+				onDelete={vi.fn()}
+			/>
+		);
+		expect(screen.getByText(/Utan omfattning räknas flexen bara per uppdrag/)).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: 'Ny period' }));
+		await user.type(within(sheet()).getByLabelText('Från'), '2026-01-05');
+		await user.click(within(sheet()).getByRole('button', { name: 'Lägg till' }));
+		await user.click(screen.getByRole('button', { name: 'Ny period' }));
+		expect((within(sheet()).getByLabelText('Från') as HTMLInputElement).value).toBe('2026-11-26');
+		await user.clear(within(sheet()).getByLabelText('Omfattning'));
+		await user.type(within(sheet()).getByLabelText('Omfattning'), '80');
+		await user.click(within(sheet()).getByRole('button', { name: 'Lägg till' }));
+		await user.clear(screen.getByLabelText('Ingående flexsaldo'));
+		await user.type(screen.getByLabelText('Ingående flexsaldo'), '-2,5');
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(g, {
+			...g,
+			terms: [
+				{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 },
+				{ from: '2026-11-26', scopePercent: 80, workdayMinutes: 480 }
+			],
+			endDate: null,
+			openingFlex: -150
+		});
+	});
+
+	it('removes the only period, and follows a newer stored value it has not changed', async () => {
+		const user = userEvent.setup();
+		const onSave = vi.fn().mockResolvedValue(undefined);
+		const g = employer({
+			terms: [{ from: '2026-01-05', scopePercent: 100, workdayMinutes: 480 }],
+			endDate: '2026-12-31',
+			openingFlex: 240
+		});
+		const view = (value: typeof g) => (
+			<PartVy
+				kind="employer"
+				value={value}
+				nextOrder={3}
+				online
+				today="2026-11-26"
+				onSave={onSave}
+				onDelete={vi.fn()}
+			/>
+		);
+		const { rerender } = render(view(g));
+		// A positive balance shows with its sign and is not a change.
+		expect((screen.getByLabelText('Ingående flexsaldo') as HTMLInputElement).value).toBe('+4');
+		expect((spara() as HTMLButtonElement).disabled).toBe(true);
+		// The server's newer value replaces what the form had, untouched.
+		rerender(view({ ...g, openingFlex: 60 }));
+		expect((screen.getByLabelText('Ingående flexsaldo') as HTMLInputElement).value).toBe('+1');
+		await user.click(screen.getByRole('button', { name: /^5 jan – 31 dec 2026/ }));
+		expect(within(sheet()).getByText(/skrivs i ändringsloggen/)).toBeTruthy();
+		await user.click(within(sheet()).getByRole('button', { name: 'Ta bort perioden' }));
+		await user.click(spara());
+		expect(onSave).toHaveBeenCalledWith(
+			{ ...g, openingFlex: 60 },
+			{ ...g, openingFlex: 60, terms: [], endDate: null }
+		);
 	});
 
 	it('renames a customer, and Spara is off until the name changes', async () => {

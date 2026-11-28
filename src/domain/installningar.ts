@@ -17,6 +17,7 @@ import type {
 	SuggestionMode,
 	TimeCode
 } from './types.ts';
+import type { Periods } from './perioder.ts';
 
 /**
  * The absence types created at the first sign-in, from the interview (#2) and ADR 0012. The ids
@@ -121,6 +122,11 @@ export interface AssignmentValues {
 	endDate?: IsoDate | null;
 	/** Left out, a changed scope or workday applies from today. */
 	termsFrom?: IsoDate;
+	/**
+	 * The periods as edited in the list (ADR 0021). Given, they replace the scope, workday, start,
+	 * end and termsFrom: the start is the first period's day.
+	 */
+	periods?: Periods;
 }
 
 /**
@@ -136,7 +142,7 @@ export const readAssignmentForm = (
 	const name = nameError(form.name);
 	if (name) errors.name = name;
 	const scope = /^\d{1,3}$/.test(form.scope.trim()) ? Number(form.scope) : NaN;
-	if (!(scope >= 1 && scope <= 100)) errors.scope = 'Mellan 1 och 100 %';
+	if (!(scope >= 0 && scope <= 100)) errors.scope = 'Mellan 0 och 100 %';
 	const workday = parseHours(form.workday);
 	if (workday === null || workday < 1 || workday > 24 * 60) errors.workday = 'Mellan 0 och 24 h';
 	const openingFlex = parseHours(form.openingFlex === '' ? '0' : form.openingFlex, true);
@@ -254,9 +260,17 @@ export const assignmentAfter = (
 ): Assignment => ({
 	id: before?.id ?? id,
 	name: values.name,
-	startDate: values.startDate,
-	endDate: values.endDate !== undefined ? values.endDate : (before?.endDate ?? null),
-	terms: termsAfter(before?.terms ?? [], values, values.termsFrom ?? today),
+	...(values.periods?.terms[0]
+		? {
+				startDate: values.periods.terms[0].from,
+				endDate: values.periods.endDate,
+				terms: [...values.periods.terms]
+			}
+		: {
+				startDate: values.startDate,
+				endDate: values.endDate !== undefined ? values.endDate : (before?.endDate ?? null),
+				terms: termsAfter(before?.terms ?? [], values, values.termsFrom ?? today)
+			}),
 	openingFlex: values.openingFlex,
 	standardDay: before?.standardDay ?? [],
 	archived: before?.archived ?? false,
@@ -303,6 +317,13 @@ export const assignmentChangeIsLogged = (before: Assignment | null, after: Assig
 	before !== null &&
 	(before.openingFlex !== after.openingFlex ||
 		before.startDate !== after.startDate ||
+		before.endDate !== after.endDate ||
+		JSON.stringify(before.terms) !== JSON.stringify(after.terms));
+
+/** Whether a change of the employer needs a log entry (ADR 0021): its periods, end or balance. */
+export const employmentChangeIsLogged = (before: Employer | null, after: Employer): boolean =>
+	before !== null &&
+	(before.openingFlex !== after.openingFlex ||
 		before.endDate !== after.endDate ||
 		JSON.stringify(before.terms) !== JSON.stringify(after.terms));
 

@@ -95,7 +95,7 @@ describe('KomIgangVy', () => {
 		await user.type(screen.getByLabelText('Uppdragets namn'), 'Intern tid');
 		await user.clear(screen.getByLabelText('Omfattning'));
 		await user.type(screen.getByLabelText('Omfattning'), '120');
-		expect(screen.getByText('Mellan 1 och 100 %')).toBeTruthy();
+		expect(screen.getByText('Mellan 0 och 100 %')).toBeTruthy();
 		expect(next().disabled).toBe(true);
 		await user.clear(screen.getByLabelText('Omfattning'));
 		await user.type(screen.getByLabelText('Omfattning'), '20');
